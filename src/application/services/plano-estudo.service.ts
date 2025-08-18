@@ -37,6 +37,7 @@ export interface UpdateProgressoData {
   horasRealizadas: number
   concluida: boolean
   observacoes?: string
+  questoesRealizadas?: number
 }
 
 export class PlanoEstudoService {
@@ -99,7 +100,9 @@ export class PlanoEstudoService {
           dataInicio: data.dataInicio,
           dataFim: data.dataFim,
           semanas: {
-            create: data.semanas.map(semana => ({
+            create: (data.semanas || [])
+              .filter(semana => Array.isArray(semana.disciplinas) && semana.disciplinas.length > 0)
+              .map(semana => ({
               numeroSemana: semana.numeroSemana,
               dataInicio: semana.dataInicio,
               dataFim: semana.dataFim,
@@ -256,7 +259,8 @@ export class PlanoEstudoService {
       data: {
         horasRealizadas: data.horasRealizadas,
         concluida: data.concluida,
-        observacoes: data.observacoes
+        observacoes: data.observacoes,
+        ...(typeof data.questoesRealizadas === 'number' ? { questoesRealizadas: data.questoesRealizadas } : {})
       },
       include: {
         disciplina: true,

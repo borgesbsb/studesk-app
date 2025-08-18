@@ -3,17 +3,23 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import { getPlanoEstudoById } from '@/interface/actions/plano-estudo/get-by-id'
 import { updateProgressoEstudo } from '@/interface/actions/plano-estudo/update-progresso'
-import { Calendar, Clock, Target, Book, CheckCircle, Circle, Save, FileText, Video, Users, ExternalLink } from 'lucide-react'
+import { Calendar, Clock, Target, Book, FileText, Video, Save } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface DisciplinaSemana {
   id: string
@@ -36,31 +42,31 @@ interface DisciplinaSemana {
   }
 }
 
-interface SemanaEstudo {
+interface SemanaEstudoDetalhe {
   id: string
   numeroSemana: number
-  dataInicio: string
-  dataFim: string
+  dataInicio: string | Date
+  dataFim: string | Date
   totalHoras: number
   horasRealizadas: number
-  observacoes?: string
+  observacoes?: string | null
   disciplinas: DisciplinaSemana[]
 }
 
-interface PlanoEstudo {
+interface PlanoEstudoDetalhe {
   id: string
   nome: string
-  descricao?: string
-  dataInicio: string
-  dataFim: string
+  descricao?: string | null
+  dataInicio: string | Date
+  dataFim: string | Date
   ativo: boolean
   concurso?: {
     id: string
     nome: string
     orgao: string
     cargo: string
-  }
-  semanas: SemanaEstudo[]
+  } | null
+  semanas: SemanaEstudoDetalhe[]
 }
 
 interface DetalhePlanoEstudoProps {
@@ -68,9 +74,11 @@ interface DetalhePlanoEstudoProps {
 }
 
 export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
-  const [plano, setPlano] = useState<PlanoEstudo | null>(null)
+  const [plano, setPlano] = useState<PlanoEstudoDetalhe | null>(null)
   const [loading, setLoading] = useState(true)
-  const [salvando, setSalvando] = useState<string | null>(null)
+  const [questoesEditadas, setQuestoesEditadas] = useState<Record<string, number>>({})
+  const [salvandoId, setSalvandoId] = useState<string | null>(null)
+  
 
   useEffect(() => {
     carregarPlano()
@@ -99,21 +107,32 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     return { progresso: Math.round(progresso), totalHoras, horasRealizadas }
   }
 
-  const obterCorPrioridade = (prioridade: number) => {
-    switch (prioridade) {
-      case 1: return 'destructive'
-      case 2: return 'default'
-      case 3: return 'secondary'
-      default: return 'secondary'
-    }
-  }
+  const atualizarQuestoes = async (disciplina: DisciplinaSemana, novasQuestoes: number) => {
+    try {
+      setSalvandoId(disciplina.id)
+      const resultado = await updateProgressoEstudo({
+        disciplinaSemanaId: disciplina.id,
+        horasRealizadas: disciplina.horasRealizadas,
+        concluida: disciplina.concluida,
+        observacoes: disciplina.observacoes,
+        questoesRealizadas: novasQuestoes,
+      })
 
-  const obterTextoPrioridade = (prioridade: number) => {
-    switch (prioridade) {
-      case 1: return 'Alta'
-      case 2: return 'Média'
-      case 3: return 'Baixa'
-      default: return 'Baixa'
+      if (resultado.success) {
+        toast.success('Questões atualizadas!')
+        carregarPlano()
+        setQuestoesEditadas(prev => {
+          const novo = { ...prev }
+          delete novo[disciplina.id]
+          return novo
+        })
+      } else {
+        toast.error(resultado.error || 'Erro ao atualizar questões')
+      }
+    } catch (error) {
+      toast.error('Erro inesperado ao salvar')
+    } finally {
+      setSalvandoId(null)
     }
   }
 
@@ -127,60 +146,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
-  const obterLabelVeiculo = (tipo?: string) => {
-    switch (tipo) {
-      case 'video': return 'Vídeo'
-      case 'pdf': return 'PDF'
-      case 'livro': return 'Livro'
-      case 'apostila': return 'Apostila'
-      default: return 'Material'
-    }
-  }
-
-  const salvarProgresso = async (disciplinaSemanaId: string, dados: {
-    horasRealizadas: number
-    concluida: boolean
-    observacoes?: string
-  }) => {
-    setSalvando(disciplinaSemanaId)
-    
-    try {
-      const resultado = await updateProgressoEstudo({
-        disciplinaSemanaId,
-        ...dados
-      })
-
-      if (resultado.success) {
-        toast.success('Progresso salvo com sucesso!')
-        carregarPlano() // Recarregar para atualizar os totais
-      } else {
-        toast.error(resultado.error || 'Erro ao salvar progresso')
-      }
-    } catch (error) {
-      toast.error('Erro inesperado ao salvar')
-    } finally {
-      setSalvando(null)
-    }
-  }
-
-  const atualizarHoras = async (disciplina: DisciplinaSemana, novasHoras: number) => {
-    await salvarProgresso(disciplina.id, {
-      horasRealizadas: novasHoras,
-      concluida: disciplina.concluida,
-      observacoes: disciplina.observacoes
-    })
-  }
-
-  const alternarConclusao = async (disciplina: DisciplinaSemana) => {
-    const novaConclusao = !disciplina.concluida
-    const horasFinais = novaConclusao ? disciplina.horasPlanejadas : disciplina.horasRealizadas
-    
-    await salvarProgresso(disciplina.id, {
-      horasRealizadas: horasFinais,
-      concluida: novaConclusao,
-      observacoes: disciplina.observacoes
-    })
-  }
+  
 
   if (loading) {
     return (
@@ -276,212 +242,151 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
         </CardContent>
       </Card>
 
-      {/* Semanas */}
-      <div className="space-y-4">
+      {/* Semanas em tabela */}
+      <div className="space-y-6">
         {plano.semanas.map((semana) => {
           const progressoSemana = semana.totalHoras > 0 
             ? (semana.horasRealizadas / semana.totalHoras) * 100 
             : 0
 
           return (
-            <Card key={semana.id}>
-              <CardHeader>
+            <div key={semana.id} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
                       <span className="bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">
                         {semana.numeroSemana}
                       </span>
                       Ciclo de Estudo {semana.numeroSemana}
-                    </CardTitle>
-                    <CardDescription>
-                      {format(new Date(semana.dataInicio), "dd/MM", { locale: ptBR })} - {" "}
-                      {format(new Date(semana.dataFim), "dd/MM/yyyy", { locale: ptBR })} • {" "}
-                      {semana.disciplinas.length} disciplina{semana.disciplinas.length !== 1 ? 's' : ''}
-                    </CardDescription>
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(semana.dataInicio), 'dd/MM', { locale: ptBR })} - {format(new Date(semana.dataFim), 'dd/MM/yyyy', { locale: ptBR })} • {semana.disciplinas.length} disciplina{semana.disciplinas.length !== 1 ? 's' : ''}
+                  </p>
                   </div>
                   <div className="text-right">
-                    <Badge variant="outline">
-                      {semana.horasRealizadas}h / {semana.totalHoras}h
-                    </Badge>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {Math.round(progressoSemana)}% concluído
-                    </p>
-                  </div>
+                  <Badge variant="outline">{semana.horasRealizadas}h / {semana.totalHoras}h</Badge>
+                  <p className="text-sm text-muted-foreground mt-1">{Math.round(progressoSemana)}% concluído</p>
+                </div>
                 </div>
                 <Progress value={progressoSemana} className="h-1" />
-              </CardHeader>
-              
-              <CardContent>
-                <div className="space-y-4">
+
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Disciplina</TableHead>
+                      <TableHead className="min-w-[220px]">Horas planejadas</TableHead>
+                      <TableHead className="w-[160px]">% Horas</TableHead>
+                      <TableHead>Questões</TableHead>
+                      <TableHead>Vídeo (min)</TableHead>
+                      <TableHead>Páginas</TableHead>
+                      <TableHead>Observações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {semana.disciplinas.map((disciplina) => {
                     const IconeVeiculo = obterIconeVeiculo(disciplina.tipoVeiculo)
+                      const progressoHoras = disciplina.horasPlanejadas > 0
+                        ? (disciplina.horasRealizadas / disciplina.horasPlanejadas) * 100
+                        : 0
+                      const valorQuestoesAtual =
+                        questoesEditadas[disciplina.id] !== undefined
+                          ? questoesEditadas[disciplina.id]
+                          : disciplina.questoesRealizadas
+                      const progressoQuestoes = disciplina.questoesPlanejadas > 0
+                        ? (valorQuestoesAtual / disciplina.questoesPlanejadas) * 100
+                        : 0
+                      const progressoPaginas = disciplina.totalPaginas > 0
+                        ? (disciplina.paginasLidas / disciplina.totalPaginas) * 100
+                        : 0
                     
                     return (
-                      <div key={disciplina.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => alternarConclusao(disciplina)}
-                              disabled={salvando === disciplina.id}
-                            >
-                              {disciplina.concluida ? (
-                                <CheckCircle className="h-5 w-5 text-green-600" />
-                              ) : (
-                                <Circle className="h-5 w-5 text-muted-foreground" />
-                              )}
-                            </Button>
+                        <TableRow key={disciplina.id}>
+                          <TableCell>
                             <div className="flex items-center gap-2">
-                              <IconeVeiculo className="h-5 w-5 text-muted-foreground" />
-                              <div>
-                                <h4 className="font-medium">{disciplina.disciplina.nome}</h4>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={obterCorPrioridade(disciplina.prioridade)} className="text-xs">
-                                    {obterTextoPrioridade(disciplina.prioridade)}
-                                  </Badge>
-                                  {disciplina.tipoVeiculo && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {obterLabelVeiculo(disciplina.tipoVeiculo)}
-                                    </Badge>
-                                  )}
+                              <IconeVeiculo className="h-4 w-4 text-muted-foreground" />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{disciplina.disciplina.nome}</span>
                                   {disciplina.concluida && (
-                                    <Badge variant="outline" className="text-xs text-green-600">
-                                      Concluída
-                                    </Badge>
-                                  )}
-                                </div>
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className="text-xs text-green-600">Concluída</Badge>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                          
-                          {disciplina.materialUrl && (
-                            <Button variant="outline" size="sm" asChild>
-                              <a href={disciplina.materialUrl} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                Abrir Material
-                              </a>
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Material Info */}
-                        {disciplina.materialNome && (
-                          <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-                            <p className="text-sm font-medium">📚 {disciplina.materialNome}</p>
-                          </div>
-                        )}
-                        
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                          {/* Horas */}
-                          <div className="space-y-2">
-                            <Label>Horas de Estudo</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                max={disciplina.horasPlanejadas + 10}
-                                value={disciplina.horasRealizadas}
-                                onChange={(e) => {
-                                  const valor = parseInt(e.target.value) || 0
-                                  atualizarHoras(disciplina, valor)
-                                }}
-                              />
-                              <span className="flex items-center text-sm text-muted-foreground">
-                                / {disciplina.horasPlanejadas}h
-                              </span>
-                            </div>
-                            <Progress 
-                              value={(disciplina.horasRealizadas / disciplina.horasPlanejadas) * 100} 
-                              className="h-1"
-                            />
-                          </div>
-
-                          {/* Questões */}
-                          {disciplina.questoesPlanejadas > 0 && (
-                            <div className="space-y-2">
-                              <Label>Questões</Label>
-                              <div className="flex gap-2">
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{disciplina.horasPlanejadas}h</span>
+                          </TableCell>
+                          <TableCell>
+                            <Progress value={progressoHoras} className="h-1" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
                                 <Input
+                                  className="w-24"
                                   type="number"
                                   min="0"
-                                  value={disciplina.questoesRealizadas}
-                                  placeholder="0"
-                                  disabled
+                                  value={valorQuestoesAtual}
+                                  onChange={(e) => {
+                                    const valor = parseInt(e.target.value) || 0
+                                    setQuestoesEditadas(prev => ({ ...prev, [disciplina.id]: valor }))
+                                  }}
                                 />
-                                <span className="flex items-center text-sm text-muted-foreground">
-                                  / {disciplina.questoesPlanejadas}
-                                </span>
+                                {disciplina.questoesPlanejadas > 0 && (
+                                  <span className="text-sm text-muted-foreground">/ {disciplina.questoesPlanejadas}</span>
+                                )}
+                                {valorQuestoesAtual !== disciplina.questoesRealizadas && (
+                                  <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    className="h-8 w-8"
+                                    onClick={() => atualizarQuestoes(disciplina, valorQuestoesAtual)}
+                                    disabled={salvandoId === disciplina.id}
+                                    aria-label="Salvar questões resolvidas"
+                                  >
+                                    <Save className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
-                              <Progress 
-                                value={disciplina.questoesPlanejadas > 0 ? (disciplina.questoesRealizadas / disciplina.questoesPlanejadas) * 100 : 0} 
-                                className="h-1"
-                              />
+                              <Progress value={progressoQuestoes} className="h-1" />
                             </div>
-                          )}
-
-                          {/* Vídeo */}
-                          {disciplina.tipoVeiculo === 'video' && disciplina.tempoVideoPlanejado > 0 && (
-                            <div className="space-y-2">
-                              <Label>Tempo de Vídeo (min)</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={disciplina.tempoVideoRealizado}
-                                  placeholder="0"
-                                  disabled
-                                />
-                                <span className="flex items-center text-sm text-muted-foreground">
-                                  / {disciplina.tempoVideoPlanejado}
-                                </span>
+                          </TableCell>
+                          <TableCell>
+                            {disciplina.tipoVeiculo === 'video' && disciplina.tempoVideoPlanejado > 0 ? (
+                              <div className="space-y-1">
+                                <div className="text-sm">{disciplina.tempoVideoRealizado} / {disciplina.tempoVideoPlanejado}</div>
+                                <Progress value={disciplina.tempoVideoPlanejado > 0 ? (disciplina.tempoVideoRealizado / disciplina.tempoVideoPlanejado) * 100 : 0} className="h-1" />
                               </div>
-                              <Progress 
-                                value={disciplina.tempoVideoPlanejado > 0 ? (disciplina.tempoVideoRealizado / disciplina.tempoVideoPlanejado) * 100 : 0} 
-                                className="h-1"
-                              />
-                            </div>
-                          )}
-
-                          {/* Páginas */}
-                          {disciplina.tipoVeiculo !== 'video' && disciplina.totalPaginas > 0 && (
-                            <div className="space-y-2">
-                              <Label>Páginas Lidas</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  value={disciplina.paginasLidas}
-                                  placeholder="0"
-                                  disabled
-                                />
-                                <span className="flex items-center text-sm text-muted-foreground">
-                                  / {disciplina.totalPaginas}
-                                </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {disciplina.tipoVeiculo !== 'video' && disciplina.totalPaginas > 0 ? (
+                              <div className="space-y-1">
+                                <div className="text-sm">{disciplina.paginasLidas} / {disciplina.totalPaginas}</div>
+                                <Progress value={progressoPaginas} className="h-1" />
                               </div>
-                              <Progress 
-                                value={disciplina.totalPaginas > 0 ? (disciplina.paginasLidas / disciplina.totalPaginas) * 100 : 0} 
-                                className="h-1"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        
-                        {disciplina.observacoes && (
-                          <div className="mt-4 space-y-2">
-                            <Label>Observações</Label>
-                            <p className="text-sm text-muted-foreground p-2 bg-muted/50 rounded">
-                              {disciplina.observacoes}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="max-w-[320px]">
+                            {disciplina.observacoes ? (
+                              <p className="text-sm text-muted-foreground line-clamp-3">{disciplina.observacoes}</p>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
                 </div>
-              </CardContent>
-            </Card>
           )
         })}
       </div>

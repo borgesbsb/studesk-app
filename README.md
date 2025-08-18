@@ -1,3 +1,92 @@
+# StudesDk - Sistema de Geração de Questões com IA
+
+## 🎯 Nova Funcionalidade: Geração com Processamento IA
+
+O sistema agora permite gerar questões a partir de texto usando inteligência artificial para:
+- Limpar e organizar o conteúdo
+- Extrair tópicos relevantes
+- Gerar questões de alta qualidade
+
+### 📝 Como usar com texto
+
+#### Endpoint: `POST /api/questoes/gerar-com-ia`
+
+```json
+{
+  "materialId": "optional-material-id",
+  "texto": "Seu texto educacional aqui...",
+  "quantidade": 5,
+  "promptPersonalizado": "Instruções específicas (opcional)",
+  "tituloSessao": "Título da sessão (opcional)",
+  "descricaoSessao": "Descrição da sessão (opcional)",
+  "apiKey": "sua-chave-openai (opcional)"
+}
+```
+
+#### Exemplo de requisição:
+
+```bash
+curl -X POST http://localhost:3000/api/questoes/gerar-com-ia \
+  -H "Content-Type: application/json" \
+  -H "x-openai-key: sua-chave-api" \
+  -d '{
+    "texto": "A gestão de projetos é uma disciplina que envolve o planejamento, execução e controle de projetos. Os principais conceitos incluem escopo, cronograma, recursos e qualidade.",
+    "quantidade": 3,
+    "tituloSessao": "Questões sobre Gestão de Projetos"
+  }'
+```
+
+#### Resposta:
+
+```json
+{
+  "questoes": [
+    {
+      "pergunta": "Qual é o principal objetivo da gestão de projetos?",
+      "alternativaA": "Maximizar lucros",
+      "alternativaB": "Planejar, executar e controlar projetos",
+      "alternativaC": "Reduzir custos",
+      "alternativaD": "Aumentar vendas",
+      "respostaCorreta": "B",
+      "explicacao": "A gestão de projetos visa planejar, executar e controlar projetos de forma eficiente."
+    }
+  ],
+  "sessaoId": "session-id",
+  "estatisticasFiltragem": "Texto processado pela IA: 150 → 120 caracteres. Tokens usados: 45",
+  "message": "3 questões geradas com sucesso usando processamento IA"
+}
+```
+
+### 🔄 Fluxo do Sistema
+
+1. **Recepção do Texto**: O sistema recebe o texto bruto
+2. **Processamento com IA**: OpenAI limpa e organiza o conteúdo
+3. **Geração de Questões**: Cria questões baseadas no texto processado
+4. **Salvamento**: Armazena as questões no banco de dados
+
+### ⚙️ Configurações
+
+- **API Key**: Pode ser enviada no header `x-openai-key` ou no body
+- **Quantidade**: Padrão é 5 questões
+- **Temperatura IA**: 0.3 para processamento consistente
+- **Modelo**: gpt-3.5-turbo
+
+### 📊 Logs e Monitoramento
+
+O sistema fornece logs detalhados de:
+- Tamanho do texto recebido
+- Progresso do processamento IA
+- Tokens utilizados
+- Estatísticas de redução de texto
+- Questões geradas
+
+### 🛠️ Tecnologias
+
+- **Next.js 15.3.2**
+- **OpenAI API**
+- **Prisma ORM**
+- **TypeScript**
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

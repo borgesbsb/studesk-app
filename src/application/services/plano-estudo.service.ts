@@ -29,6 +29,7 @@ export interface CreateDisciplinaSemanaData {
   questoesPlanejadas?: number
   tempoVideoPlanejado?: number
   parametro?: string
+  diasEstudo?: string
 }
 
 export interface UpdateProgressoData {
@@ -209,6 +210,44 @@ export class PlanoEstudoService {
     return await prisma.planoEstudo.delete({
       where: { id }
     })
+  }
+
+  static async adicionarSemana(planoId: string, semanaData: CreateSemanaEstudoData) {
+    try {
+      return await prisma.semanaEstudo.create({
+        data: {
+          planoId: planoId,
+          numeroSemana: semanaData.numeroSemana,
+          dataInicio: semanaData.dataInicio,
+          dataFim: semanaData.dataFim,
+          observacoes: semanaData.observacoes,
+          totalHoras: semanaData.totalHoras,
+          disciplinas: {
+            create: semanaData.disciplinas.map(disciplina => ({
+              disciplinaId: disciplina.disciplinaId,
+              horasPlanejadas: disciplina.horasPlanejadas,
+              prioridade: 2, // Valor padrão
+              tipoVeiculo: disciplina.tipoVeiculo,
+              materialNome: disciplina.materialNome,
+              questoesPlanejadas: disciplina.questoesPlanejadas || 0,
+              tempoVideoPlanejado: disciplina.tempoVideoPlanejado || 0,
+              observacoes: disciplina.parametro,
+              diasEstudo: disciplina.diasEstudo
+            }))
+          }
+        },
+        include: {
+          disciplinas: {
+            include: {
+              disciplina: true
+            }
+          }
+        }
+      })
+    } catch (error) {
+      const errorLog = logError(error, 'adicionarSemana')
+      throw new Error(formatPrismaError(error))
+    }
   }
 
   static async atualizarProgresso(data: UpdateProgressoData) {

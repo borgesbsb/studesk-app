@@ -47,7 +47,9 @@ export async function POST(request: NextRequest) {
         dataInicio: new Date(dataInicio),
         dataFim: new Date(dataFim),
         semanas: {
-          create: semanas.map((semana: any) => ({
+          create: (Array.isArray(semanas) ? semanas : [])
+            .filter((semana: any) => Array.isArray(semana.disciplinas) && semana.disciplinas.length > 0)
+            .map((semana: any) => ({
             numeroSemana: semana.numeroSemana,
             dataInicio: new Date(semana.dataInicio),
             dataFim: new Date(semana.dataFim),

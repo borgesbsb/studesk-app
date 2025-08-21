@@ -108,23 +108,25 @@ export function CriarPlanoCompletoForm() {
     setLoading(true)
 
     try {
-      // Preparar dados das semanas
-      const semanasData = semanas.map(semana => ({
-        numeroSemana: semana.numero,
-        dataInicio: semana.dataInicio,
-        dataFim: semana.dataFim,
-        totalHoras: semana.disciplinas.reduce((total, d) => total + d.horasPlanejadas, 0),
-        disciplinas: semana.disciplinas.map(d => ({
-          disciplinaId: d.disciplinaId,
-          horasPlanejadas: d.horasPlanejadas,
-          tipoVeiculo: d.tipoVeiculo,
-          materialNome: d.materialNome,
-          questoesPlanejadas: d.questoesPlanejadas,
-          tempoVideoPlanejado: d.tempoVideoPlanejado,
-          parametro: d.parametro,
-          diasEstudo: d.diasEstudo?.join(',') || ''
+      // Preparar dados das semanas (apenas com disciplinas)
+      const semanasData = semanas
+        .filter(semana => semana.disciplinas.length > 0)
+        .map(semana => ({
+          numeroSemana: semana.numero,
+          dataInicio: semana.dataInicio,
+          dataFim: semana.dataFim,
+          totalHoras: semana.disciplinas.reduce((total, d) => total + d.horasPlanejadas, 0),
+          disciplinas: semana.disciplinas.map(d => ({
+            disciplinaId: d.disciplinaId,
+            horasPlanejadas: d.horasPlanejadas,
+            tipoVeiculo: d.tipoVeiculo,
+            materialNome: d.materialNome,
+            questoesPlanejadas: d.questoesPlanejadas,
+            tempoVideoPlanejado: d.tempoVideoPlanejado,
+            parametro: d.parametro,
+            diasEstudo: d.diasEstudo?.join(',') || ''
+          }))
         }))
-      }))
 
       const resultado = await createPlanoEstudo({
         nome: formData.nome,

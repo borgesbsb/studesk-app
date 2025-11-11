@@ -16,7 +16,6 @@ import { deleteDisciplinaSemana } from '@/interface/actions/plano-estudo/delete-
 import { updateSemanaEstudo } from '@/interface/actions/plano-estudo/update-semana'
 import { adicionarCicloAoPlano } from '@/interface/actions/plano-estudo/adicionar-ciclo'
 import { reordenarDisciplinas } from '@/interface/actions/plano-estudo/reordenar-disciplinas'
-import { debugSemana, limparDisciplinasOrfas } from '@/interface/actions/plano-estudo/debug-semana'
 import { listarDisciplinas } from '@/interface/actions/disciplina/list'
 import { Calendar, Clock, Target, Book, FileText, Video, Save, Trash2, Plus, ChevronDown, ChevronUp, GripVertical, MessageSquare, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
@@ -2094,7 +2093,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                 </div>
                 
                 {/* Botão para adicionar nova disciplina */}
-                <div className="mt-3 flex justify-center gap-2">
+                <div className="mt-3 flex justify-center">
                   <Button
                     variant="outline"
                     size="sm"
@@ -2103,33 +2102,6 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                   >
                     <Plus className="h-4 w-4" />
                     Adicionar disciplina
-                  </Button>
-                  
-                  {/* Botão temporário de debug */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      console.log('🔍 DEBUG: Iniciando debug da semana:', semana.id)
-                      
-                      // Primeiro, fazer debug geral da semana
-                      const debugResult = await debugSemana(semana.id, disciplinas[0]?.id || '')
-                      console.log('📊 DEBUG: Resultado:', debugResult)
-                      
-                      if (debugResult.success && debugResult.data) {
-                        toast(`Debug: ${debugResult.data.disciplinasNaSemana} disciplinas na semana. ${debugResult.data.disciplinaJaExiste ? 'Disciplina já existe!' : 'Disciplina pode ser adicionada.'}`)
-                      }
-                      
-                      // Tentar limpar disciplinas órfãs
-                      const cleanResult = await limparDisciplinasOrfas(semana.id)
-                      if (cleanResult.success && typeof cleanResult.removidas === 'number' && cleanResult.removidas > 0) {
-                        toast(`Limpeza: ${cleanResult.removidas} disciplinas órfãs removidas`)
-                        await carregarPlano() // Recarregar após limpeza
-                      }
-                    }}
-                    className="flex items-center gap-2 text-sm bg-orange-50 hover:bg-orange-100 text-orange-600"
-                  >
-                    🔍 Debug
                   </Button>
                 </div>
                 </CardContent>

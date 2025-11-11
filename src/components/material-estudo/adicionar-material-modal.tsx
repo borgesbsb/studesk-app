@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Upload, Loader2, FileText } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { Plus, Upload, Loader2, FileText, CheckCircle2 } from "lucide-react"
+import { useState, useRef } from "react"
 import { toast } from "sonner"
 import { criarMaterialEstudo } from "@/interface/actions/material-estudo/create"
 import * as pdfjsLib from 'pdfjs-dist'
@@ -32,34 +32,46 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
   const [loading, setLoading] = useState(false)
   const [loadingPdf, setLoadingPdf] = useState(false)
   const [nome, setNome] = useState("")
-  const [totalPaginas, setTotalPaginas] = useState("")
+  const [totalPaginas, setTotalPaginas] = useState(0)
   const [arquivoPdfUrl, setArquivoPdfUrl] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [pdfCarregado, setPdfCarregado] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (file.type !== 'application/pdf') {
-        toast.error("Por favor, selecione apenas arquivos PDF")
-        return
-      }
-      setSelectedFile(file)
-      setNome(file.name.replace('.pdf', ''))
+  const resetForm = () => {
+    setNome("")
+    setTotalPaginas(0)
+    setArquivoPdfUrl("")
+    setSelectedFile(null)
+    setPdfCarregado(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
     }
   }
 
-  const handleLoadPdf = async () => {
-    if (!selectedFile) {
-      toast.error("Por favor, selecione um arquivo PDF primeiro")
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.type !== 'application/pdf') {
+      toast.error("Selecione apenas arquivos PDF")
       return
     }
 
+    setSelectedFile(file)
+    setNome(file.name.replace('.pdf', ''))
+    setPdfCarregado(false)
+
+    // Auto-carregar o PDF
+    await handleLoadPdf(file)
+  }
+
+  const handleLoadPdf = async (file: File) => {
     setLoadingPdf(true)
     try {
-      // Primeiro fazer o upload do arquivo
+      // Upload do arquivo
       const formData = new FormData()
-      formData.append('file', selectedFile)
+      formData.append('file', file)
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -67,32 +79,26 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
       })
 
       const data = await response.json()
-      
+
       if (!data.success) {
         throw new Error(data.error || "Erro ao enviar arquivo")
       }
 
       setArquivoPdfUrl(data.fileUrl)
 
-      // Carregar o PDF para contar as páginas
-      try {
-        const arrayBuffer = await selectedFile.arrayBuffer()
-        const typedArray = new Uint8Array(arrayBuffer)
-        
-        // Carregar o PDF e contar páginas
-        const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise
-        setTotalPaginas(String(pdf.numPages))
-        toast.success("PDF carregado com sucesso!")
-      } catch (pdfError) {
-        console.error('Erro ao ler PDF:', pdfError)
-        toast.error("Erro ao ler o PDF. O arquivo pode estar corrompido.")
-        throw pdfError
-      }
-      
+      // Contar páginas do PDF
+      const arrayBuffer = await file.arrayBuffer()
+      const typedArray = new Uint8Array(arrayBuffer)
+      const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise
+      setTotalPaginas(pdf.numPages)
+      setPdfCarregado(true)
+      toast.success(`PDF carregado: ${pdf.numPages} páginas`)
+
     } catch (error) {
       console.error('Erro ao carregar PDF:', error)
-      toast.error("Erro ao carregar o PDF. Por favor, tente novamente.")
+      toast.error("Erro ao carregar o PDF")
       setArquivoPdfUrl("")
+      setPdfCarregado(false)
     } finally {
       setLoadingPdf(false)
     }
@@ -100,9 +106,9 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!arquivoPdfUrl) {
-      toast.error("Por favor, carregue o PDF primeiro")
+      toast.error("Aguarde o carregamento do PDF")
       return
     }
 
@@ -111,7 +117,7 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
     try {
       const response = await criarMaterialEstudo({
         nome,
-        totalPaginas: parseInt(totalPaginas),
+        totalPaginas,
         arquivoPdfUrl,
         disciplinaIds: [disciplinaId],
       })
@@ -119,15 +125,8 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
       if (response.success) {
         toast.success("Material adicionado com sucesso!")
         setOpen(false)
+        resetForm()
         onSuccess?.()
-        // Limpar formulário
-        setNome("")
-        setTotalPaginas("")
-        setArquivoPdfUrl("")
-        setSelectedFile(null)
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ""
-        }
       } else {
         toast.error(response.error || "Erro ao adicionar material")
       }
@@ -140,99 +139,91 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      setOpen(newOpen)
+      if (!newOpen) resetForm()
+    }}>
       <DialogTrigger asChild>
         <Button className={className}>
           <Plus className="h-4 w-4 mr-2" />
           Adicionar Material
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Adicionar Material de Estudo</DialogTitle>
-            <DialogDescription>
-              Adicione um novo material de estudo para esta disciplina.
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Adicionar Material de Estudo</DialogTitle>
+          <DialogDescription>
+            Faça upload de um PDF para adicionar à disciplina
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="nome">Nome do Material</Label>
-              <Input
-                id="nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex: Apostila de Português"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Nome do Material */}
+          <div className="space-y-2">
+            <Label htmlFor="nome">Nome do Material</Label>
+            <Input
+              id="nome"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Ex: Apostila de Português"
+              required
+              disabled={loadingPdf}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label>PDF do Material</Label>
-              <div className="flex gap-2">
+          {/* Upload do PDF */}
+          <div className="space-y-2">
+            <Label htmlFor="file">Arquivo PDF</Label>
+            <div className="space-y-3">
+              <div className="relative">
                 <Input
+                  id="file"
                   type="file"
                   accept=".pdf"
                   ref={fileInputRef}
                   onChange={handleFileSelect}
-                  className="flex-1"
+                  disabled={loadingPdf}
+                  className="cursor-pointer"
                   required
                 />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleLoadPdf}
-                  disabled={!selectedFile || loadingPdf}
-                >
-                  {loadingPdf ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Carregando...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Carregar PDF
-                    </>
-                  )}
-                </Button>
               </div>
-              {arquivoPdfUrl && (
-                <div className="flex items-center gap-2 text-sm text-green-600 mt-2">
-                  <FileText className="h-4 w-4" />
-                  <span>PDF carregado com sucesso!</span>
+
+              {/* Feedback do carregamento */}
+              {loadingPdf && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Carregando PDF e contando páginas...</span>
+                </div>
+              )}
+
+              {/* PDF carregado com sucesso */}
+              {pdfCarregado && !loadingPdf && (
+                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-md">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <div className="flex-1">
+                    <p className="font-medium">PDF carregado com sucesso!</p>
+                    <p className="text-xs text-green-600/80 mt-0.5">
+                      {totalPaginas} {totalPaginas === 1 ? 'página' : 'páginas'}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="totalPaginas">Total de Páginas</Label>
-              <Input
-                id="totalPaginas"
-                type="number"
-                min="1"
-                value={totalPaginas}
-                onChange={(e) => setTotalPaginas(e.target.value)}
-                placeholder="Será preenchido automaticamente ao carregar o PDF"
-                required
-                readOnly
-              />
-            </div>
           </div>
 
-          <DialogFooter>
+          {/* Botões */}
+          <DialogFooter className="gap-2">
             <Button
               variant="outline"
               type="button"
               onClick={() => setOpen(false)}
-              disabled={loading}
+              disabled={loading || loadingPdf}
             >
               Cancelar
             </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || !arquivoPdfUrl}
+            <Button
+              type="submit"
+              disabled={loading || loadingPdf || !pdfCarregado}
             >
               {loading ? (
                 <>
@@ -240,7 +231,10 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
                   Salvando...
                 </>
               ) : (
-                "Salvar Material"
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar
+                </>
               )}
             </Button>
           </DialogFooter>
@@ -248,4 +242,4 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
       </DialogContent>
     </Dialog>
   )
-} 
+}

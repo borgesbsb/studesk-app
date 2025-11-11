@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { getAllPlanosEstudo } from '@/interface/actions/plano-estudo/get-all'
 import { deletePlanoEstudo } from '@/interface/actions/plano-estudo/delete'
-import { Calendar, Eye, Trash2, Plus } from 'lucide-react'
+import { Calendar, Eye, Trash2, Plus, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -203,8 +203,8 @@ export function PlanosEstudoTable() {
                   
                   <TableCell className="text-right">
                     <div className="flex gap-2 justify-end">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setPlanoSelecionado(plano.id)}
                       >
@@ -217,8 +217,13 @@ export function PlanosEstudoTable() {
                           Ver
                         </Button>
                       </Link>
-                      <Button 
-                        variant="outline" 
+                      <Link href={`/plano-estudos/${plano.id}/editar`}>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setPlanoParaExcluir(plano)}
                       >

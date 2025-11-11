@@ -7,7 +7,9 @@ import { Progress } from "@/components/ui/progress";
 import { Clock, BookOpen, CheckCircle, ExternalLink, ArrowRight, Plus } from "lucide-react";
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
+import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
 import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual";
+import { adicionarQuestoes } from "@/interface/actions/dashboard/adicionar-questoes";
 import { transferirTempoSessoes } from "@/interface/actions/dashboard/transferir-tempo-sessoes";
 import { useDashboard } from "@/contexts/dashboard-context";
 import { useSaveStatus } from "@/contexts/save-status-context";
@@ -69,12 +71,38 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
   };
 
 
+  const handleAdicionarQuestoes = async (disciplinaId: string, quantidade: number) => {
+    try {
+      console.log(`📝 [INICIO] Adicionando ${quantidade} questões para disciplina ${disciplinaId} na data ${selectedDate.toISOString()}`);
+
+      const resultado = await adicionarQuestoes(disciplinaId, quantidade, selectedDate);
+
+      console.log('📝 [RESULTADO]', resultado);
+
+      if (resultado.success) {
+        console.log('✅ [SUCCESS] Questões adicionadas com sucesso:', resultado.message);
+        setSuccess(resultado.message);
+        if (onTempoAdicionado) {
+          console.log('🔄 [REFRESH] Chamando callback onTempoAdicionado');
+          await onTempoAdicionado();
+          console.log('✅ [REFRESH] Callback executado com sucesso');
+        }
+      } else {
+        console.error('❌ [ERROR] Erro ao adicionar questões:', resultado.message);
+        setError(resultado.message);
+      }
+    } catch (error) {
+      console.error('❌ [EXCEPTION] Erro inesperado:', error);
+      setError('Erro inesperado ao adicionar questões');
+    }
+  };
+
   const handleTransferirTempo = async (disciplinaId: string) => {
     try {
       console.log(`Transferindo tempo das sessões PDF para disciplina ${disciplinaId} na data ${selectedDate.toISOString()}`);
-      
+
       const resultado = await transferirTempoSessoes(disciplinaId, selectedDate);
-      
+
       if (resultado.success) {
         console.log('✅ Tempo transferido com sucesso:', resultado.message);
         setSuccess(resultado.message);
@@ -244,7 +272,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
 
                         {/* Botões centralizados embaixo das barras */}
                         <div className="flex items-center justify-center gap-2 mt-3 pt-2 border-t">
-                          <Link 
+                          <Link
                             href={`/disciplina/${materia.disciplinaId}/materiais`}
                             onClick={(e) => e.stopPropagation()}
                             className="p-1 rounded hover:bg-accent transition-colors"
@@ -256,6 +284,12 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                             disciplinaNome={materia.disciplinaNome}
                             onAdicionarTempo={(minutos) => handleAdicionarTempo(materia.disciplinaId, minutos)}
                           />
+                          {materia.questoesPlanejadas > 0 && (
+                            <AdicionarQuestoesModal
+                              disciplinaNome={materia.disciplinaNome}
+                              onAdicionarQuestoes={(quantidade) => handleAdicionarQuestoes(materia.disciplinaId, quantidade)}
+                            />
+                          )}
                           {materia.tempoSessoesPdf > 0 && (
                             <Button
                               variant="ghost"

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { getAllPlanosEstudo } from '@/interface/actions/plano-estudo/get-all'
-import { Calendar, Clock, Target, Trash2, Eye } from 'lucide-react'
+import { Calendar, Clock, Target, Trash2, Eye, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -165,6 +165,11 @@ export function PlanosEstudoGrid() {
                   <Button variant="outline" size="sm" className="w-full">
                     <Eye className="h-4 w-4 mr-2" />
                     Ver Detalhes
+                  </Button>
+                </Link>
+                <Link href={`/plano-estudos/${plano.id}/editar`}>
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-4 w-4" />
                   </Button>
                 </Link>
                 <Button variant="outline" size="sm">

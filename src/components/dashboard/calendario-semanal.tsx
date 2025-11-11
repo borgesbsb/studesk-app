@@ -1,14 +1,15 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format, addDays, isSameDay } from "date-fns";
+import { format, addDays, isSameDay, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useDashboard } from "@/contexts/dashboard-context";
 
 export function CalendarioSemanal() {
-  const hoje = new Date();
+  // Memoizar 'hoje' para que não seja recriado a cada render
+  const hoje = useMemo(() => startOfDay(new Date()), []);
   const { selectedDate, setSelectedDate } = useDashboard();
   const [startDay, setStartDay] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -35,7 +36,14 @@ export function CalendarioSemanal() {
   // Função para selecionar um dia
   const selecionarDia = (data: Date) => {
     if (!isTransitioning) {
+      console.log('📅 [CalendarioSemanal] Data selecionada:', {
+        data: data.toISOString(),
+        dataFormatada: format(data, 'dd/MM/yyyy', { locale: ptBR }),
+        isTransitioning
+      });
       setSelectedDate(data);
+    } else {
+      console.log('⏸️ [CalendarioSemanal] Clique ignorado - em transição');
     }
   };
 

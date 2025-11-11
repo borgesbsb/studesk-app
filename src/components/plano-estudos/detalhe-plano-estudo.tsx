@@ -17,7 +17,7 @@ import { updateSemanaEstudo } from '@/interface/actions/plano-estudo/update-sema
 import { adicionarCicloAoPlano } from '@/interface/actions/plano-estudo/adicionar-ciclo'
 import { reordenarDisciplinas } from '@/interface/actions/plano-estudo/reordenar-disciplinas'
 import { listarDisciplinas } from '@/interface/actions/disciplina/list'
-import { Calendar, Clock, Target, Book, FileText, Video, Save, Trash2, Plus, ChevronDown, ChevronUp, GripVertical, MessageSquare, ChevronRight } from 'lucide-react'
+import { Calendar, Clock, Target, Book, FileText, Video, Save, Trash2, Plus, ChevronDown, ChevronUp, GripVertical } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -142,8 +142,6 @@ function SortableDisciplinaRow({
   disciplinas,
   plano,
   diasSemana,
-  observacoesExpandidas,
-  setObservacoesExpandidas,
   onDisciplinaActions
 }: {
   disciplina: DisciplinaSemana
@@ -161,8 +159,6 @@ function SortableDisciplinaRow({
   disciplinas: Disciplina[]
   plano: PlanoEstudoDetalhe | null
   diasSemana: { id: string; label: string }[]
-  observacoesExpandidas: Record<string, boolean>
-  setObservacoesExpandidas: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   onDisciplinaActions: {
     iniciarEdicao: (disciplinaId: string, campo: string, valorAtual: any) => void
     atualizarValorEditado: (disciplinaId: string, campo: string, valor: any) => void
@@ -303,6 +299,38 @@ function SortableDisciplinaRow({
         </div>
       </TableCell>
 
+      {/* Assuntos - editável */}
+      <TableCell>
+        {estaEditando === 'observacoes' ? (
+          <Textarea
+            className="min-h-[60px] resize-none text-sm"
+            value={valoresEditadosDisciplina.observacoes || disciplina.observacoes || ''}
+            onChange={(e) => {
+              onDisciplinaActions.atualizarValorEditado(disciplina.id, 'observacoes', e.target.value)
+            }}
+            onBlur={() => onDisciplinaActions.salvarEdicao(disciplina)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.ctrlKey) onDisciplinaActions.salvarEdicao(disciplina)
+              if (e.key === 'Escape') onDisciplinaActions.cancelarEdicao(disciplina.id)
+            }}
+            placeholder="Ex: Capítulo 1 - Teoria dos conjuntos, Exercícios 1 a 10..."
+            autoFocus
+          />
+        ) : (
+          <div
+            className="text-xs text-muted-foreground cursor-pointer hover:bg-muted/30 p-2 rounded min-h-[40px] transition-colors"
+            onDoubleClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'observacoes', disciplina.observacoes || '')}
+            title="Duplo clique para editar assuntos"
+          >
+            {disciplina.observacoes || (
+              <span className="italic text-muted-foreground/50">
+                Clique para adicionar assuntos...
+              </span>
+            )}
+          </div>
+        )}
+      </TableCell>
+
       {/* Horas planejadas - editável */}
       <TableCell className="text-center">
         {estaEditando === 'horasPlanejadas' ? (
@@ -427,82 +455,8 @@ function SortableDisciplinaRow({
             <Trash2 className="h-4 w-4" />
           </Button>
         </TableCell>
-      </TableRow>,
-    
-    <TableRow key={`${disciplina.id}-assuntos`} className="border-t-0">
-      <TableCell colSpan={6} className="py-2 px-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Assuntos a estudar:</span>
-            {disciplina.observacoes && (
-              <MessageSquare className="h-3 w-3 text-muted-foreground" />
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setObservacoesExpandidas(prev => ({
-                ...prev,
-                [disciplina.id]: !prev[disciplina.id]
-              }))
-            }}
-            className="h-6 w-6 p-0"
-            title="Ver/editar assuntos"
-          >
-            {observacoesExpandidas[disciplina.id] ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        
-        {observacoesExpandidas[disciplina.id] && (
-          <div className="space-y-2">
-            {estaEditando === 'observacoes' ? (
-              <div className="space-y-3">
-                <Textarea
-                  className="min-h-[80px] resize-none"
-                  value={valoresEditadosDisciplina.observacoes || disciplina.observacoes || ''}
-                  onChange={(e) => {
-                    onDisciplinaActions.atualizarValorEditado(disciplina.id, 'observacoes', e.target.value)
-                  }}
-                  placeholder="Ex: Capítulo 1 - Teoria dos conjuntos, Exercícios 1 a 10, Revisão de conceitos básicos..."
-                  autoFocus
-                />
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onDisciplinaActions.cancelarEdicao(disciplina.id)}
-                    disabled={salvandoId === disciplina.id}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => onDisciplinaActions.salvarEdicao(disciplina)}
-                    disabled={salvandoId === disciplina.id}
-                  >
-                    {salvandoId === disciplina.id ? 'Salvando...' : 'Salvar'}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div 
-                className="text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 p-3 rounded-md border-dashed border-2 min-h-[60px] transition-colors flex items-center"
-                onClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'observacoes', disciplina.observacoes || '')}
-                title="Clique para editar assuntos"
-              >
-                {disciplina.observacoes || 'Clique para definir os assuntos que serão estudados nesta disciplina...'}
-              </div>
-            )}
-          </div>
-        )}
-      </TableCell>
-    </TableRow>
-  ]
+      </TableRow>
+  )
 }
 
 export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
@@ -528,9 +482,6 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
   
   // Estado para colapsar cards - todos fechados por padrão
   const [semanasColapsadas, setSemanasColapsadas] = useState<Record<string, boolean>>({})
-  
-  // Estado para controlar observações expandidas
-  const [observacoesExpandidas, setObservacoesExpandidas] = useState<Record<string, boolean>>({})
   
   // Estados para modal de seleção de ciclo origem
   const [modalSelecionarCicloAberto, setModalSelecionarCicloAberto] = useState(false)
@@ -2025,8 +1976,9 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                     <TableHeader className="bg-gray-50">
                       <TableRow>
                         <TableHead className="w-8"></TableHead>
-                        <TableHead>Disciplina</TableHead>
-                        <TableHead className="min-w-[220px] text-center">Horas planejadas</TableHead>
+                        <TableHead className="min-w-[180px]">Disciplina</TableHead>
+                        <TableHead className="min-w-[250px]">Assuntos</TableHead>
+                        <TableHead className="min-w-[180px] text-center">Horas planejadas</TableHead>
                         <TableHead className="text-center">Questões planejadas</TableHead>
                         <TableHead className="text-center">Dias da semana</TableHead>
                         <TableHead className="w-12">Ações</TableHead>
@@ -2068,8 +2020,6 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                               disciplinas={disciplinas}
                               plano={plano}
                               diasSemana={diasSemana}
-                              observacoesExpandidas={observacoesExpandidas}
-                              setObservacoesExpandidas={setObservacoesExpandidas}
                               onDisciplinaActions={{
                                 iniciarEdicao,
                                 atualizarValorEditado,

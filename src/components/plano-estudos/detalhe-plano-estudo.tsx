@@ -234,18 +234,18 @@ function SortableDisciplinaRow({
                   const timestamp = new Date().toISOString().substr(14, 9)
                   console.log(`⏰ ${timestamp} 🎯 SELECT ONVALUECHANGE CHAMADO:`, valor)
                   console.log(`⏰ ${timestamp} 🎯 Disciplina atual antes da mudança:`, disciplina.disciplina?.nome)
-                  
+
                   // PRIMEIRO: Atualizar valor editado em memória
                   console.log(`⏰ ${timestamp} 🎯 PASSO 1: Atualizando valoresEditados...`)
                   console.log(`⏰ ${timestamp} 🎯 VALOR SENDO SALVO NO ESTADO:`, valor)
                   onDisciplinaActions.atualizarValorEditado(disciplina.id, 'disciplinaId', valor)
-                  
+
                   // SEGUNDO: Atualizar plano local para feedback visual imediato
                   const novaDisciplina = disciplinas.find(d => d.id === valor)
                   if (novaDisciplina && plano) {
                     console.log(`⏰ ${timestamp} 🎯 PASSO 2: Atualizando plano local com:`, novaDisciplina.nome)
                     // Lógica de atualização local...
-                    
+
                     // TERCEIRO: Salvar no servidor após um pequeno delay
                     setTimeout(() => {
                       const timestampDelay = new Date().toISOString().substr(14, 9)
@@ -254,6 +254,16 @@ function SortableDisciplinaRow({
                     }, 50)
                   } else {
                     console.log(`⏰ ${timestamp} ❌ Nova disciplina não encontrada:`, valor)
+                  }
+                }}
+                onOpenChange={(isOpen) => {
+                  // Quando o select fechar (isOpen = false), cancelar edição
+                  // Usamos um timeout para dar tempo do onValueChange executar primeiro
+                  if (!isOpen) {
+                    setTimeout(() => {
+                      console.log('🔄 Select fechou, cancelando edição da disciplina')
+                      onDisciplinaActions.cancelarEdicao(disciplina.id)
+                    }, 100)
                   }
                 }}
               >

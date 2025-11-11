@@ -41,6 +41,7 @@ export default function WebViewerCleanModal({
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
   const [elapsedTime, setElapsedTime] = useState(0) // em segundos
   const [isTimerRunning, setIsTimerRunning] = useState(false)
+  const [timerInitialized, setTimerInitialized] = useState(false) // Rastreia se o timer já foi inicializado nesta sessão
   const [isNavigatingToProgress, setIsNavigatingToProgress] = useState(false)
   const [assuntoInput, setAssuntoInput] = useState('')
   const [adicionandoAssunto, setAdicionandoAssunto] = useState(false)
@@ -288,18 +289,22 @@ export default function WebViewerCleanModal({
 
   // Iniciar cronômetro quando modal abre
   useEffect(() => {
-    if (open && !isTimerRunning) {
+    if (open && !timerInitialized) {
+      // Só inicia o cronômetro na primeira vez que o modal abre
       console.log('⏱️ Iniciando cronômetro de sessão...')
       setSessionStartTime(new Date())
       setIsTimerRunning(true)
       setElapsedTime(0)
-    } else if (!open && isTimerRunning) {
-      console.log('⏱️ Parando cronômetro de sessão...')
+      setTimerInitialized(true)
+    } else if (!open) {
+      // Quando o modal fecha, reseta tudo
+      console.log('⏱️ Resetando cronômetro (modal fechado)...')
       setIsTimerRunning(false)
       setSessionStartTime(null)
       setElapsedTime(0)
+      setTimerInitialized(false)
     }
-  }, [open, isTimerRunning])
+  }, [open, timerInitialized])
 
   // Controlar pausa do cronômetro quando aba muda
   useEffect(() => {
@@ -307,7 +312,8 @@ export default function WebViewerCleanModal({
       if (document.hidden && isTimerRunning) {
         console.log('⏸️ Aba oculta - pausando cronômetro')
         setIsTimerRunning(false)
-      } else if (!document.hidden && open) {
+      } else if (!document.hidden && open && timerInitialized && !isTimerRunning) {
+        // Só retoma automaticamente se o timer foi iniciado e está pausado
         console.log('▶️ Aba visível - retomando cronômetro')
         setIsTimerRunning(true)
       }

@@ -106,15 +106,23 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
     })
 
     // Busca o plano de estudo ativo que contenha o dia consultado
+    // Importante: comparar apenas as DATAS, ignorando horários
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
         ativo: true,
-        dataInicio: {
-          lte: diaConsultado
-        },
-        dataFim: {
-          gte: diaConsultado
-        }
+        // Comparar se diaConsultado está entre dataInicio e dataFim (ignorando horários)
+        AND: [
+          {
+            dataInicio: {
+              lte: fimDia  // Se início do plano <= fim do dia consultado
+            }
+          },
+          {
+            dataFim: {
+              gte: inicioDia  // Se fim do plano >= início do dia consultado
+            }
+          }
+        ]
       }
     })
 

@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getFileApiUrl } from '@/lib/utils'
+import WebViewer from '@pdftron/webviewer'
 
 interface WebViewerEmbeddedCleanProps {
   pdfUrl?: string
@@ -480,9 +481,7 @@ export default function WebViewerEmbeddedClean({
       const initWebViewer = async () => {
         try {
           const element = await waitForElement(() => viewerRef.current)
-          
-          const { default: WebViewer } = await import('@pdftron/webviewer')
-          
+
           // Converter URL para formato da API se necessário
           const apiUrl = getFileApiUrl(pdfUrl)
           

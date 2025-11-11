@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { getFileApiUrl } from '@/lib/utils'
+import WebViewer from '@pdftron/webviewer'
 
 interface WebViewerCleanModalProps {
   open: boolean
@@ -987,9 +988,7 @@ export default function WebViewerCleanModal({
       const initWebViewer = async () => {
         try {
           const element = await waitForElement(() => viewerRef.current)
-          
-          const { default: WebViewer } = await import('@pdftron/webviewer')
-          
+
           const instance = await WebViewer({
             path: '/lib/webviewer',
             licenseKey: process.env.NEXT_PUBLIC_PDFTRON_LICENSE_KEY,

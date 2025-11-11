@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Clock } from "lucide-react";
+import { Timer, Clock } from "lucide-react";
 
 interface AdicionarTempoModalProps {
   disciplinaNome: string;
@@ -56,14 +56,14 @@ export function AdicionarTempoModal({ disciplinaNome, onAdicionarTempo }: Adicio
 
   return (
     <>
-      <Button 
-        variant="outline" 
-        size="sm" 
+      <Button
+        variant="outline"
+        size="sm"
         onClick={handleOpenModal}
-        className="h-8 w-8 p-0 border-dashed hover:border-solid"
-        title="Adicionar tempo de estudo"
+        className="h-8 w-8 p-0 hover:bg-blue-50 hover:border-blue-400 dark:hover:bg-blue-950/20"
+        title="⏱️ Adicionar tempo de estudo"
       >
-        <Plus className="h-4 w-4" />
+        <Timer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -73,7 +73,7 @@ export function AdicionarTempoModal({ disciplinaNome, onAdicionarTempo }: Adicio
         >
           <DialogHeader className="text-center space-y-2">
             <DialogTitle className="flex items-center justify-center gap-2 text-lg">
-              <Clock className="h-5 w-5 text-primary" />
+              <Timer className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               Adicionar Tempo
             </DialogTitle>
             <p className="text-sm text-muted-foreground font-medium">

@@ -3,8 +3,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Clock, BookOpen, CheckCircle, ExternalLink, ArrowRight, Plus } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Clock, BookOpen, CheckCircle, FolderOpen, ArrowRightCircle, Timer, ClipboardList, Plus } from "lucide-react";
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
 import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
@@ -42,6 +42,14 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
   const calcularProgressoQuestoes = (realizadas: number, planejadas: number) => {
     if (planejadas === 0) return 0;
     return Math.min((realizadas / planejadas) * 100, 100);
+  };
+
+  const getPizzaEmoji = (progresso: number) => {
+    if (progresso === 0) return "○"; // 0%
+    if (progresso < 25) return "◔"; // 1-25%
+    if (progresso < 50) return "◑"; // 25-50%
+    if (progresso < 75) return "◕"; // 50-75%
+    return "●"; // 75%+
   };
 
   const handleAdicionarTempo = async (disciplinaId: string, minutos: number) => {
@@ -186,131 +194,141 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
             </div>
 
             <div className="flex-1 overflow-y-auto min-h-0">
-              <div className="space-y-3 pr-2">
-              {materias.map((materia) => {
-                const cardClasses = materia.concluida 
-                  ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
-                  : "bg-background border-border";
-                  
-                return (
-                  <div 
-                    key={materia.id}
-                    className={`p-3 rounded-lg border transition-all hover:shadow-sm ${cardClasses}`}
-                  >
-                      {/* Header simplificado */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <h4 className="font-semibold text-base text-foreground truncate">
-                            {materia.disciplinaNome}
-                          </h4>
-                          {materia.concluida && (
-                            <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          )}
-                        </div>
-                        
-                        {/* Apenas badge no canto superior direito */}
-                        <Badge 
-                          variant={materia.prioridade === 1 ? "destructive" : materia.prioridade === 2 ? "default" : "secondary"}
-                          className="text-xs flex-shrink-0"
-                        >
-                          {materia.prioridade === 1 ? "Alta" : materia.prioridade === 2 ? "Média" : "Baixa"}
-                        </Badge>
-                      </div>
-                      
-                      {/* Material nome compacto */}
-                      {materia.materialNome && (
-                        <p className="text-xs text-muted-foreground mb-2 truncate">
-                          📄 {materia.materialNome}
-                        </p>
-                      )}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[250px]">Disciplina</TableHead>
+                      <TableHead className="w-[200px]">Assuntos</TableHead>
+                      <TableHead className="w-[140px] text-center">Tempo</TableHead>
+                      <TableHead className="w-[140px] text-center">Questões</TableHead>
+                      <TableHead className="w-[120px] text-center">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {materias.map((materia) => {
+                      const progressoTempo = calcularProgressoHoras(materia.tempoRealEstudo, materia.horasPlanejadas);
+                      const progressoQuestoes = calcularProgressoQuestoes(materia.questoesRealizadas, materia.questoesPlanejadas);
+                      const rowClasses = materia.concluida
+                        ? "bg-green-50 dark:bg-green-950/20"
+                        : "";
 
-                      {/* Assuntos a estudar */}
-                      {materia.observacoes && (
-                        <div className="mb-3 p-3 bg-primary/10 border border-primary/20 rounded-md">
-                          <p className="text-xs font-semibold text-primary mb-2">📝 Assuntos:</p>
-                          <p className="text-sm text-foreground font-medium leading-relaxed">{materia.observacoes}</p>
-                        </div>
-                      )}
-
-                      {/* Progresso compacto */}
-                      <div className="space-y-2">
-                        {/* Tempo */}
-                        <div>
-                          <div className="flex justify-between items-center text-xs mb-1">
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              Tempo
-                            </span>
-                            <span className="font-medium text-foreground">
-                              {formatarTempo(materia.tempoRealEstudo)} / {formatarTempo(materia.horasPlanejadas)}
-                            </span>
-                          </div>
-                          <Progress 
-                            value={calcularProgressoHoras(materia.tempoRealEstudo, materia.horasPlanejadas)}
-                            className="h-2"
-                          />
-                        </div>
-
-                        {/* Questões */}
-                        {materia.questoesPlanejadas > 0 && (
-                          <div>
-                            <div className="flex justify-between items-center text-xs mb-1">
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                <BookOpen className="h-3 w-3" />
-                                Questões
-                              </span>
-                              <span className="font-medium text-foreground">
-                                {materia.questoesRealizadas} / {materia.questoesPlanejadas}
-                              </span>
+                      return (
+                        <TableRow key={materia.id} className={rowClasses}>
+                          {/* Disciplina */}
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                {materia.concluida && (
+                                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                )}
+                                <span className="font-semibold text-sm">
+                                  {materia.disciplinaNome}
+                                </span>
+                              </div>
+                              <Badge
+                                variant={materia.prioridade === 1 ? "destructive" : materia.prioridade === 2 ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {materia.prioridade === 1 ? "Alta" : materia.prioridade === 2 ? "Média" : "Baixa"}
+                              </Badge>
                             </div>
-                            <Progress 
-                              value={calcularProgressoQuestoes(materia.questoesRealizadas, materia.questoesPlanejadas)}
-                              className="h-2"
-                            />
-                          </div>
-                        )}
+                          </TableCell>
 
-                        {/* Botões centralizados embaixo das barras */}
-                        <div className="flex items-center justify-center gap-2 mt-3 pt-2 border-t">
-                          <Link
-                            href={`/disciplina/${materia.disciplinaId}/materiais`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-1 rounded hover:bg-accent transition-colors"
-                            title="Ver materiais da disciplina"
-                          >
-                            <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                          </Link>
-                          <AdicionarTempoModal
-                            disciplinaNome={materia.disciplinaNome}
-                            onAdicionarTempo={(minutos) => handleAdicionarTempo(materia.disciplinaId, minutos)}
-                          />
-                          {materia.questoesPlanejadas > 0 && (
-                            <AdicionarQuestoesModal
-                              disciplinaNome={materia.disciplinaNome}
-                              onAdicionarQuestoes={(quantidade) => handleAdicionarQuestoes(materia.disciplinaId, quantidade)}
-                            />
-                          )}
-                          {materia.tempoSessoesPdf > 0 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleTransferirTempo(materia.disciplinaId);
-                              }}
-                              className="h-8 text-xs"
-                              title="Transferir tempo das sessões PDF para Tempo Real de Estudo"
-                            >
-                              <ArrowRight className="h-3 w-3 mr-1" />
-                              Transferir PDF
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                  </div>
-                );
-              })}
+                          {/* Assuntos */}
+                          <TableCell>
+                            <div className="text-xs text-muted-foreground">
+                              {materia.observacoes || (
+                                <span className="italic">Sem assuntos definidos</span>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* Tempo com Pizza */}
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{getPizzaEmoji(progressoTempo)}</span>
+                                <span className="text-sm font-medium">{Math.round(progressoTempo)}%</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatarTempo(materia.tempoRealEstudo)} / {formatarTempo(materia.horasPlanejadas)}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* Questões com Pizza */}
+                          <TableCell className="text-center">
+                            {materia.questoesPlanejadas > 0 ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-2xl">{getPizzaEmoji(progressoQuestoes)}</span>
+                                  <span className="text-sm font-medium">{Math.round(progressoQuestoes)}%</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {materia.questoesRealizadas} / {materia.questoesPlanejadas}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">N/A</span>
+                            )}
+                          </TableCell>
+
+                          {/* Ações */}
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <Link
+                                href={`/disciplina/${materia.disciplinaId}/materiais`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1.5 rounded-md hover:bg-primary/10 transition-colors group"
+                                title="📂 Abrir materiais"
+                              >
+                                <FolderOpen className="h-4 w-4 text-primary group-hover:text-primary/80" />
+                              </Link>
+                              <AdicionarTempoModal
+                                disciplinaNome={materia.disciplinaNome}
+                                onAdicionarTempo={(minutos) => handleAdicionarTempo(materia.disciplinaId, minutos)}
+                              />
+                              {materia.questoesPlanejadas > 0 && (
+                                <AdicionarQuestoesModal
+                                  disciplinaNome={materia.disciplinaNome}
+                                  onAdicionarQuestoes={(quantidade) => handleAdicionarQuestoes(materia.disciplinaId, quantidade)}
+                                />
+                              )}
+                              {materia.tempoSessoesPdf > 0 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleTransferirTempo(materia.disciplinaId);
+                                  }}
+                                  className="h-8 w-8 p-0 hover:bg-purple-50 hover:border-purple-400 dark:hover:bg-purple-950/20"
+                                  title="🔄 Transferir tempo das sessões PDF"
+                                >
+                                  <ArrowRightCircle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Legenda das Pizzas */}
+              <div className="mt-3 p-2 bg-muted/30 rounded-md">
+                <p className="text-xs text-muted-foreground text-center">
+                  <span className="font-medium">Legenda:</span>
+                  {" "}● = 75%+{" · "}
+                  ◕ = 50-75%{" · "}
+                  ◑ = 25-50%{" · "}
+                  ◔ = 1-25%{" · "}
+                  ○ = 0%
+                </p>
               </div>
             </div>
           </>

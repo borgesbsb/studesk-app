@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, BookOpen } from "lucide-react";
+import { ClipboardList, BookOpen } from "lucide-react";
 
 interface AdicionarQuestoesModalProps {
   disciplinaNome: string;
@@ -62,10 +62,10 @@ export function AdicionarQuestoesModal({ disciplinaNome, onAdicionarQuestoes }: 
         variant="outline"
         size="sm"
         onClick={handleOpenModal}
-        className="h-8 w-8 p-0 border-dashed hover:border-solid"
-        title="Adicionar questões resolvidas"
+        className="h-8 w-8 p-0 hover:bg-green-50 hover:border-green-400 dark:hover:bg-green-950/20"
+        title="✅ Adicionar questões resolvidas"
       >
-        <Plus className="h-4 w-4" />
+        <ClipboardList className="h-4 w-4 text-green-600 dark:text-green-400" />
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -75,7 +75,7 @@ export function AdicionarQuestoesModal({ disciplinaNome, onAdicionarQuestoes }: 
         >
           <DialogHeader className="text-center space-y-2">
             <DialogTitle className="flex items-center justify-center gap-2 text-lg">
-              <BookOpen className="h-5 w-5 text-primary" />
+              <ClipboardList className="h-5 w-5 text-green-600 dark:text-green-400" />
               Adicionar Questões
             </DialogTitle>
             <p className="text-sm text-muted-foreground font-medium">

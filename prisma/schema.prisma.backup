@@ -1,0 +1,332 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model Disciplina {
+  id                  String               @id @default(cuid())
+  nome                String
+  descricao           String?
+  cargaHoraria        Int                  @default(0)
+  peso                Float                @default(1.0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  materiais           DisciplinaMaterial[]
+  semanasEstudo       DisciplinaSemana[]
+  historicoPontuacoes HistoricoPontuacao[]
+  sessoes             SessaoQuestoes[]
+}
+
+
+model MaterialEstudo {
+  id                  String               @id @default(cuid())
+  nome                String
+  totalPaginas        Int
+  paginasLidas        Int                  @default(0)
+  arquivoPdfUrl       String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  anotacoes           Anotacao[]
+  disciplinas         DisciplinaMaterial[]
+  historicoLeitura    HistoricoLeitura[]
+  historicoPontuacoes HistoricoPontuacao[]
+  progressoAdaptativo ProgressoAdaptativo?
+  sessoes             SessaoQuestoes[]
+}
+
+model DisciplinaMaterial {
+  id           String         @id @default(cuid())
+  disciplinaId String
+  materialId   String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  disciplina   Disciplina     @relation(fields: [disciplinaId], references: [id])
+  material     MaterialEstudo @relation(fields: [materialId], references: [id])
+
+  @@unique([disciplinaId, materialId])
+}
+
+model OpenAIConfig {
+  id          String   @id @default(cuid())
+  model       String   @default("gpt-4-turbo-preview")
+  temperature Float    @default(0.7)
+  maxTokens   Int      @default(2000)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  apiKey      String?
+}
+
+model SessaoQuestoes {
+  id                String            @id @default(cuid())
+  materialId        String?
+  disciplinaId      String?
+  titulo            String
+  descricao         String?
+  prompt            String
+  totalQuestoes     Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  questoes          Questao[]
+  disciplina        Disciplina?       @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  material          MaterialEstudo?   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  sessoesRealizadas SessaoRealizada[]
+
+  @@index([materialId])
+  @@index([disciplinaId])
+  @@index([createdAt])
+}
+
+model Questao {
+  id                  String              @id @default(cuid())
+  sessaoId            String
+  pergunta            String
+  alternativaA        String
+  alternativaB        String
+  alternativaC        String
+  alternativaD        String
+  alternativaE        String?
+  respostaCorreta     String
+  explicacao          String?
+  nivel               String?
+  topico              String?
+  ordem               Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  sessao              SessaoQuestoes      @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  respostasDetalhadas RespostaDetalhada[]
+  respostas           RespostaUsuario[]
+
+  @@index([sessaoId])
+  @@index([ordem])
+}
+
+model RespostaUsuario {
+  id         String   @id @default(cuid())
+  questaoId  String
+  resposta   String
+  correto    Boolean
+  tempoGasto Int?
+  createdAt  DateTime @default(now())
+  questao    Questao  @relation(fields: [questaoId], references: [id], onDelete: Cascade)
+
+  @@index([questaoId])
+  @@index([createdAt])
+}
+
+model ChunkCache {
+  id              String   @id @default(cuid())
+  textHash        String   @unique
+  textoOriginal   String
+  textoProcessado String
+  parametros      String
+  tokens          Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([textHash])
+  @@index([createdAt])
+}
+
+model SessaoRealizada {
+  id                     String               @id @default(cuid())
+  sessaoQuestoesId       String
+  totalQuestoes          Int
+  questoesCorretas       Int
+  questoesIncorretas     Int
+  questoesNaoRespondidas Int
+  pontuacao              Float
+  percentualAcerto       Float
+  tempoTotalSegundos     Int?
+  iniciada               Boolean              @default(false)
+  finalizada             Boolean              @default(false)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  historicoPontuacoes    HistoricoPontuacao[]
+  respostasDetalhadas    RespostaDetalhada[]
+  sessaoQuestoes         SessaoQuestoes       @relation(fields: [sessaoQuestoesId], references: [id], onDelete: Cascade)
+
+  @@index([sessaoQuestoesId])
+  @@index([createdAt])
+  @@index([pontuacao])
+  @@index([percentualAcerto])
+}
+
+model RespostaDetalhada {
+  id                  String          @id @default(cuid())
+  sessaoRealizadaId   String
+  questaoId           String
+  respostaSelecionada String?
+  correto             Boolean?
+  tempoSegundos       Int?
+  ordem               Int
+  createdAt           DateTime        @default(now())
+  questao             Questao         @relation(fields: [questaoId], references: [id], onDelete: Cascade)
+  sessaoRealizada     SessaoRealizada @relation(fields: [sessaoRealizadaId], references: [id], onDelete: Cascade)
+
+  @@unique([sessaoRealizadaId, questaoId])
+  @@index([sessaoRealizadaId])
+  @@index([questaoId])
+  @@index([correto])
+}
+
+model HistoricoPontuacao {
+  id                String          @id @default(cuid())
+  materialId        String?
+  disciplinaId      String?
+  sessaoRealizadaId String
+  data              DateTime
+  pontuacao         Float
+  percentualAcerto  Float
+  totalQuestoes     Int
+  questoesCorretas  Int
+  tempoTotal        Int?
+  createdAt         DateTime        @default(now())
+  disciplina        Disciplina?     @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  material          MaterialEstudo? @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  sessaoRealizada   SessaoRealizada @relation(fields: [sessaoRealizadaId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([disciplinaId])
+  @@index([data])
+  @@index([pontuacao])
+  @@index([percentualAcerto])
+}
+
+model ProgressoAdaptativo {
+  id               String         @id @default(cuid())
+  materialId       String         @unique
+  nivelAtual       String         @default("FACIL")
+  totalSessoes     Int            @default(0)
+  ultimaPontuacao  Float?
+  ultimoPercentual Float?
+  podeAvancar      Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  material         MaterialEstudo @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([nivelAtual])
+}
+
+model ChunkUtilizado {
+  id           String   @id
+  materialId   String
+  chunkHash    String
+  indiceChunk  Int
+  tamanhoChunk Int
+  sessaoId     String
+  createdAt    DateTime @default(now())
+
+  @@unique([materialId, chunkHash])
+  @@index([createdAt])
+  @@index([materialId])
+  @@index([sessaoId])
+}
+
+model HistoricoLeitura {
+  id                   String         @id @default(cuid())
+  materialId           String
+  paginaAtual          Int
+  tempoLeituraSegundos Int
+  dataLeitura          DateTime       @default(now())
+  createdAt            DateTime       @default(now())
+  assuntosEstudados    String?
+  nomeSessao           String?
+  material             MaterialEstudo @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([dataLeitura])
+  @@index([paginaAtual])
+}
+
+model Anotacao {
+  id         String         @id @default(cuid())
+  materialId String
+  pagina     Int
+  texto      String
+  posicaoX   Float?
+  posicaoY   Float?
+  largura    Float?
+  altura     Float?
+  cor        String?        @default("#ffff00")
+  tipo       String         @default("highlight")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  material   MaterialEstudo @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([pagina])
+  @@index([tipo])
+  @@index([createdAt])
+}
+
+model PlanoEstudo {
+  id         String         @id @default(cuid())
+  nome       String
+  descricao  String?
+  dataInicio DateTime
+  dataFim    DateTime
+  ativo      Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  semanas    SemanaEstudo[]
+
+  @@index([ativo])
+  @@index([dataInicio])
+  @@index([dataFim])
+}
+
+model SemanaEstudo {
+  id              String             @id @default(cuid())
+  planoId         String
+  numeroSemana    Int
+  dataInicio      DateTime
+  dataFim         DateTime
+  observacoes     String?
+  totalHoras      Int                @default(0)
+  horasRealizadas Int                @default(0)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  disciplinas     DisciplinaSemana[]
+  plano           PlanoEstudo        @relation(fields: [planoId], references: [id], onDelete: Cascade)
+
+  @@unique([planoId, numeroSemana])
+  @@index([planoId])
+  @@index([numeroSemana])
+  @@index([dataInicio])
+}
+
+model DisciplinaSemana {
+  id                  String       @id @default(cuid())
+  semanaId            String
+  disciplinaId        String
+  horasPlanejadas     Int
+  horasRealizadas     Int          @default(0)
+  prioridade          Int          @default(1)
+  observacoes         String?
+  concluida           Boolean      @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  materialNome        String?
+  materialUrl         String?
+  paginasLidas        Int          @default(0)
+  questoesPlanejadas  Int          @default(0)
+  questoesRealizadas  Int          @default(0)
+  tempoVideoPlanejado Int          @default(0)
+  tempoVideoRealizado Int          @default(0)
+  tipoVeiculo         String?
+  totalPaginas        Int          @default(0)
+  diasEstudo          String?
+  disciplina          Disciplina   @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  semana              SemanaEstudo @relation(fields: [semanaId], references: [id], onDelete: Cascade)
+
+  @@unique([semanaId, disciplinaId])
+  @@index([semanaId])
+  @@index([disciplinaId])
+  @@index([prioridade])
+}

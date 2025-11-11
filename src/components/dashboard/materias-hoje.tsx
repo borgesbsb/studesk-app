@@ -7,9 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Clock, BookOpen, CheckCircle, ExternalLink, ArrowRight, Plus } from "lucide-react";
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
-import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
 import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual";
-import { adicionarQuestoesManual } from "@/interface/actions/dashboard/adicionar-questoes-manual";
 import { transferirTempoSessoes } from "@/interface/actions/dashboard/transferir-tempo-sessoes";
 import { useDashboard } from "@/contexts/dashboard-context";
 import { useSaveStatus } from "@/contexts/save-status-context";
@@ -70,31 +68,6 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
     }
   };
 
-  const handleAdicionarQuestoes = async (disciplinaId: string, questoes: number) => {
-    try {
-      console.log(`📚 [INICIO] Adicionando ${questoes} questões para disciplina ${disciplinaId} na data ${selectedDate.toISOString()}`);
-      
-      const resultado = await adicionarQuestoesManual(disciplinaId, questoes, selectedDate);
-      
-      console.log('📚 [RESULTADO]', resultado);
-      
-      if (resultado.success) {
-        console.log('✅ [SUCCESS] Questões adicionadas com sucesso:', resultado.message);
-        setSuccess(resultado.message);
-        if (onTempoAdicionado) {
-          console.log('🔄 [REFRESH] Chamando callback onTempoAdicionado');
-          await onTempoAdicionado();
-          console.log('✅ [REFRESH] Callback executado com sucesso');
-        }
-      } else {
-        console.error('❌ [ERROR] Erro ao adicionar questões:', resultado.message);
-        setError(resultado.message);
-      }
-    } catch (error) {
-      console.error('❌ [EXCEPTION] Erro inesperado:', error);
-      setError('Erro inesperado ao adicionar questões');
-    }
-  };
 
   const handleTransferirTempo = async (disciplinaId: string) => {
     try {
@@ -283,12 +256,6 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                             disciplinaNome={materia.disciplinaNome}
                             onAdicionarTempo={(minutos) => handleAdicionarTempo(materia.disciplinaId, minutos)}
                           />
-                          {materia.questoesPlanejadas > 0 && (
-                            <AdicionarQuestoesModal
-                              disciplinaNome={materia.disciplinaNome}
-                              onAdicionarQuestoes={(questoes) => handleAdicionarQuestoes(materia.disciplinaId, questoes)}
-                            />
-                          )}
                           {materia.tempoSessoesPdf > 0 && (
                             <Button
                               variant="ghost"

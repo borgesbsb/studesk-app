@@ -4,15 +4,18 @@
   "private": true,
   "scripts": {
     "copy-webviewer": "mkdir -p ./public/lib/webviewer && cp -a ./node_modules/@pdftron/webviewer/public/* ./public/lib/webviewer",
-    "dev": "npm run copy-webviewer && next dev",
+    "dev": "npm run copy-webviewer && next dev -p 3030",
     "build": "npm run copy-webviewer && cp node_modules/pdfjs-dist/build/pdf.worker.min.js public/ && NEXT_TELEMETRY_DISABLED=1 SKIP_TYPE_CHECK=true next build --no-lint",
-    "start": "next start",
+    "start": "next start -p 3030",
     "lint": "next lint",
     "migrate-pdf-urls": "node scripts/migrate-pdf-urls.js",
     "test-delete-material": "node scripts/test-delete-material.js"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.9.1",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.0.1",
     "@pdftron/webviewer": "^11.6.1",
     "@prisma/client": "^6.9.0",

@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { getFileApiUrl } from '@/lib/utils'
 import WebViewer from '@pdftron/webviewer'
+import { Play, Pause } from 'lucide-react'
 
 interface WebViewerCleanModalProps {
   open: boolean
@@ -273,6 +274,16 @@ export default function WebViewerCleanModal({
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  // Função para alternar pausa/play do cronômetro
+  const toggleTimer = () => {
+    setIsTimerRunning(prev => !prev)
+    if (!isTimerRunning) {
+      toast.success('Cronômetro retomado')
+    } else {
+      toast.info('Cronômetro pausado')
+    }
   }
 
   // Iniciar cronômetro quando modal abre
@@ -1321,10 +1332,23 @@ export default function WebViewerCleanModal({
                 
                 {/* Cronômetro */}
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className={`w-2 h-2 rounded-full ${isTimerRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                   <span className="text-sm text-gray-700 font-medium font-mono">
                     ⏱️ {formatTime(elapsedTime)}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleTimer}
+                    className="h-6 w-6 p-0 hover:bg-gray-100 rounded-full"
+                    title={isTimerRunning ? 'Pausar cronômetro' : 'Retomar cronômetro'}
+                  >
+                    {isTimerRunning ? (
+                      <Pause className="h-3 w-3 text-gray-600" />
+                    ) : (
+                      <Play className="h-3 w-3 text-gray-600" />
+                    )}
+                  </Button>
                 </div>
               </div>
               

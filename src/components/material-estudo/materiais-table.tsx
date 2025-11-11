@@ -10,14 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Pencil, Trash2, ExternalLink } from "lucide-react"
+import { FileText, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { deletarMaterialEstudo } from "@/interface/actions/material-estudo/delete"
 import { atualizarProgressoLeitura } from "@/interface/actions/material-estudo/update"
 import { toast } from "sonner"
-import { MaterialEstudo, DisciplinaMaterial } from "@/domain/entities/MaterialEstudo"
+import { MaterialEstudo } from "@/domain/entities/MaterialEstudo"
 import WebViewerPdfModal from './webviewer-clean'
 
 interface MateriaisTableProps {
@@ -25,7 +24,6 @@ interface MateriaisTableProps {
 }
 
 export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
-  const router = useRouter()
   const [materiais, setMateriais] = useState<MaterialEstudo[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialEstudo | null>(null)
@@ -216,9 +214,10 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    onClick={() => router.push(`/material/${material.id}`)}
+                    onClick={() => handleOpenPdf(material)}
                     className="bg-gray-900 hover:bg-gray-800 text-white"
                   >
+                    <FileText className="h-4 w-4 mr-2" />
                     Abrir Material
                   </Button>
                   <Button
@@ -226,6 +225,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                     size="icon"
                     onClick={() => handleDelete(material.id)}
                     title="Excluir material"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

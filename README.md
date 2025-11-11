@@ -1,125 +1,107 @@
-# StudesDk - Sistema de Geração de Questões com IA
+# StudesDk
 
-## 🎯 Nova Funcionalidade: Geração com Processamento IA
+Plataforma completa de estudos para gerenciamento de materiais e planos de estudo personalizados.
 
-O sistema agora permite gerar questões a partir de texto usando inteligência artificial para:
-- Limpar e organizar o conteúdo
-- Extrair tópicos relevantes
-- Gerar questões de alta qualidade
-
-### 📝 Como usar com texto
-
-#### Endpoint: `POST /api/questoes/gerar-com-ia`
-
-```json
-{
-  "materialId": "optional-material-id",
-  "texto": "Seu texto educacional aqui...",
-  "quantidade": 5,
-  "promptPersonalizado": "Instruções específicas (opcional)",
-  "tituloSessao": "Título da sessão (opcional)",
-  "descricaoSessao": "Descrição da sessão (opcional)",
-  "apiKey": "sua-chave-openai (opcional)"
-}
-```
-
-#### Exemplo de requisição:
+## 🚀 Quick Start
 
 ```bash
-curl -X POST http://localhost:3000/api/questoes/gerar-com-ia \
-  -H "Content-Type: application/json" \
-  -H "x-openai-key: sua-chave-api" \
-  -d '{
-    "texto": "A gestão de projetos é uma disciplina que envolve o planejamento, execução e controle de projetos. Os principais conceitos incluem escopo, cronograma, recursos e qualidade.",
-    "quantidade": 3,
-    "tituloSessao": "Questões sobre Gestão de Projetos"
-  }'
-```
+# Instalar dependências
+npm install
 
-#### Resposta:
+# Configurar banco de dados
+npx prisma generate
+npx prisma db push
 
-```json
-{
-  "questoes": [
-    {
-      "pergunta": "Qual é o principal objetivo da gestão de projetos?",
-      "alternativaA": "Maximizar lucros",
-      "alternativaB": "Planejar, executar e controlar projetos",
-      "alternativaC": "Reduzir custos",
-      "alternativaD": "Aumentar vendas",
-      "respostaCorreta": "B",
-      "explicacao": "A gestão de projetos visa planejar, executar e controlar projetos de forma eficiente."
-    }
-  ],
-  "sessaoId": "session-id",
-  "estatisticasFiltragem": "Texto processado pela IA: 150 → 120 caracteres. Tokens usados: 45",
-  "message": "3 questões geradas com sucesso usando processamento IA"
-}
-```
+# Copiar arquivos do WebViewer
+npm run copy-webviewer
 
-### 🔄 Fluxo do Sistema
-
-1. **Recepção do Texto**: O sistema recebe o texto bruto
-2. **Processamento com IA**: OpenAI limpa e organiza o conteúdo
-3. **Geração de Questões**: Cria questões baseadas no texto processado
-4. **Salvamento**: Armazena as questões no banco de dados
-
-### ⚙️ Configurações
-
-- **API Key**: Pode ser enviada no header `x-openai-key` ou no body
-- **Quantidade**: Padrão é 5 questões
-- **Temperatura IA**: 0.3 para processamento consistente
-- **Modelo**: gpt-3.5-turbo
-
-### 📊 Logs e Monitoramento
-
-O sistema fornece logs detalhados de:
-- Tamanho do texto recebido
-- Progresso do processamento IA
-- Tokens utilizados
-- Estatísticas de redução de texto
-- Questões geradas
-
-### 🛠️ Tecnologias
-
-- **Next.js 15.3.2**
-- **OpenAI API**
-- **Prisma ORM**
-- **TypeScript**
-
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
+# Iniciar servidor de desenvolvimento
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📚 Documentação
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Para retomar sessão rapidamente**: Leia [PRD.md](./docs/PRD.md) ⭐
 
-## Learn More
+Documentação completa em [`/docs`](./docs/README.md):
 
-To learn more about Next.js, take a look at the following resources:
+- **[PRD](./docs/PRD.md)** - Contexto rápido (2-3min) ⭐
+- **[Visão Geral](./docs/PROJECT_OVERVIEW.md)** - Funcionalidades e estrutura (5min)
+- **[Arquitetura](./docs/ARCHITECTURE.md)** - Detalhes técnicos completos (15min)
+- **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Problemas comuns e soluções
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🛠️ Stack Tecnológico
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Framework**: Next.js 15.3.2 (App Router)
+- **Database**: PostgreSQL + Prisma ORM
+- **UI**: React 19, Tailwind CSS, Radix UI
+- **PDF**: PDFTron WebViewer, PDF.js
+- **Auth**: NextAuth.js
 
-## Deploy on Vercel
+## ✨ Principais Funcionalidades
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- 📄 **Visualização de PDFs** - Upload, visualização e anotações em materiais
+- 📊 **Planos de Estudo** - Organização por semanas, ciclos e disciplinas
+- 📈 **Dashboard Analítico** - Acompanhamento de progresso e desempenho
+- 🎯 **Gerenciamento de Disciplinas** - Organize suas matérias de estudo
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📋 Comandos Principais
+
+```bash
+# Desenvolvimento
+npm run dev              # Iniciar servidor de desenvolvimento
+npm run build            # Build de produção
+npm run start            # Servidor de produção
+
+# Banco de Dados
+npx prisma generate      # Gerar Prisma Client
+npx prisma db push       # Aplicar schema ao banco
+npx prisma migrate dev   # Criar e aplicar migrations
+npx prisma studio        # Interface visual do banco
+
+# Utilitários
+npm run lint             # Executar ESLint
+npm run copy-webviewer   # Copiar arquivos do WebViewer
+```
+
+## ⚙️ Configuração
+
+Crie um arquivo `.env` na raiz do projeto:
+
+```env
+DATABASE_URL="postgresql://usuario:senha@localhost:5432/studesk"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="seu-secret-aqui"
+```
+
+## 🏗️ Estrutura do Projeto
+
+```
+/src
+  /app                    # Next.js App Router
+    /(authenticated)      # Rotas protegidas
+  /domain/entities        # Entidades de domínio
+  /application/services   # Serviços de aplicação
+  /interface/actions      # Server Actions
+  /components            # Componentes React
+/prisma                  # Schema e migrations
+/public                  # Assets estáticos
+/docs                    # Documentação completa
+```
+
+## 📖 Links Úteis
+
+- [Documentação Completa](/docs/README.md)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Prisma Documentation](https://www.prisma.io/docs)
+
+## 📝 Licença
+
+Este projeto é de uso privado.
+
+---
+
+**Desenvolvido por**: Benjamin Borges
+**Última atualização**: 2025-01-11

@@ -63,6 +63,7 @@ export function WizardAdicionarCiclo({
   // Dados do wizard
   const [disciplinasSelecionadas, setDisciplinasSelecionadas] = useState<Set<string>>(new Set())
   const [horasPorDisciplina, setHorasPorDisciplina] = useState<Record<string, number>>({})
+  const [questoesPorDisciplina, setQuestoesPorDisciplina] = useState<Record<string, number>>({})
   const [veiculoPorDisciplina, setVeiculoPorDisciplina] = useState<Record<string, string>>({})
   const [parametroPorDisciplina, setParametroPorDisciplina] = useState<Record<string, string>>({})
   const [diasPorDisciplina, setDiasPorDisciplina] = useState<Record<string, Set<string>>>({})
@@ -97,6 +98,7 @@ export function WizardAdicionarCiclo({
     setCurrentStep(1)
     setDisciplinasSelecionadas(new Set())
     setHorasPorDisciplina({})
+    setQuestoesPorDisciplina({})
     setVeiculoPorDisciplina({})
     setParametroPorDisciplina({})
     setDiasPorDisciplina({})
@@ -121,10 +123,12 @@ export function WizardAdicionarCiclo({
       novasSelecionadas.delete(disciplinaId)
       // Remove dados relacionados quando deseleciona
       const { [disciplinaId]: _, ...restoHoras } = horasPorDisciplina
-      const { [disciplinaId]: __, ...restoVeiculo } = veiculoPorDisciplina
-      const { [disciplinaId]: ___, ...restoParametro } = parametroPorDisciplina
-      const { [disciplinaId]: ____, ...restoDias } = diasPorDisciplina
+      const { [disciplinaId]: __, ...restoQuestoes } = questoesPorDisciplina
+      const { [disciplinaId]: ___, ...restoVeiculo } = veiculoPorDisciplina
+      const { [disciplinaId]: ____, ...restoParametro } = parametroPorDisciplina
+      const { [disciplinaId]: _____, ...restoDias } = diasPorDisciplina
       setHorasPorDisciplina(restoHoras)
+      setQuestoesPorDisciplina(restoQuestoes)
       setVeiculoPorDisciplina(restoVeiculo)
       setParametroPorDisciplina(restoParametro)
       setDiasPorDisciplina(restoDias)
@@ -132,6 +136,7 @@ export function WizardAdicionarCiclo({
       novasSelecionadas.add(disciplinaId)
       // Inicializa com valores padrão
       setHorasPorDisciplina(prev => ({ ...prev, [disciplinaId]: 2 }))
+      setQuestoesPorDisciplina(prev => ({ ...prev, [disciplinaId]: 10 }))
       setVeiculoPorDisciplina(prev => ({ ...prev, [disciplinaId]: 'pdf' }))
       setParametroPorDisciplina(prev => ({ ...prev, [disciplinaId]: '' }))
       setDiasPorDisciplina(prev => ({ ...prev, [disciplinaId]: new Set() }))
@@ -153,7 +158,8 @@ export function WizardAdicionarCiclo({
 
   const canProceedStep1 = disciplinasSelecionadas.size > 0
   const canProceedStep2 = Array.from(disciplinasSelecionadas).every(id => 
-    horasPorDisciplina[id] && horasPorDisciplina[id] > 0
+    horasPorDisciplina[id] && horasPorDisciplina[id] > 0 &&
+    questoesPorDisciplina[id] !== undefined && questoesPorDisciplina[id] >= 0
   )
   const canProceedStep3 = Array.from(disciplinasSelecionadas).every(id => 
     veiculoPorDisciplina[id] && veiculoPorDisciplina[id].length > 0
@@ -171,7 +177,7 @@ export function WizardAdicionarCiclo({
         horasPlanejadas: horasPorDisciplina[disciplinaId] || 0,
         horasRealizadas: 0,
         tipoVeiculo: veiculoPorDisciplina[disciplinaId] || 'pdf',
-        questoesPlanejadas: 0,
+        questoesPlanejadas: questoesPorDisciplina[disciplinaId] || 0,
         tempoVideoPlanejado: 0,
         parametro: parametroPorDisciplina[disciplinaId] || '',
         diasEstudo: Array.from(diasPorDisciplina[disciplinaId] || new Set())
@@ -202,18 +208,21 @@ export function WizardAdicionarCiclo({
       
       // Inicializar valores padrão para todas
       const novosHoras: Record<string, number> = {}
+      const novosQuestoes: Record<string, number> = {}
       const novosVeiculo: Record<string, string> = {}
       const novosParametro: Record<string, string> = {}
       const novosDias: Record<string, Set<string>> = {}
       
       disciplinasDisponiveis.forEach(d => {
         novosHoras[d.id] = 2
+        novosQuestoes[d.id] = 10
         novosVeiculo[d.id] = 'pdf'
         novosParametro[d.id] = ''
         novosDias[d.id] = new Set()
       })
       
       setHorasPorDisciplina(novosHoras)
+      setQuestoesPorDisciplina(novosQuestoes)
       setVeiculoPorDisciplina(novosVeiculo)
       setParametroPorDisciplina(novosParametro)
       setDiasPorDisciplina(novosDias)
@@ -222,6 +231,7 @@ export function WizardAdicionarCiclo({
     const handleRemoverTodas = () => {
       setDisciplinasSelecionadas(new Set())
       setHorasPorDisciplina({})
+      setQuestoesPorDisciplina({})
       setVeiculoPorDisciplina({})
       setParametroPorDisciplina({})
       setDiasPorDisciplina({})
@@ -234,6 +244,7 @@ export function WizardAdicionarCiclo({
       
       // Inicializar com valores padrão
       setHorasPorDisciplina(prev => ({ ...prev, [disciplinaId]: 2 }))
+      setQuestoesPorDisciplina(prev => ({ ...prev, [disciplinaId]: 10 }))
       setVeiculoPorDisciplina(prev => ({ ...prev, [disciplinaId]: 'pdf' }))
       setParametroPorDisciplina(prev => ({ ...prev, [disciplinaId]: '' }))
       setDiasPorDisciplina(prev => ({ ...prev, [disciplinaId]: new Set() }))
@@ -246,10 +257,12 @@ export function WizardAdicionarCiclo({
       
       // Remove dados relacionados
       const { [disciplinaId]: _, ...restoHoras } = horasPorDisciplina
-      const { [disciplinaId]: __, ...restoVeiculo } = veiculoPorDisciplina
-      const { [disciplinaId]: ___, ...restoParametro } = parametroPorDisciplina
-      const { [disciplinaId]: ____, ...restoDias } = diasPorDisciplina
+      const { [disciplinaId]: __, ...restoQuestoes } = questoesPorDisciplina
+      const { [disciplinaId]: ___, ...restoVeiculo } = veiculoPorDisciplina
+      const { [disciplinaId]: ____, ...restoParametro } = parametroPorDisciplina
+      const { [disciplinaId]: _____, ...restoDias } = diasPorDisciplina
       setHorasPorDisciplina(restoHoras)
+      setQuestoesPorDisciplina(restoQuestoes)
       setVeiculoPorDisciplina(restoVeiculo)
       setParametroPorDisciplina(restoParametro)
       setDiasPorDisciplina(restoDias)
@@ -407,39 +420,67 @@ export function WizardAdicionarCiclo({
   const renderStep2 = () => (
     <div className="space-y-4">
       <div className="text-center space-y-2">
-        <h3 className="text-lg font-semibold">Defina as Horas de Estudo</h3>
+        <h3 className="text-lg font-semibold">Defina Horas e Questões</h3>
         <p className="text-sm text-muted-foreground">
-          Quantas horas por semana dedicar a cada disciplina
+          Configure horas de estudo e questões planejadas para cada disciplina
         </p>
       </div>
 
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Array.from(disciplinasSelecionadas).map(disciplinaId => {
               const disciplina = disciplinasDisponiveis.find(d => d.id === disciplinaId)!
               return (
-                <div key={disciplinaId} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
+                <div key={disciplinaId} className="p-4 border rounded-lg space-y-4">
+                  <div>
                     <h4 className="font-medium">{disciplina.nome}</h4>
-                    <p className="text-sm text-muted-foreground">Horas por semana</p>
+                    {disciplina.descricao && (
+                      <p className="text-sm text-muted-foreground">{disciplina.descricao}</p>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="number"
-                      min="0.5"
-                      max="40"
-                      step="0.5"
-                      value={horasPorDisciplina[disciplinaId] || ''}
-                      onChange={(e) => setHorasPorDisciplina(prev => ({
-                        ...prev,
-                        [disciplinaId]: parseFloat(e.target.value) || 0
-                      }))}
-                      className="w-20 text-center"
-                      placeholder="0"
-                    />
-                    <span className="text-sm text-muted-foreground">h</span>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Horas por semana</Label>
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          min="0.5"
+                          max="40"
+                          step="0.5"
+                          value={horasPorDisciplina[disciplinaId] || ''}
+                          onChange={(e) => setHorasPorDisciplina(prev => ({
+                            ...prev,
+                            [disciplinaId]: parseFloat(e.target.value) || 0
+                          }))}
+                          className="w-20 text-center"
+                          placeholder="0"
+                        />
+                        <span className="text-sm text-muted-foreground">h</span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm">Questões planejadas</Label>
+                      <div className="flex items-center space-x-2">
+                        <Target className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          min="0"
+                          max="1000"
+                          value={questoesPorDisciplina[disciplinaId] || ''}
+                          onChange={(e) => setQuestoesPorDisciplina(prev => ({
+                            ...prev,
+                            [disciplinaId]: parseInt(e.target.value) || 0
+                          }))}
+                          className="w-20 text-center"
+                          placeholder="0"
+                        />
+                        <span className="text-sm text-muted-foreground">q</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )
@@ -449,11 +490,19 @@ export function WizardAdicionarCiclo({
       </Card>
 
       <div className="pt-4 border-t">
-        <div className="flex justify-between text-sm">
-          <span>Total de horas semanais:</span>
-          <span className="font-medium">
-            {Object.values(horasPorDisciplina).reduce((total, horas) => total + (horas || 0), 0)}h
-          </span>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="flex justify-between">
+            <span>Total de horas semanais:</span>
+            <span className="font-medium">
+              {Object.values(horasPorDisciplina).reduce((total, horas) => total + (horas || 0), 0)}h
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Total de questões:</span>
+            <span className="font-medium">
+              {Object.values(questoesPorDisciplina).reduce((total, questoes) => total + (questoes || 0), 0)}
+            </span>
+          </div>
         </div>
       </div>
     </div>

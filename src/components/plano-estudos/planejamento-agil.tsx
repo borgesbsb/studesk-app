@@ -387,7 +387,17 @@ export function PlanejamentoAgil({
                     <Checkbox
                       id={disciplina.id}
                       checked={disciplinasSelecionadas.has(disciplina.id)}
-                      onCheckedChange={() => toggleDisciplina(disciplina.id)}
+                      onCheckedChange={(checked) => {
+                        setDisciplinasSelecionadas(prev => {
+                          const novaSelecao = new Set(prev)
+                          if (checked) {
+                            novaSelecao.add(disciplina.id)
+                          } else {
+                            novaSelecao.delete(disciplina.id)
+                          }
+                          return novaSelecao
+                        })
+                      }}
                     />
                     <Label htmlFor={disciplina.id} className="text-sm cursor-pointer">
                       {disciplina.nome}

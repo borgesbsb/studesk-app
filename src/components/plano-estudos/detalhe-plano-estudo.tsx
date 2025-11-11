@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -15,12 +15,30 @@ import { adicionarDisciplinaSemana } from '@/interface/actions/plano-estudo/adic
 import { deleteDisciplinaSemana } from '@/interface/actions/plano-estudo/delete-disciplina'
 import { updateSemanaEstudo } from '@/interface/actions/plano-estudo/update-semana'
 import { adicionarCicloAoPlano } from '@/interface/actions/plano-estudo/adicionar-ciclo'
+import { reordenarDisciplinas } from '@/interface/actions/plano-estudo/reordenar-disciplinas'
+import { debugSemana, limparDisciplinasOrfas } from '@/interface/actions/plano-estudo/debug-semana'
 import { listarDisciplinas } from '@/interface/actions/disciplina/list'
-import { Calendar, Clock, Target, Book, FileText, Video, Save, Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { Calendar, Clock, Target, Book, FileText, Video, Save, Trash2, Plus, ChevronDown, ChevronUp, GripVertical, MessageSquare, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { useSaveStatus } from '@/contexts/save-status-context'
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  CSS,
+} from '@dnd-kit/utilities'
 import {
   Table,
   TableBody,
@@ -108,6 +126,376 @@ interface Disciplina {
   nome: string
 }
 
+// Componente SortableDisciplinaRow
+function SortableDisciplinaRow({ 
+  disciplina, 
+  index,
+  semana,
+  IconeVeiculo,
+  valorQuestoesAtual,
+  progressoQuestoes,
+  estaEditando,
+  valoresEditadosDisciplina,
+  camposEditando,
+  valoresEditados,
+  questoesEditadas,
+  salvandoId,
+  disciplinas,
+  plano,
+  diasSemana,
+  observacoesExpandidas,
+  setObservacoesExpandidas,
+  onDisciplinaActions
+}: {
+  disciplina: DisciplinaSemana
+  index: number
+  semana: SemanaEstudoDetalhe
+  IconeVeiculo: any
+  valorQuestoesAtual: number
+  progressoQuestoes: number
+  estaEditando: string | undefined
+  valoresEditadosDisciplina: any
+  camposEditando: Record<string, string>
+  valoresEditados: Record<string, any>
+  questoesEditadas: Record<string, number>
+  salvandoId: string | null
+  disciplinas: Disciplina[]
+  plano: PlanoEstudoDetalhe | null
+  diasSemana: { id: string; label: string }[]
+  observacoesExpandidas: Record<string, boolean>
+  setObservacoesExpandidas: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
+  onDisciplinaActions: {
+    iniciarEdicao: (disciplinaId: string, campo: string, valorAtual: any) => void
+    atualizarValorEditado: (disciplinaId: string, campo: string, valor: any) => void
+    salvarEdicao: (disciplina: DisciplinaSemana) => void
+    salvarEdicaoComValor: (disciplina: DisciplinaSemana, campo: string, valor: any) => void
+    cancelarEdicao: (disciplinaId: string) => void
+    temEdicoesPendentes: (disciplinaId: string) => boolean
+    obterNomeDisciplina: (disciplinaSemana: DisciplinaSemana) => string
+    obterIdDisciplinaAtual: (disciplinaSemana: DisciplinaSemana) => string
+    parseDiasEstudo: (diasEstudo?: string | null) => string[]
+    atualizarDiasEstudo: (disciplina: DisciplinaSemana, diasSelecionados: string[]) => void
+    excluirDisciplina: (disciplinaSemanaId: string, semanaId: string) => void
+  }
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: disciplina.id,
+    disabled: estaEditando !== undefined // Desabilitar drag quando estiver editando
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  console.log(`📋 Renderizando disciplina ${index + 1}/${semana.disciplinas.length}:`, {
+    id: disciplina.id,
+    nome: disciplina.disciplina?.nome || 'Sem nome',
+    diasEstudo: disciplina.diasEstudo,
+    semanaId: semana.id,
+    numeroSemana: semana.numeroSemana
+  })
+
+  return [
+    <TableRow 
+      key={`${disciplina.id}-main`}
+      ref={setNodeRef} 
+      style={style}
+      className={isDragging ? 'opacity-50' : ''}
+    >
+      {/* Coluna do handle de drag */}
+      <TableCell className="w-8">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded flex items-center justify-center"
+          style={{ touchAction: 'none' }}
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <IconeVeiculo className="h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-col min-w-0 flex-1">
+            {estaEditando === 'disciplinaId' ? (
+              <Select
+                value={onDisciplinaActions.obterIdDisciplinaAtual(disciplina)}
+                onValueChange={(valor) => {
+                  const timestamp = new Date().toISOString().substr(14, 9)
+                  console.log(`⏰ ${timestamp} 🎯 SELECT ONVALUECHANGE CHAMADO:`, valor)
+                  console.log(`⏰ ${timestamp} 🎯 Disciplina atual antes da mudança:`, disciplina.disciplina?.nome)
+                  
+                  // PRIMEIRO: Atualizar valor editado em memória
+                  console.log(`⏰ ${timestamp} 🎯 PASSO 1: Atualizando valoresEditados...`)
+                  console.log(`⏰ ${timestamp} 🎯 VALOR SENDO SALVO NO ESTADO:`, valor)
+                  onDisciplinaActions.atualizarValorEditado(disciplina.id, 'disciplinaId', valor)
+                  
+                  // SEGUNDO: Atualizar plano local para feedback visual imediato
+                  const novaDisciplina = disciplinas.find(d => d.id === valor)
+                  if (novaDisciplina && plano) {
+                    console.log(`⏰ ${timestamp} 🎯 PASSO 2: Atualizando plano local com:`, novaDisciplina.nome)
+                    // Lógica de atualização local...
+                    
+                    // TERCEIRO: Salvar no servidor após um pequeno delay
+                    setTimeout(() => {
+                      const timestampDelay = new Date().toISOString().substr(14, 9)
+                      console.log(`⏰ ${timestampDelay} 🎯 PASSO 3: Iniciando salvamento no servidor...`)
+                      onDisciplinaActions.salvarEdicaoComValor(disciplina, 'disciplinaId', valor)
+                    }, 50)
+                  } else {
+                    console.log(`⏰ ${timestamp} ❌ Nova disciplina não encontrada:`, valor)
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full min-w-[150px]">
+                  <SelectValue placeholder="Selecione uma disciplina" />
+                </SelectTrigger>
+                <SelectContent>
+                  {disciplinas.map((disc) => (
+                    <SelectItem key={disc.id} value={disc.id}>
+                      {disc.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <span 
+                className="font-medium cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                onDoubleClick={() => {
+                  // IMPORTANTE: Só iniciar edição se não há valores pendentes de salvamento
+                  if (!onDisciplinaActions.temEdicoesPendentes(disciplina.id)) {
+                    const idDisciplinaAtual = onDisciplinaActions.obterIdDisciplinaAtual(disciplina)
+                    console.log('Iniciando edição de disciplina com ID:', idDisciplinaAtual)
+                    onDisciplinaActions.iniciarEdicao(disciplina.id, 'disciplinaId', idDisciplinaAtual)
+                  } else {
+                    console.log('⚠️ Edição bloqueada - há valores pendentes de salvamento')
+                  }
+                }}
+              >
+                {onDisciplinaActions.obterNomeDisciplina(disciplina)}
+              </span>
+            )}
+            {disciplina.concluida && (
+              <div className="mt-1">
+                <Badge variant="outline" className="text-xs text-green-600">Concluída</Badge>
+              </div>
+            )}
+          </div>
+        </div>
+      </TableCell>
+
+      {/* Horas planejadas - editável */}
+      <TableCell className="text-center">
+        {estaEditando === 'horasPlanejadas' ? (
+          <Input
+            className="w-20 text-center"
+            type="text"
+            value={valoresEditadosDisciplina.horasPlanejadas || disciplina.horasPlanejadas}
+            onChange={(e) => {
+              const valor = e.target.value.replace(/[^0-9]/g, '')
+              onDisciplinaActions.atualizarValorEditado(disciplina.id, 'horasPlanejadas', parseInt(valor) || 0)
+            }}
+            onBlur={() => onDisciplinaActions.salvarEdicao(disciplina)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onDisciplinaActions.salvarEdicao(disciplina)
+              if (e.key === 'Escape') onDisciplinaActions.cancelarEdicao(disciplina.id)
+            }}
+            autoFocus
+          />
+        ) : (
+          <span 
+            className="text-sm cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+            onDoubleClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'horasPlanejadas', disciplina.horasPlanejadas)}
+          >
+            {disciplina.horasPlanejadas}h
+          </span>
+        )}
+      </TableCell>
+
+      {/* Questões planejadas - editável */}
+      <TableCell className="text-center">
+        {estaEditando === 'questoesPlanejadas' ? (
+          <Input
+            className="w-20 text-center"
+            type="text"
+            value={valoresEditadosDisciplina.questoesPlanejadas || disciplina.questoesPlanejadas}
+            onChange={(e) => {
+              const valor = e.target.value.replace(/[^0-9]/g, '')
+              onDisciplinaActions.atualizarValorEditado(disciplina.id, 'questoesPlanejadas', parseInt(valor) || 0)
+            }}
+            onBlur={() => onDisciplinaActions.salvarEdicao(disciplina)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onDisciplinaActions.salvarEdicao(disciplina)
+              if (e.key === 'Escape') onDisciplinaActions.cancelarEdicao(disciplina.id)
+            }}
+            autoFocus
+          />
+        ) : (
+          <span 
+            className="text-sm cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+            onDoubleClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'questoesPlanejadas', disciplina.questoesPlanejadas)}
+          >
+            {disciplina.questoesPlanejadas}
+          </span>
+        )}
+      </TableCell>
+
+      {/* Dias da semana - checkboxes */}
+      <TableCell className="text-center">
+        <div className="flex flex-wrap gap-2 justify-center">
+          {diasSemana.map((dia) => {
+            const diasSelecionados = onDisciplinaActions.parseDiasEstudo(disciplina.diasEstudo)
+            const isChecked = diasSelecionados.includes(dia.id)
+            
+            console.log(`🔍 Renderizando ${dia.id} para disciplina ${disciplina.id} (${disciplina.disciplina?.nome}):`, {
+              diasEstudo: disciplina.diasEstudo,
+              diasSelecionados,
+              isChecked,
+              diaId: dia.id,
+              semanaId: semana.id,
+              numeroSemana: semana.numeroSemana
+            })
+            
+            return (
+              <div key={`${disciplina.id}-${dia.id}-${disciplina.diasEstudo || 'empty'}`} className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  id={`${disciplina.id}-${dia.id}`}
+                  checked={isChecked}
+                  key={`checkbox-${disciplina.id}-${dia.id}-${isChecked}`}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    console.log(`🗓️ Native Checkbox ${dia.id} (${dia.label}) para disciplina ${disciplina.id}`)
+                    console.log(`🗓️ Estado atual: ${isChecked} → ${checked}`)
+                    
+                    const diasAtuais = onDisciplinaActions.parseDiasEstudo(disciplina.diasEstudo)
+                    console.log(`🗓️ Dias atuais:`, diasAtuais)
+                    
+                    let novosDias: string[]
+                    
+                    if (checked) {
+                      novosDias = [...diasAtuais.filter(d => d !== dia.id), dia.id]
+                    } else {
+                      novosDias = diasAtuais.filter(d => d !== dia.id)
+                    }
+                    
+                    console.log(`🗓️ Novos dias calculados:`, novosDias)
+                    onDisciplinaActions.atualizarDiasEstudo(disciplina, novosDias)
+                  }}
+                  className="h-4 w-4"
+                />
+                <label 
+                  htmlFor={`${disciplina.id}-${dia.id}`}
+                  className="text-xs cursor-pointer select-none hover:text-blue-600"
+                >
+                  {dia.label}
+                </label>
+              </div>
+            )
+          })}
+        </div>
+      </TableCell>
+
+        {/* Ações - botão excluir */}
+        <TableCell>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDisciplinaActions.excluirDisciplina(disciplina.id, semana.id)}
+            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+            title="Excluir disciplina"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>,
+    
+    <TableRow key={`${disciplina.id}-assuntos`} className="border-t-0">
+      <TableCell colSpan={6} className="py-2 px-4">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Assuntos a estudar:</span>
+            {disciplina.observacoes && (
+              <MessageSquare className="h-3 w-3 text-muted-foreground" />
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setObservacoesExpandidas(prev => ({
+                ...prev,
+                [disciplina.id]: !prev[disciplina.id]
+              }))
+            }}
+            className="h-6 w-6 p-0"
+            title="Ver/editar assuntos"
+          >
+            {observacoesExpandidas[disciplina.id] ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        
+        {observacoesExpandidas[disciplina.id] && (
+          <div className="space-y-2">
+            {estaEditando === 'observacoes' ? (
+              <div className="space-y-3">
+                <Textarea
+                  className="min-h-[80px] resize-none"
+                  value={valoresEditadosDisciplina.observacoes || disciplina.observacoes || ''}
+                  onChange={(e) => {
+                    onDisciplinaActions.atualizarValorEditado(disciplina.id, 'observacoes', e.target.value)
+                  }}
+                  placeholder="Ex: Capítulo 1 - Teoria dos conjuntos, Exercícios 1 a 10, Revisão de conceitos básicos..."
+                  autoFocus
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onDisciplinaActions.cancelarEdicao(disciplina.id)}
+                    disabled={salvandoId === disciplina.id}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => onDisciplinaActions.salvarEdicao(disciplina)}
+                    disabled={salvandoId === disciplina.id}
+                  >
+                    {salvandoId === disciplina.id ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div 
+                className="text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 p-3 rounded-md border-dashed border-2 min-h-[60px] transition-colors flex items-center"
+                onClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'observacoes', disciplina.observacoes || '')}
+                title="Clique para editar assuntos"
+              >
+                {disciplina.observacoes || 'Clique para definir os assuntos que serão estudados nesta disciplina...'}
+              </div>
+            )}
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
+  ]
+}
+
 export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
   const [plano, setPlano] = useState<PlanoEstudoDetalhe | null>(null)
   const [loading, setLoading] = useState(true)
@@ -132,9 +520,26 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
   // Estado para colapsar cards - todos fechados por padrão
   const [semanasColapsadas, setSemanasColapsadas] = useState<Record<string, boolean>>({})
   
+  // Estado para controlar observações expandidas
+  const [observacoesExpandidas, setObservacoesExpandidas] = useState<Record<string, boolean>>({})
+  
   // Estados para modal de seleção de ciclo origem
   const [modalSelecionarCicloAberto, setModalSelecionarCicloAberto] = useState(false)
   const [cicloOrigemSelecionado, setCicloOrigemSelecionado] = useState<string | null>(null)
+  
+  // Estados para modal de seleção de disciplina
+  const [modalAdicionarDisciplinaAberto, setModalAdicionarDisciplinaAberto] = useState(false)
+  const [semanaParaAdicionar, setSemanaParaAdicionar] = useState<SemanaEstudoDetalhe | null>(null)
+  const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<string | null>(null)
+
+  // Configuração dos sensores de drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Drag só ativa após 8px de movimento
+      },
+    })
+  )
   
 
   useEffect(() => {
@@ -696,20 +1101,44 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
   ]
 
   const parseDiasEstudo = (diasEstudo?: string | null): string[] => {
-    if (!diasEstudo || diasEstudo.trim() === '') return []
+    console.log('🔍 parseDiasEstudo chamado com:', diasEstudo)
     
-    // Se começa com '[' é JSON
+    if (!diasEstudo || diasEstudo.trim() === '') {
+      console.log('🔍 diasEstudo vazio, retornando []')
+      return []
+    }
+    
+    // Se começa com '[' é JSON (pode ser array de números ou strings)
     if (diasEstudo.trim().startsWith('[')) {
       try {
-        return JSON.parse(diasEstudo)
-      } catch {
-        console.warn('Erro ao fazer parse JSON do diasEstudo:', diasEstudo)
+        const parsed = JSON.parse(diasEstudo)
+        console.log('🔍 JSON parsed:', parsed)
+        
+        if (Array.isArray(parsed)) {
+          // Converter números para strings correspondentes aos dias
+          const resultado = parsed.map(item => {
+            if (typeof item === 'number') {
+              const mapaDias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']
+              const diaString = mapaDias[item] || 'seg'
+              console.log(`🔍 Convertendo número ${item} para string ${diaString}`)
+              return diaString
+            }
+            return String(item)
+          })
+          console.log('🔍 Resultado final JSON:', resultado)
+          return resultado
+        }
+        return []
+      } catch (error) {
+        console.warn('Erro ao fazer parse JSON do diasEstudo:', diasEstudo, error)
         return []
       }
     }
     
     // Caso contrário, é CSV
-    return diasEstudo.split(',').filter(d => d.trim())
+    const resultado = diasEstudo.split(',').filter(d => d.trim())
+    console.log('🔍 Resultado final CSV:', resultado)
+    return resultado
   }
 
   const atualizarDiasEstudo = async (disciplina: DisciplinaSemana, diasSelecionados: string[]) => {
@@ -732,30 +1161,48 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
-  const adicionarNovaDisciplina = async (semana: SemanaEstudoDetalhe) => {
+  const abrirModalAdicionarDisciplina = (semana: SemanaEstudoDetalhe) => {
     if (!disciplinas.length) {
       setError('Nenhuma disciplina disponível')
       return
     }
     
+    // Encontrar disciplinas que ainda não estão no ciclo
+    const disciplinasNoCiclo = semana.disciplinas.map(d => d.disciplinaId)
+    const disciplinasDisponiveis = disciplinas.filter(d => !disciplinasNoCiclo.includes(d.id))
+    
+    if (!disciplinasDisponiveis.length) {
+      setError('Todas as disciplinas já foram adicionadas a este ciclo')
+      return
+    }
+    
+    // Definir primeira disciplina disponível como padrão
+    setSemanaParaAdicionar(semana)
+    setDisciplinaSelecionada(disciplinasDisponiveis[0].id)
+    setModalAdicionarDisciplinaAberto(true)
+  }
+
+  const confirmarAdicionarDisciplina = async () => {
+    if (!semanaParaAdicionar || !disciplinaSelecionada) return
+    
+    setModalAdicionarDisciplinaAberto(false)
     setSaving()
     
     try {
-      // Criar uma disciplina "vazia" usando uma disciplina placeholder
-      // O usuário poderá alterar depois através do select
-      const primeiraDisciplina = disciplinas[0]
+      const disciplina = disciplinas.find(d => d.id === disciplinaSelecionada)
+      console.log('➕ Adicionando disciplina selecionada:', disciplina?.nome)
       
       // Chamar a nova action para adicionar disciplina
       const resultado = await adicionarDisciplinaSemana({
-        semanaId: semana.id,
-        disciplinaId: primeiraDisciplina.id,
+        semanaId: semanaParaAdicionar.id,
+        disciplinaId: disciplinaSelecionada,
         horasPlanejadas: 1,
         questoesPlanejadas: 0,
         diasEstudo: '[]'
       })
       
       if (resultado.success) {
-        setSuccess()
+        setSuccess(`Disciplina "${disciplina?.nome}" adicionada ao ciclo!`)
         // Recarregar o plano para obter a nova disciplina
         await carregarPlano()
         // Limpar valores editados para mostrar dados reais do banco
@@ -766,6 +1213,9 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     } catch (error) {
       console.error('Erro ao adicionar disciplina:', error)
       setError('Erro inesperado ao adicionar disciplina')
+    } finally {
+      setSemanaParaAdicionar(null)
+      setDisciplinaSelecionada(null)
     }
   }
 
@@ -1049,6 +1499,72 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
+  const handleDragEnd = async (event: DragEndEvent, semanaId: string) => {
+    const { active, over } = event
+    
+    if (!over || active.id === over.id) return
+    
+    // Encontrar a semana atual
+    const semanaAtual = plano?.semanas.find(s => s.id === semanaId)
+    if (!semanaAtual) return
+
+    const disciplinas = semanaAtual.disciplinas
+    const activeIndex = disciplinas.findIndex(d => d.id === active.id)
+    const overIndex = disciplinas.findIndex(d => d.id === over.id)
+    
+    if (activeIndex === overIndex) return
+
+    console.log('🔄 Reordenando disciplinas:', { activeId: active.id, overId: over.id, activeIndex, overIndex })
+
+    try {
+      setSaving()
+      
+      // Atualizar localmente primeiro para feedback imediato
+      if (plano) {
+        const novoPlano = { ...plano }
+        const semana = novoPlano.semanas.find(s => s.id === semanaId)
+        
+        if (semana) {
+          // Reordenar array local
+          const novasDisciplinas = [...semana.disciplinas]
+          const [disciplinaMovida] = novasDisciplinas.splice(activeIndex, 1)
+          novasDisciplinas.splice(overIndex, 0, disciplinaMovida)
+          
+          semana.disciplinas = novasDisciplinas
+          setPlano(novoPlano)
+        }
+      }
+
+      // Criar nova ordem com base na posição final
+      const novaOrdem = disciplinas.map((disciplina, index) => {
+        if (disciplina.id === active.id) {
+          return disciplina.id
+        }
+        return disciplina.id
+      })
+      
+      // Ajustar a ordem baseada no movimento
+      const disciplinaMovida = novaOrdem.splice(activeIndex, 1)[0]
+      novaOrdem.splice(overIndex, 0, disciplinaMovida)
+
+      // Salvar no servidor
+      const resultado = await reordenarDisciplinas(novaOrdem)
+      
+      if (resultado.success) {
+        setSuccess('Ordem das disciplinas atualizada!')
+      } else {
+        setError('Erro ao salvar nova ordem')
+        // Recarregar em caso de erro para reverter mudanças locais
+        await carregarPlano()
+      }
+    } catch (error) {
+      console.error('Erro ao reordenar disciplinas:', error)
+      setError('Erro inesperado ao reordenar')
+      // Recarregar em caso de erro
+      await carregarPlano()
+    }
+  }
+
   
 
   if (loading) {
@@ -1083,6 +1599,75 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
   return (
     <div className="space-y-6">
+      {/* Modal para adicionar disciplina */}
+      <Dialog open={modalAdicionarDisciplinaAberto} onOpenChange={setModalAdicionarDisciplinaAberto}>
+        <DialogContent className="w-[95vw] max-w-md max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Adicionar Disciplina</DialogTitle>
+            <DialogDescription>
+              Selecione uma disciplina para adicionar ao ciclo.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {semanaParaAdicionar && (
+            <div className="p-3 bg-blue-50 rounded-lg flex-shrink-0">
+              <div className="text-sm font-medium text-blue-900">
+                Ciclo {semanaParaAdicionar.numeroSemana}
+              </div>
+              <div className="text-xs text-blue-600">
+                {format(new Date(semanaParaAdicionar.dataInicio), 'dd/MM', { locale: ptBR })} - {format(new Date(semanaParaAdicionar.dataFim), 'dd/MM', { locale: ptBR })}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex-1 overflow-y-auto space-y-2 py-2">
+            {semanaParaAdicionar && disciplinas.filter(d => 
+              !semanaParaAdicionar.disciplinas.map(ds => ds.disciplinaId).includes(d.id)
+            ).map((disciplina) => (
+              <div key={disciplina.id} className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id={`disciplina-${disciplina.id}`}
+                  name="disciplinaSelecao"
+                  value={disciplina.id}
+                  checked={disciplinaSelecionada === disciplina.id}
+                  onChange={(e) => setDisciplinaSelecionada(e.target.value)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 flex-shrink-0"
+                />
+                <label htmlFor={`disciplina-${disciplina.id}`} className="flex-1 cursor-pointer">
+                  <div className="flex justify-between items-center p-2 border rounded hover:bg-gray-50">
+                    <div className="font-medium text-sm truncate pr-2">
+                      {disciplina.nome}
+                    </div>
+                    {disciplinaSelecionada === disciplina.id && (
+                      <div className="text-blue-600 flex-shrink-0">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </label>
+              </div>
+            ))}
+          </div>
+          
+          <DialogFooter className="flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setModalAdicionarDisciplinaAberto(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarAdicionarDisciplina}
+              disabled={!disciplinaSelecionada}
+            >
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Modal para selecionar ciclo origem */}
       <Dialog open={modalSelecionarCicloAberto} onOpenChange={setModalSelecionarCicloAberto}>
         <DialogContent className="sm:max-w-[500px]">
@@ -1422,282 +2007,119 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                   </div>
                 
                 <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader className="bg-gray-50">
-                    <TableRow>
-                      <TableHead>Disciplina</TableHead>
-                      <TableHead className="min-w-[220px] text-center">Horas planejadas</TableHead>
-                      <TableHead className="text-center">Questões planejadas</TableHead>
-                      <TableHead className="text-center">Dias da semana</TableHead>
-                      <TableHead className="w-12">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                  {semana.disciplinas.map((disciplina, index) => {
-                    console.log(`📋 Renderizando disciplina ${index + 1}/${semana.disciplinas.length}:`, {
-                      id: disciplina.id,
-                      nome: disciplina.disciplina?.nome || 'Sem nome',
-                      diasEstudo: disciplina.diasEstudo,
-                      semanaId: semana.id,
-                      numeroSemana: semana.numeroSemana
-                    })
-                    
-                    const IconeVeiculo = obterIconeVeiculo(disciplina.tipoVeiculo || undefined)
-                      const valorQuestoesAtual =
-                        questoesEditadas[disciplina.id] !== undefined
-                          ? questoesEditadas[disciplina.id]
-                          : disciplina.questoesRealizadas
-                      const progressoQuestoes = disciplina.questoesPlanejadas > 0
-                        ? (valorQuestoesAtual / disciplina.questoesPlanejadas) * 100
-                        : 0
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => handleDragEnd(event, semana.id)}
+                >
+                  <Table>
+                    <TableHeader className="bg-gray-50">
+                      <TableRow>
+                        <TableHead className="w-8"></TableHead>
+                        <TableHead>Disciplina</TableHead>
+                        <TableHead className="min-w-[220px] text-center">Horas planejadas</TableHead>
+                        <TableHead className="text-center">Questões planejadas</TableHead>
+                        <TableHead className="text-center">Dias da semana</TableHead>
+                        <TableHead className="w-12">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <SortableContext 
+                        items={semana.disciplinas.map(d => d.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {semana.disciplinas.map((disciplina, index) => {
+                          const IconeVeiculo = obterIconeVeiculo(disciplina.tipoVeiculo || undefined)
+                          const valorQuestoesAtual =
+                            questoesEditadas[disciplina.id] !== undefined
+                              ? questoesEditadas[disciplina.id]
+                              : disciplina.questoesRealizadas
+                          const progressoQuestoes = disciplina.questoesPlanejadas > 0
+                            ? (valorQuestoesAtual / disciplina.questoesPlanejadas) * 100
+                            : 0
 
-                      const estaEditando = camposEditando[disciplina.id]
-                      const valoresEditadosDisciplina = valoresEditados[disciplina.id] || {}
-                    
-                    return (
-                        <TableRow key={disciplina.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <IconeVeiculo className="h-4 w-4 text-muted-foreground" />
-                              <div className="flex flex-col min-w-0 flex-1">
-                                {estaEditando === 'disciplinaId' ? (
-                                  <Select
-                                    value={obterIdDisciplinaAtual(disciplina)}
-                                    onValueChange={(valor) => {
-                                      const timestamp = new Date().toISOString().substr(14, 9)
-                                      console.log(`⏰ ${timestamp} 🎯 SELECT ONVALUECHANGE CHAMADO:`, valor)
-                                      console.log(`⏰ ${timestamp} 🎯 Disciplina atual antes da mudança:`, disciplina.disciplina?.nome)
-                                      
-                                      // PRIMEIRO: Atualizar valor editado em memória
-                                      console.log(`⏰ ${timestamp} 🎯 PASSO 1: Atualizando valoresEditados...`)
-                                      console.log(`⏰ ${timestamp} 🎯 VALOR SENDO SALVO NO ESTADO:`, valor)
-                                      atualizarValorEditado(disciplina.id, 'disciplinaId', valor)
-                                      
-                                      // SEGUNDO: Atualizar plano local para feedback visual imediato
-                                      const novaDisciplina = disciplinas.find(d => d.id === valor)
-                                      if (novaDisciplina && plano) {
-                                        console.log(`⏰ ${timestamp} 🎯 PASSO 2: Atualizando plano local com:`, novaDisciplina.nome)
-                                        const novoPlano = { ...plano }
-                                        novoPlano.semanas = novoPlano.semanas.map(semana => ({
-                                          ...semana,
-                                          disciplinas: semana.disciplinas.map(disc => {
-                                            if (disc.id === disciplina.id) {
-                                              return {
-                                                ...disc,
-                                                disciplina: {
-                                                  id: novaDisciplina.id,
-                                                  nome: novaDisciplina.nome,
-                                                  createdAt: new Date(),
-                                                  updatedAt: new Date(),
-                                                  peso: 1,
-                                                  descricao: null,
-                                                  cargaHoraria: 0
-                                                },
-                                                disciplinaId: valor
-                                              }
-                                            }
-                                            return disc
-                                          })
-                                        }))
-                                        setPlano(novoPlano)
-                                        console.log(`⏰ ${timestamp} 🎯 PASSO 2: Plano atualizado localmente`)
-                                        
-                                        // TERCEIRO: Salvar no servidor após um pequeno delay
-                                        setTimeout(() => {
-                                          const timestampDelay = new Date().toISOString().substr(14, 9)
-                                          console.log(`⏰ ${timestampDelay} 🎯 PASSO 3: Iniciando salvamento no servidor...`)
-                                          console.log(`⏰ ${timestampDelay} 🎯 ANTES DO SALVAMENTO - valoresEditados[${disciplina.id}]:`, valoresEditados[disciplina.id])
-                                          console.log(`⏰ ${timestampDelay} 🎯 VALOR DIRETO PARA SALVAMENTO:`, valor)
-                                          salvarEdicaoComValor(disciplina, 'disciplinaId', valor)
-                                        }, 50)
-                                      } else {
-                                        console.log(`⏰ ${timestamp} ❌ Nova disciplina não encontrada:`, valor)
-                                      }
-                                    }}
-                                  >
-                                    <SelectTrigger className="w-full min-w-[150px]">
-                                      <SelectValue placeholder="Selecione uma disciplina" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {disciplinas.map((disc) => (
-                                        <SelectItem key={disc.id} value={disc.id}>
-                                          {disc.nome}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <span 
-                                    className="font-medium cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                                    onDoubleClick={() => {
-                                      // IMPORTANTE: Só iniciar edição se não há valores pendentes de salvamento
-                                      if (!temEdicoesPendentes(disciplina.id)) {
-                                        const idDisciplinaAtual = obterIdDisciplinaAtual(disciplina)
-                                        console.log('Iniciando edição de disciplina com ID:', idDisciplinaAtual) // Debug
-                                        iniciarEdicao(disciplina.id, 'disciplinaId', idDisciplinaAtual)
-                                      } else {
-                                        console.log('⚠️ Edição bloqueada - há valores pendentes de salvamento') // Debug
-                                      }
-                                    }}
-                                  >
-                                    {obterNomeDisciplina(disciplina)}
-                                  </span>
-                                )}
-                                {disciplina.concluida && (
-                                  <div className="mt-1">
-                                    <Badge variant="outline" className="text-xs text-green-600">Concluída</Badge>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
+                          const estaEditando = camposEditando[disciplina.id]
+                          const valoresEditadosDisciplina = valoresEditados[disciplina.id] || {}
 
-                          {/* Horas planejadas - editável */}
-                          <TableCell className="text-center">
-                            {estaEditando === 'horasPlanejadas' ? (
-                              <Input
-                                className="w-20 text-center"
-                                type="text"
-                                value={valoresEditadosDisciplina.horasPlanejadas || disciplina.horasPlanejadas}
-                                onChange={(e) => {
-                                  const valor = e.target.value.replace(/[^0-9]/g, '')
-                                  atualizarValorEditado(disciplina.id, 'horasPlanejadas', parseInt(valor) || 0)
-                                }}
-                                onBlur={() => salvarEdicao(disciplina)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') salvarEdicao(disciplina)
-                                  if (e.key === 'Escape') cancelarEdicao(disciplina.id)
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <span 
-                                className="text-sm cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                                onDoubleClick={() => iniciarEdicao(disciplina.id, 'horasPlanejadas', disciplina.horasPlanejadas)}
-                              >
-                                {disciplina.horasPlanejadas}h
-                              </span>
-                            )}
-                          </TableCell>
-
-                          {/* Questões planejadas - editável */}
-                          <TableCell className="text-center">
-                            {estaEditando === 'questoesPlanejadas' ? (
-                              <Input
-                                className="w-20 text-center"
-                                type="text"
-                                value={valoresEditadosDisciplina.questoesPlanejadas || disciplina.questoesPlanejadas}
-                                onChange={(e) => {
-                                  const valor = e.target.value.replace(/[^0-9]/g, '')
-                                  atualizarValorEditado(disciplina.id, 'questoesPlanejadas', parseInt(valor) || 0)
-                                }}
-                                onBlur={() => salvarEdicao(disciplina)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') salvarEdicao(disciplina)
-                                  if (e.key === 'Escape') cancelarEdicao(disciplina.id)
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <span 
-                                className="text-sm cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                                onDoubleClick={() => iniciarEdicao(disciplina.id, 'questoesPlanejadas', disciplina.questoesPlanejadas)}
-                              >
-                                {disciplina.questoesPlanejadas}
-                              </span>
-                            )}
-                          </TableCell>
-
-                          {/* Dias da semana - checkboxes */}
-                          <TableCell className="text-center">
-                            <div className="flex flex-wrap gap-2 justify-center">
-                              {diasSemana.map((dia) => {
-                                const diasSelecionados = parseDiasEstudo(disciplina.diasEstudo)
-                                const isChecked = diasSelecionados.includes(dia.id)
-                                
-                                // Debug detalhado da reatividade
-                                console.log(`🔍 Renderizando ${dia.id} para disciplina ${disciplina.id} (${disciplina.disciplina?.nome}):`, {
-                                  diasEstudo: disciplina.diasEstudo,
-                                  diasSelecionados,
-                                  isChecked,
-                                  diaId: dia.id,
-                                  semanaId: semana.id,
-                                  numeroSemana: semana.numeroSemana
-                                })
-                                
-                                return (
-                                  <div key={`${disciplina.id}-${dia.id}-${disciplina.diasEstudo || 'empty'}`} className="flex items-center gap-1">
-                                    <input
-                                      type="checkbox"
-                                      id={`${disciplina.id}-${dia.id}`}
-                                      checked={isChecked}
-                                      key={`checkbox-${disciplina.id}-${dia.id}-${isChecked}`}
-                                      onChange={(e) => {
-                                        const checked = e.target.checked
-                                        console.log(`🗓️ Native Checkbox ${dia.id} (${dia.label}) para disciplina ${disciplina.id}`)
-                                        console.log(`🗓️ Estado atual: ${isChecked} → ${checked}`)
-                                        console.log(`🗓️ Event target checked:`, e.target.checked)
-                                        
-                                        const diasAtuais = parseDiasEstudo(disciplina.diasEstudo)
-                                        console.log(`🗓️ Dias atuais:`, diasAtuais)
-                                        
-                                        let novosDias: string[]
-                                        
-                                        if (checked) {
-                                          // Adicionar dia se não estiver presente
-                                          novosDias = [...diasAtuais.filter(d => d !== dia.id), dia.id]
-                                        } else {
-                                          // Remover dia se estiver presente
-                                          novosDias = diasAtuais.filter(d => d !== dia.id)
-                                        }
-                                        
-                                        console.log(`🗓️ Novos dias calculados:`, novosDias)
-                                        atualizarDiasEstudo(disciplina, novosDias)
-                                      }}
-                                      className="h-4 w-4"
-                                    />
-                                    <label 
-                                      htmlFor={`${disciplina.id}-${dia.id}`}
-                                      className="text-xs cursor-pointer select-none hover:text-blue-600"
-                                    >
-                                      {dia.label}
-                                    </label>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </TableCell>
-
-                          {/* Ações - botão excluir */}
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => excluirDisciplina(disciplina.id, semana.id)}
-                              className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
-                              title="Excluir disciplina"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                          return (
+                            <SortableDisciplinaRow
+                              key={disciplina.id}
+                              disciplina={disciplina}
+                              index={index}
+                              semana={semana}
+                              IconeVeiculo={IconeVeiculo}
+                              valorQuestoesAtual={valorQuestoesAtual}
+                              progressoQuestoes={progressoQuestoes}
+                              estaEditando={estaEditando}
+                              valoresEditadosDisciplina={valoresEditadosDisciplina}
+                              camposEditando={camposEditando}
+                              valoresEditados={valoresEditados}
+                              questoesEditadas={questoesEditadas}
+                              salvandoId={salvandoId}
+                              disciplinas={disciplinas}
+                              plano={plano}
+                              diasSemana={diasSemana}
+                              observacoesExpandidas={observacoesExpandidas}
+                              setObservacoesExpandidas={setObservacoesExpandidas}
+                              onDisciplinaActions={{
+                                iniciarEdicao,
+                                atualizarValorEditado,
+                                salvarEdicao,
+                                salvarEdicaoComValor,
+                                cancelarEdicao,
+                                temEdicoesPendentes,
+                                obterNomeDisciplina,
+                                obterIdDisciplinaAtual,
+                                parseDiasEstudo,
+                                atualizarDiasEstudo,
+                                excluirDisciplina
+                              }}
+                            />
+                          )
+                        })}
+                      </SortableContext>
+                    </TableBody>
+                  </Table>
+                </DndContext>
                 </div>
                 
                 {/* Botão para adicionar nova disciplina */}
-                <div className="mt-3 flex justify-center">
+                <div className="mt-3 flex justify-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => adicionarNovaDisciplina(semana)}
+                    onClick={() => abrirModalAdicionarDisciplina(semana)}
                     className="flex items-center gap-2 text-sm"
                   >
                     <Plus className="h-4 w-4" />
                     Adicionar disciplina
+                  </Button>
+                  
+                  {/* Botão temporário de debug */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      console.log('🔍 DEBUG: Iniciando debug da semana:', semana.id)
+                      
+                      // Primeiro, fazer debug geral da semana
+                      const debugResult = await debugSemana(semana.id, disciplinas[0]?.id || '')
+                      console.log('📊 DEBUG: Resultado:', debugResult)
+                      
+                      if (debugResult.success && debugResult.data) {
+                        toast(`Debug: ${debugResult.data.disciplinasNaSemana} disciplinas na semana. ${debugResult.data.disciplinaJaExiste ? 'Disciplina já existe!' : 'Disciplina pode ser adicionada.'}`)
+                      }
+                      
+                      // Tentar limpar disciplinas órfãs
+                      const cleanResult = await limparDisciplinasOrfas(semana.id)
+                      if (cleanResult.success && typeof cleanResult.removidas === 'number' && cleanResult.removidas > 0) {
+                        toast(`Limpeza: ${cleanResult.removidas} disciplinas órfãs removidas`)
+                        await carregarPlano() // Recarregar após limpeza
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm bg-orange-50 hover:bg-orange-100 text-orange-600"
+                  >
+                    🔍 Debug
                   </Button>
                 </div>
                 </CardContent>

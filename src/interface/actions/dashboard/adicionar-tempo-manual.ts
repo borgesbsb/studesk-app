@@ -3,32 +3,17 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
-export async function adicionarTempoManual(disciplinaId: string, horas: number, minutos: number, data?: Date) {
+export async function adicionarTempoManual(disciplinaId: string, minutos: number, data?: Date) {
   try {
     const diaConsultado = data || new Date();
-    const totalSegundos = (horas * 3600) + (minutos * 60);
-    
     console.log('🕒 Adicionando tempo manual:', {
       disciplinaId,
-      horas,
       minutos,
-      totalSegundos,
       data: diaConsultado.toISOString()
     });
 
-    // Buscar um material da disciplina para associar o tempo
-    const materialDisciplina = await prisma.disciplinaMaterial.findFirst({
-      where: {
-        disciplinaId: disciplinaId
-      },
-      include: {
-        material: true
-      }
-    });
-
-    if (!materialDisciplina) {
-      throw new Error('Nenhum material encontrado para esta disciplina');
-    }
+    // Não é necessário ter material para adicionar tempo de estudo
+    // O tempo será adicionado diretamente à disciplina na semana de estudo
 
     // Buscar a semana de estudo ativa para a disciplina
     const planoAtivo = await prisma.planoEstudo.findFirst({
@@ -76,35 +61,52 @@ export async function adicionarTempoManual(disciplinaId: string, horas: number, 
       throw new Error('Disciplina não encontrada na semana de estudo');
     }
 
-    // Converter segundos para horas (com 2 decimais)
-    const horasAdicionadas = Math.round((totalSegundos / 3600) * 100) / 100;
+    // Trabalhar diretamente com minutos
+    const minutosAdicionados = minutos;
+    
+    // horasRealizadas armazena minutos totais para ter precisão
+    const tempoAnteriorMinutos = disciplinaSemana.horasRealizadas; // Minutos
+    const novoTempoRealizadoMinutos = tempoAnteriorMinutos + minutosAdicionados;
 
-    // Adicionar diretamente ao tempo real de estudo (horasRealizadas)
-    const novoTempoRealizado = disciplinaSemana.horasRealizadas + horasAdicionadas;
+    console.log('🔍 [DEBUG - APENAS MINUTOS]:', {
+      minutos,
+      minutosAdicionados,
+      tempoAnteriorMinutos,
+      novoTempoRealizadoMinutos,
+      diferencaCalculada: novoTempoRealizadoMinutos - tempoAnteriorMinutos
+    });
 
     await prisma.disciplinaSemana.update({
       where: {
         id: disciplinaSemana.id
       },
       data: {
-        horasRealizadas: novoTempoRealizado
+        horasRealizadas: novoTempoRealizadoMinutos // Salva em minutos
       }
     });
 
-    console.log('✅ Tempo real de estudo atualizado:', {
-      disciplinaSemanaId: disciplinaSemana.id,
-      horasAdicionadas,
-      novoTempoRealizado,
-      totalSegundos
+    // Verificar o que foi realmente salvo no banco
+    const disciplinaAtualizada = await prisma.disciplinaSemana.findUnique({
+      where: { id: disciplinaSemana.id },
+      select: { horasRealizadas: true }
     });
 
-    // Revalidar o cache da página do dashboard
+    console.log('✅ Tempo real de estudo atualizado (em minutos):', {
+      disciplinaSemanaId: disciplinaSemana.id,
+      minutosAdicionados,
+      tempoAnteriorMinutos,
+      novoTempoCalculadoMinutos: novoTempoRealizadoMinutos,
+      tempoSalvoNoBanco: disciplinaAtualizada?.horasRealizadas
+    });
+
+    // Revalidar o cache das páginas do dashboard
     revalidatePath('/dashboard');
+    revalidatePath('/hoje');
 
     return {
       success: true,
-      message: `${horas}h ${minutos}min adicionados ao Tempo Real de Estudo com sucesso!`,
-      tempoAdicionado: horasAdicionadas
+      message: `${minutos} minutos adicionados ao Tempo Real de Estudo com sucesso!`,
+      tempoAdicionado: minutosAdicionados
     };
 
   } catch (error) {

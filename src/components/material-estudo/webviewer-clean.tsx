@@ -289,6 +289,28 @@ export default function WebViewerCleanModal({
     }
   }, [open, isTimerRunning])
 
+  // Controlar pausa do cronômetro quando aba muda
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isTimerRunning) {
+        console.log('⏸️ Aba oculta - pausando cronômetro')
+        setIsTimerRunning(false)
+      } else if (!document.hidden && open) {
+        console.log('▶️ Aba visível - retomando cronômetro')
+        setIsTimerRunning(true)
+      }
+    }
+
+    // Adicionar listener apenas se o modal estiver aberto
+    if (open) {
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [open, isTimerRunning])
+
   // Atualizar cronômetro a cada segundo
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
@@ -496,6 +518,80 @@ export default function WebViewerCleanModal({
     setSelectedTheme(savedTheme)
   }, [])
 
+  // Função para limpar cache e reinicializar WebViewer
+  const handleWebViewerTrialExpired = useCallback(async () => {
+    console.warn('🚨 WebViewer trial expirado detectado, limpando cache...')
+    
+    try {
+      // Limpar todos os tipos de cache do browser
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(name => caches.delete(name)))
+        console.log('✅ Cache de Service Workers limpo')
+      }
+      
+      // Limpar localStorage e sessionStorage (mas preservar tema)
+      const savedTheme = localStorage.getItem('pdf-filter-theme')
+      localStorage.clear()
+      sessionStorage.clear()
+      if (savedTheme) {
+        localStorage.setItem('pdf-filter-theme', savedTheme)
+      }
+      console.log('✅ Local/Session Storage limpo')
+      
+      // Limpar IndexedDB se disponível
+      if ('indexedDB' in window) {
+        try {
+          const databases = await indexedDB.databases()
+          await Promise.all(databases.map(db => {
+            if (db.name) {
+              const deleteReq = indexedDB.deleteDatabase(db.name)
+              return new Promise((resolve) => {
+                deleteReq.onsuccess = () => resolve(true)
+                deleteReq.onerror = () => resolve(false)
+              })
+            }
+          }))
+          console.log('✅ IndexedDB limpo')
+        } catch (e) {
+          console.log('⚠️ Não foi possível limpar IndexedDB:', e)
+        }
+      }
+      
+      toast.info('Cache limpo! Reinicializando PDF...', {
+        duration: 2000
+      })
+      
+      // Limpar instância do WebViewer atual
+      if (webViewerInstanceRef.current) {
+        webViewerInstanceRef.current = null
+      }
+      
+      // Limpar o container
+      if (viewerRef.current) {
+        viewerRef.current.innerHTML = ''
+      }
+      
+      // Fechar modal e aguardar um pouco antes de reabrir
+      onOpenChange(false)
+      
+      setTimeout(() => {
+        console.log('🔄 Reabrindo modal PDF após limpeza de cache...')
+        // Forçar timestamp para evitar cache
+        forcePdfReload()
+        onOpenChange(true)
+      }, 2000)
+      
+    } catch (error) {
+      console.error('❌ Erro ao limpar cache:', error)
+      // Fallback: apenas recarregar a página
+      toast.info('Recarregando página...', { duration: 2000 })
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    }
+  }, [onOpenChange, forcePdfReload])
+
   // Aplicar tema salvo ao container quando estiver pronto
   useEffect(() => {
     if (viewerRef.current && selectedTheme) {
@@ -505,6 +601,41 @@ export default function WebViewerCleanModal({
       }
     }
   }, [selectedTheme, open])
+
+  // Listener global para erros não capturados do WebViewer
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      const errorMessage = event.message || event.error?.message || ''
+      if (errorMessage.includes('trial has expired') || 
+          errorMessage.includes('7-day trial') ||
+          errorMessage.includes('Thank you for evaluating WebViewer')) {
+        console.warn('🚨 Trial do WebViewer expirado detectado (erro global)!')
+        event.preventDefault()
+        handleWebViewerTrialExpired()
+      }
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const errorMessage = event.reason?.message || event.reason?.toString() || ''
+      if (errorMessage.includes('trial has expired') || 
+          errorMessage.includes('7-day trial') ||
+          errorMessage.includes('Thank you for evaluating WebViewer')) {
+        console.warn('🚨 Trial do WebViewer expirado detectado (promise rejeitada)!')
+        event.preventDefault()
+        handleWebViewerTrialExpired()
+      }
+    }
+
+    if (open) {
+      window.addEventListener('error', handleGlobalError)
+      window.addEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+
+    return () => {
+      window.removeEventListener('error', handleGlobalError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+  }, [open, handleWebViewerTrialExpired])
 
   // Fechar menu ao clicar fora
   useEffect(() => {
@@ -1039,10 +1170,28 @@ export default function WebViewerCleanModal({
 
           documentViewer.addEventListener('error', (err) => {
             console.error('❌ Erro no WebViewer:', err)
+            
+            // Verificar se é erro de trial expirado
+            const errorMessage = err?.message || err?.toString() || ''
+            if (errorMessage.includes('trial has expired') || 
+                errorMessage.includes('7-day trial') ||
+                errorMessage.includes('Thank you for evaluating WebViewer')) {
+              console.warn('🚨 Trial do WebViewer expirado detectado!')
+              handleWebViewerTrialExpired()
+            }
           })
 
         } catch (error) {
           console.error('❌ Erro ao inicializar WebViewer:', error)
+          
+          // Verificar se é erro de trial expirado na inicialização
+          const errorMessage = (error as any)?.message || error?.toString() || ''
+          if (errorMessage.includes('trial has expired') || 
+              errorMessage.includes('7-day trial') ||
+              errorMessage.includes('Thank you for evaluating WebViewer')) {
+            console.warn('🚨 Trial do WebViewer expirado detectado na inicialização!')
+            handleWebViewerTrialExpired()
+          }
         }
       }
 

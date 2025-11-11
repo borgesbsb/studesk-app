@@ -44,9 +44,40 @@ export function AdicionarCicloModal({ planoId, isOpen, onClose, onSuccess }: Adi
 
   const handleConfirmarCiclo = async (disciplinas: DisciplinaPlanejada[]) => {
     if (!planoId) return
+    
+    if (!disciplinas || disciplinas.length === 0) {
+      toast.error('Nenhuma disciplina selecionada!')
+      return
+    }
 
     try {
-      const resultado = await adicionarCicloAoPlano(planoId, proximaSemana, disciplinas)
+      console.log('🚀 Modal: iniciando handleConfirmarCiclo', { planoId, proximaSemana, disciplinas })
+      // Calcular datas para a semana (início na segunda-feira)
+      const hoje = new Date()
+      const dataInicio = new Date(hoje)
+      const diaSemana = hoje.getDay() // 0 = domingo, 1 = segunda
+      
+      // Se hoje é segunda (1), usar hoje. Senão, próxima segunda
+      if (diaSemana === 1) {
+        // Hoje é segunda, usar hoje mesmo
+      } else if (diaSemana === 0) {
+        // Hoje é domingo, próxima segunda é amanhã (+1)
+        dataInicio.setDate(hoje.getDate() + 1)
+      } else {
+        // Qualquer outro dia, calcular próxima segunda
+        const diasParaSegunda = 8 - diaSemana
+        dataInicio.setDate(hoje.getDate() + diasParaSegunda)
+      }
+      
+      const dataFim = new Date(dataInicio)
+      dataFim.setDate(dataInicio.getDate() + 6) // 7 dias depois
+      
+      const dataInicioStr = dataInicio.toISOString().split('T')[0]
+      const dataFimStr = dataFim.toISOString().split('T')[0]
+
+      console.log('📅 Modal: datas calculadas', { dataInicioStr, dataFimStr })
+      const resultado = await adicionarCicloAoPlano(planoId, proximaSemana, disciplinas, dataInicioStr, dataFimStr)
+      console.log('✅ Modal: resultado da action', resultado)
       
       if (resultado.success) {
         toast.success(`Ciclo ${proximaSemana} configurado com ${disciplinas.length} disciplinas!`)

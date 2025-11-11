@@ -330,7 +330,7 @@ export default function QuestionarioInterativoPage() {
     let pontosGanhos = 0;
     let novoStreak = streakAtual;
     let bonusVelocidade = 1;
-    let achievements: string[] = [];
+    const achievements: string[] = [];
 
     if (correto) {
       // Pontos base

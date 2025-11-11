@@ -16,6 +16,7 @@ export interface MateriaDoDia {
   questoesPlanejadas: number
   questoesRealizadas: number
   prioridade: number
+  observacoes?: string // Assuntos a estudar
 }
 
 // Função para obter o dia da semana em formato abreviado
@@ -29,15 +30,29 @@ function isDiaDeEstudo(diasEstudo: string | null, diaAtual: string): boolean {
   if (!diasEstudo) return false
   
   try {
-    // Se for JSON
+    let diasArray: string[] = []
+    
+    // Se for JSON (pode conter números ou strings)
     if (diasEstudo.trim().startsWith('[')) {
-      const diasArray = JSON.parse(diasEstudo)
-      return diasArray.includes(diaAtual)
+      const parsed = JSON.parse(diasEstudo)
+      if (Array.isArray(parsed)) {
+        // Converter números para strings se necessário
+        diasArray = parsed.map(item => {
+          if (typeof item === 'number') {
+            const mapaDias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']
+            return mapaDias[item] || 'seg'
+          }
+          return String(item).trim()
+        })
+      }
+    } else {
+      // Se for CSV
+      diasArray = diasEstudo.split(',').map(d => d.trim()).filter(d => d)
     }
     
-    // Se for CSV
-    const diasArray = diasEstudo.split(',').map(d => d.trim()).filter(d => d)
-    return diasArray.includes(diaAtual)
+    const resultado = diasArray.includes(diaAtual)
+    console.log(`🔍 isDiaDeEstudo: "${diasEstudo}" → [${diasArray.join(',')}] → dia "${diaAtual}" = ${resultado}`)
+    return resultado
   } catch (error) {
     console.warn('Erro ao processar diasEstudo:', diasEstudo, error)
     return false
@@ -149,8 +164,10 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
                     // Apenas sessões de estudo reais (com nomeSessao e assuntosEstudados) e não transferidas
                     nomeSessao: { not: null },
                     assuntosEstudados: { 
-                      not: null,
-                      not: { contains: '[TEMPO TRANSFERIDO]' }
+                      not: null
+                    },
+                    NOT: {
+                      assuntosEstudados: { contains: '[TEMPO TRANSFERIDO]' }
                     }
                   }
                 }
@@ -187,29 +204,32 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
         // Converter segundos para horas (com 2 decimais)
         const tempoSessoesPdf = Math.round((tempoSessoesPdfSegundos / 3600) * 100) / 100
         
-        // Tempo Real de Estudo vem do campo horasRealizadas (controlado pelo usuário)
-        const tempoRealEstudo = disciplinaSemana.horasRealizadas
+        // Tempo Real de Estudo: horasRealizadas está em minutos, converter para horas
+        const tempoRealEstudo = Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100
 
         console.log('🔍 DEBUG - Cálculo final:', {
           disciplinaNome: disciplinaSemana.disciplina.nome,
-          tempoSessoesPdfSegundos,
-          tempoSessoesPdf,
-          tempoRealEstudo
+          horasPlanejadas: disciplinaSemana.horasPlanejadas, // Em horas
+          horasRealizadasMinutos: disciplinaSemana.horasRealizadas, // Em minutos
+          tempoRealEstudo, // Em horas (convertido)
+          tempoSessoesPdf, // Em horas
+          proporcao: `${Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100}h / ${disciplinaSemana.horasPlanejadas}h`
         })
 
         return {
           id: disciplinaSemana.id,
           disciplinaId: disciplinaSemana.disciplina.id,
           disciplinaNome: disciplinaSemana.disciplina.nome,
-          horasPlanejadas: disciplinaSemana.horasPlanejadas,
-          horasRealizadas: disciplinaSemana.horasRealizadas,
+          horasPlanejadas: disciplinaSemana.horasPlanejadas, // Já está em horas
+          horasRealizadas: Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100, // Converter minutos para horas
           tempoRealEstudo,
           tempoSessoesPdf,
           concluida: disciplinaSemana.concluida,
           materialNome: disciplinaSemana.materialNome || undefined,
           questoesPlanejadas: disciplinaSemana.questoesPlanejadas,
           questoesRealizadas: disciplinaSemana.questoesRealizadas,
-          prioridade: disciplinaSemana.prioridade
+          prioridade: disciplinaSemana.prioridade,
+          observacoes: disciplinaSemana.observacoes || undefined
         }
       })
     )

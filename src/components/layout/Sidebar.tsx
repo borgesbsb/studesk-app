@@ -52,8 +52,9 @@ const CalendarIcon = ({ className }: { className?: string }) => (
 )
 
 const sidebarLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
-  { href: "/concurso", label: "Concursos", icon: BookOpenIcon },
+  { href: "/hoje", label: "Hoje", icon: LayoutDashboardIcon },
+  { href: "/agenda", label: "Agenda", icon: CalendarIcon },
+  { href: "/disciplinas", label: "Disciplinas", icon: BookOpenIcon },
   { href: "/plano-estudos", label: "Gerenciador de Estudos", icon: CalendarIcon },
 ]
 

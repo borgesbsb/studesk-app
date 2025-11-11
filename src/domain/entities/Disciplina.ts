@@ -1,18 +1,4 @@
-import { Concurso } from "./Concurso"
 import { MaterialEstudo } from "./MaterialEstudo"
-
-export interface ConcursoDisciplina {
-  id: string
-  concursoId: string
-  disciplinaId: string
-  ordem: number
-  peso: number
-  questoes: number
-  pontos: number
-  createdAt: Date
-  updatedAt: Date
-  concurso?: Concurso
-}
 
 export interface DisciplinaMaterial {
   id: string
@@ -31,7 +17,6 @@ export interface Disciplina {
   peso: number
   createdAt: Date
   updatedAt: Date
-  concursos?: ConcursoDisciplina[]
   materiais?: DisciplinaMaterial[]
 }
 

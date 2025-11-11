@@ -30,12 +30,6 @@ interface PlanoEstudo {
   dataInicio: string | Date
   dataFim: string | Date
   ativo: boolean
-  concurso?: {
-    id: string
-    nome: string
-    orgao: string
-    cargo: string
-  }
   semanas: Array<{
     id: string
     numeroSemana: number
@@ -167,7 +161,7 @@ export function PlanosEstudoTable() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
-              <TableHead>Concurso</TableHead>
+              <TableHead>Período</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -190,16 +184,15 @@ export function PlanosEstudoTable() {
                   </TableCell>
                   
                   <TableCell>
-                    {plano.concurso ? (
-                      <div className="space-y-1">
-                        <div className="font-medium text-sm">{plano.concurso.nome}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {plano.concurso.orgao} - {plano.concurso.cargo}
-                        </div>
+                    <div className="space-y-1">
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(plano.dataInicio), "dd/MM/yyyy", { locale: ptBR })} - {" "}
+                        {format(new Date(plano.dataFim), "dd/MM/yyyy", { locale: ptBR })}
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
+                      <div className="text-xs text-muted-foreground">
+                        {plano.semanas.length} semana{plano.semanas.length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
                   </TableCell>
                   
                   <TableCell>

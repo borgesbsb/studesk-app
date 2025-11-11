@@ -17,7 +17,7 @@ export async function createPlanoEstudo(data: CreatePlanoEstudoData) {
   }
 }
 
-export async function createPlanoEstudoSimples(data: { nome: string; concursoId?: string }) {
+export async function createPlanoEstudoSimples(data: { nome: string }) {
   try {
     const plano = await PlanoEstudoService.criarSimples(data)
     revalidatePath('/plano-estudos')

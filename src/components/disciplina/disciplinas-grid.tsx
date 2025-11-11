@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
-import { listarDisciplinasDoConcurso, removerDisciplinaDoConcurso } from "@/interface/actions/disciplina/concurso"
+import { listarDisciplinas } from "@/interface/actions/disciplina/list"
+import { deletarDisciplina } from "@/interface/actions/disciplina/delete"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { useRouter } from "next/navigation"
 import { 
@@ -27,21 +28,7 @@ import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface DisciplinasGridProps {
-  concursoId: string
-}
-
-interface DisciplinaConcurso {
-  id: string
-  concursoId: string
-  disciplinaId: string
-  ordem: number
-  peso: number
-  questoes: number
-  pontos: number
-  disciplina: {
-    id: string
-    nome: string
-  }
+  termoPesquisa?: string
 }
 
 interface MaterialEstudo {
@@ -52,7 +39,13 @@ interface MaterialEstudo {
   arquivoPdfUrl?: string | null
 }
 
-interface DisciplinaComMateriais extends DisciplinaConcurso {
+interface DisciplinaComMateriais {
+  id: string
+  disciplinaId: string
+  disciplina: {
+    id: string
+    nome: string
+  }
   materiais: MaterialEstudo[]
   progresso: number
   totalPaginas: number
@@ -62,7 +55,7 @@ interface DisciplinaComMateriais extends DisciplinaConcurso {
   xp?: number // Pontos de experiência
 }
 
-export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
+export function DisciplinasGrid({ termoPesquisa }: DisciplinasGridProps) {
   const { toast } = useToast()
   const [disciplinas, setDisciplinas] = useState<DisciplinaComMateriais[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,11 +64,11 @@ export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
   useEffect(() => {
     const carregarDados = async () => {
       try {
-        const response = await listarDisciplinasDoConcurso(concursoId)
+        const response = await listarDisciplinas()
         if (response.success && response.data) {
           const disciplinasComMateriais = await Promise.all(
-            response.data.map(async (disc) => {
-              const materiaisResponse = await listarMateriaisDaDisciplina(disc.disciplinaId)
+            response.data.map(async (disciplina) => {
+              const materiaisResponse = await listarMateriaisDaDisciplina(disciplina.id)
               const materiais = materiaisResponse.success ? materiaisResponse.data?.map(dm => dm.material) || [] : []
               
               const totalPaginas = materiais.reduce((total, mat) => total + mat.totalPaginas, 0)
@@ -88,7 +81,12 @@ export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
               const streak = Math.floor(Math.random() * 7) + 1 // Simulando streak (substituir por lógica real)
 
               return {
-                ...disc,
+                id: disciplina.id,
+                disciplinaId: disciplina.id,
+                disciplina: {
+                  id: disciplina.id,
+                  nome: disciplina.nome
+                },
                 materiais,
                 progresso,
                 totalPaginas,
@@ -112,14 +110,14 @@ export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
       }
     }
     carregarDados()
-  }, [concursoId, toast])
+  }, [toast])
 
   const handleRemover = async (disciplinaId: string) => {
     if (!confirm("Tem certeza que deseja remover esta disciplina?")) {
       return
     }
 
-    const response = await removerDisciplinaDoConcurso(concursoId, disciplinaId)
+    const response = await deletarDisciplina(disciplinaId)
     if (response.success) {
       toast({
         title: "Disciplina removida com sucesso",
@@ -159,6 +157,11 @@ export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
     return "bg-gray-400"
   }
 
+  // Filter disciplinas based on search term
+  const disciplinasFiltradas = disciplinas.filter(disciplina =>
+    disciplina.disciplina.nome.toLowerCase().includes((termoPesquisa || '').toLowerCase())
+  )
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -187,7 +190,7 @@ export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {disciplinas.map((disciplina) => {
+      {disciplinasFiltradas.map((disciplina) => {
         const progressoColor = getProgressColor(disciplina.progresso)
 
         return (
@@ -205,23 +208,13 @@ export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
                     <GraduationCap className="h-5 w-5 text-gray-600" />
                     {disciplina.disciplina.nome}
                   </CardTitle>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Scale className="h-4 w-4" />
-                      Peso {disciplina.peso}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <ListChecks className="h-4 w-4" />
-                      {disciplina.questoes} questões
-                    </div>
-                  </div>
                 </div>
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                    onClick={() => router.push(`/concurso/${concursoId}/disciplina/${disciplina.disciplinaId}/materiais`)}
+                    onClick={() => router.push(`/disciplina/${disciplina.disciplinaId}/materiais`)}
                     title="Materiais de Estudo"
                   >
                     <Book className="h-4 w-4" />
@@ -325,12 +318,12 @@ export function DisciplinasGrid({ concursoId }: DisciplinasGridProps) {
         )
       })}
 
-      {disciplinas.length === 0 && (
+      {disciplinasFiltradas.length === 0 && (
         <Card className="col-span-full p-8 border border-gray-200 shadow-sm bg-white">
           <div className="text-center text-gray-500">
             <GraduationCap className="h-12 w-12 mx-auto mb-3 text-gray-300" />
             <p className="text-lg font-medium text-gray-700 mb-1">Nenhuma disciplina cadastrada</p>
-            <p className="text-sm">Adicione disciplinas para começar a estudar</p>
+            <p className="text-sm">Crie disciplinas para começar a organizar seus estudos</p>
           </div>
         </Card>
       )}

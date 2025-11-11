@@ -19,7 +19,8 @@ export function CalendarioSemanal() {
   const gerarDias = (startOffset: number) => {
     const dias = [];
     for (let i = 0; i < 7; i++) {
-      const data = addDays(hoje, startOffset + i);
+      // Usar startOfDay para garantir que a data está normalizada
+      const data = startOfDay(addDays(hoje, startOffset + i));
       dias.push({
         data,
         dia: format(data, "d", { locale: ptBR }),

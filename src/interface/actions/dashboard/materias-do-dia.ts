@@ -61,16 +61,48 @@ function isDiaDeEstudo(diasEstudo: string | null, diaAtual: string): boolean {
 
 export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
   try {
-    const diaConsultado = data || new Date()
+    // Normalizar a data recebida para o início do dia
+    const diaConsultado = data ? startOfDay(data) : startOfDay(new Date())
     const inicioDia = startOfDay(diaConsultado)
     const fimDia = endOfDay(diaConsultado)
     const diaDaSemana = getDiaDaSemana(diaConsultado)
 
     console.log('🔍 DEBUG getMateriasDoDia - Início:', {
+      dataRecebida: data?.toISOString(),
       diaConsultado: diaConsultado.toISOString(),
       inicioDia: inicioDia.toISOString(),
       fimDia: fimDia.toISOString(),
-      diaDaSemana
+      diaDaSemana,
+      timestamp: {
+        diaConsultado: diaConsultado.getTime(),
+        inicioDia: inicioDia.getTime(),
+        fimDia: fimDia.getTime()
+      }
+    })
+
+    // Primeiro, buscar TODOS os planos ativos para debug
+    const todosPlanos = await prisma.planoEstudo.findMany({
+      where: {
+        ativo: true
+      },
+      select: {
+        id: true,
+        nome: true,
+        dataInicio: true,
+        dataFim: true,
+        ativo: true
+      }
+    })
+
+    console.log('🔍 DEBUG - Todos os planos ativos:', {
+      quantidade: todosPlanos.length,
+      planos: todosPlanos.map(p => ({
+        id: p.id,
+        nome: p.nome,
+        dataInicio: p.dataInicio.toISOString(),
+        dataFim: p.dataFim.toISOString(),
+        diaConsultadoDentro: p.dataInicio <= diaConsultado && p.dataFim >= diaConsultado
+      }))
     })
 
     // Busca o plano de estudo ativo que contenha o dia consultado
@@ -86,7 +118,11 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
       }
     })
 
-    console.log('🔍 DEBUG - Plano ativo encontrado:', planoAtivo?.id)
+    console.log('🔍 DEBUG - Plano ativo encontrado:', {
+      planoId: planoAtivo?.id,
+      planoNome: planoAtivo?.nome,
+      diaConsultado: diaConsultado.toISOString()
+    })
 
     if (!planoAtivo) {
       return []

@@ -199,9 +199,9 @@ function SortableDisciplinaRow({
     numeroSemana: semana.numeroSemana
   })
 
-  return [
-    <TableRow 
-      key={`${disciplina.id}-main`}
+  return (
+    <TableRow
+      key={disciplina.id}
       ref={setNodeRef} 
       style={style}
       className={isDragging ? 'opacity-50' : ''}

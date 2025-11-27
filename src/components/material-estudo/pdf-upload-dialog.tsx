@@ -128,21 +128,21 @@ export function PdfUploadDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Upload de PDF</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle className="text-xl font-bold">Upload de PDF</DialogTitle>
+                    <DialogDescription className="text-sm">
                         {materialNome ? `Envie um arquivo PDF para "${materialNome}"` : 'Selecione um arquivo PDF do seu computador'}
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
+                <div className="space-y-6 py-4">
                     {!selectedFile ? (
                         // Área de upload
                         <div
-                            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${dragActive
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                            className={`border-2 border-dashed rounded-xl p-10 text-center transition-all cursor-pointer ${dragActive
+                                    ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                    : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50 hover:shadow-md'
                                 }`}
                             onDragEnter={handleDrag}
                             onDragLeave={handleDrag}
@@ -150,13 +150,22 @@ export function PdfUploadDialog({
                             onDrop={handleDrop}
                             onClick={() => fileInputRef.current?.click()}
                         >
-                            <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                            <p className="text-sm font-medium text-gray-700 mb-1">
-                                Clique para selecionar ou arraste o arquivo
-                            </p>
-                            <p className="text-xs text-gray-500">
-                                Apenas arquivos PDF (máx. 50MB)
-                            </p>
+                            <div className="flex flex-col items-center gap-3">
+                                <div className="rounded-full bg-blue-100 p-4">
+                                    <Upload className="h-8 w-8 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="text-base font-semibold text-gray-900 mb-1">
+                                        Arraste e solte seu arquivo aqui
+                                    </p>
+                                    <p className="text-sm text-gray-600 mb-2">
+                                        ou clique para selecionar
+                                    </p>
+                                    <p className="text-xs text-gray-500 bg-gray-100 inline-block px-3 py-1 rounded-full">
+                                        Apenas PDF • Máximo 50MB
+                                    </p>
+                                </div>
+                            </div>
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -167,16 +176,21 @@ export function PdfUploadDialog({
                         </div>
                     ) : (
                         // Arquivo selecionado
-                        <div className="border rounded-lg p-4 bg-gray-50">
-                            <div className="flex items-start gap-3">
+                        <div className="border-2 border-green-200 rounded-xl p-5 bg-green-50">
+                            <div className="flex items-start gap-4">
                                 <div className="flex-shrink-0">
-                                    <FileText className="h-10 w-10 text-red-500" />
+                                    <div className="rounded-lg bg-red-100 p-3">
+                                        <FileText className="h-8 w-8 text-red-600" />
+                                    </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                    <p className="text-sm font-semibold text-gray-900 mb-1">
+                                        Arquivo selecionado
+                                    </p>
+                                    <p className="text-sm font-medium text-gray-700 truncate mb-1">
                                         {selectedFile.name}
                                     </p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-gray-600 bg-white inline-block px-2 py-1 rounded">
                                         {formatFileSize(selectedFile.size)}
                                     </p>
                                 </div>
@@ -184,36 +198,39 @@ export function PdfUploadDialog({
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleRemoveFile}
-                                    className="flex-shrink-0 h-8 w-8 p-0"
+                                    className="flex-shrink-0 h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
                                     disabled={uploading}
+                                    title="Remover arquivo"
                                 >
-                                    <X className="h-4 w-4" />
+                                    <X className="h-5 w-5" />
                                 </Button>
                             </div>
                         </div>
                     )}
 
-                    {/* Botões de ação */}
-                    <div className="flex justify-end gap-2 pt-2">
+                    {/* Botões de ação - Layout melhorado */}
+                    <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t">
                         <Button
                             variant="outline"
+                            size="lg"
                             onClick={() => {
                                 setSelectedFile(null)
                                 onOpenChange(false)
                             }}
                             disabled={uploading}
-                            className="border-gray-300 hover:bg-gray-100"
+                            className="flex-1 border-2 border-gray-300 hover:bg-gray-100 font-medium"
                         >
                             Cancelar
                         </Button>
                         <Button
+                            size="lg"
                             onClick={handleUpload}
                             disabled={!selectedFile || uploading}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px]"
+                            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-400"
                         >
                             {uploading ? (
                                 <>
-                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
@@ -221,7 +238,7 @@ export function PdfUploadDialog({
                                 </>
                             ) : (
                                 <>
-                                    <Upload className="h-4 w-4 mr-2" />
+                                    <Upload className="h-5 w-5 mr-2" />
                                     Enviar e Abrir
                                 </>
                             )}

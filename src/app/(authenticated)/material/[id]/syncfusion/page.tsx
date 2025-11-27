@@ -7,6 +7,7 @@ import SyncfusionPdfViewer from "@/components/pdf/SyncfusionPdfViewer"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Play, Pause, Save } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { AdicionarTempoCicloDialog } from "@/components/material-estudo/adicionar-tempo-ciclo-dialog"
 
@@ -15,9 +16,11 @@ interface PageProps {
 }
 
 export default function SyncfusionViewerPage({ params }: PageProps) {
+    const router = useRouter()
     const [materialId, setMaterialId] = useState<string>("")
     const [material, setMaterial] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [disciplinaIdFromUrl, setDisciplinaIdFromUrl] = useState<string>("")
 
     // Estados do cronômetro
     const [elapsedTime, setElapsedTime] = useState(0) // em segundos
@@ -36,9 +39,14 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             const { id } = await params
             setMaterialId(id)
 
-            // Adicionar lógica para detectar tempUrl nos parâmetros de busca
+            // Adicionar lógica para detectar tempUrl e disciplinaId nos parâmetros de busca
             const urlParams = new URLSearchParams(window.location.search)
             const tempUrl = urlParams.get('tempUrl')
+            const disciplinaId = urlParams.get('disciplinaId')
+
+            if (disciplinaId) {
+                setDisciplinaIdFromUrl(disciplinaId)
+            }
 
             if (tempUrl) {
                 // Se tempUrl estiver presente, usar essa URL para o PDF
@@ -319,14 +327,36 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     const tempUrl = searchParams.get('tempUrl')
     const pdfUrl = tempUrl || material.arquivoPdfUrl || ''
 
+    // Determinar a URL de retorno
+    const getBackUrl = () => {
+        // 1. Tentar usar disciplinaId da URL
+        if (disciplinaIdFromUrl) {
+            return `/disciplina/${disciplinaIdFromUrl}/materiais`
+        }
+        // 2. Tentar usar disciplinaId do material
+        const disciplinaId = material.disciplinas?.[0]?.disciplina?.id || material.disciplinas?.[0]?.disciplinaId
+        if (disciplinaId) {
+            return `/disciplina/${disciplinaId}/materiais`
+        }
+        // 3. Fallback: voltar para página anterior
+        return null
+    }
+
+    const handleBack = () => {
+        const backUrl = getBackUrl()
+        if (backUrl) {
+            router.push(backUrl)
+        } else {
+            router.back()
+        }
+    }
+
     return (
         <div className="h-screen flex flex-col">
             <div className="bg-white border-b p-4 flex items-center gap-4">
-                <Link href={`/disciplina/${material.disciplinas?.[0]?.disciplina?.id || material.disciplinas?.[0]?.disciplinaId || ''}/materiais`}>
-                    <Button variant="ghost" size="icon">
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                </Link>
+                <Button variant="ghost" size="icon" onClick={handleBack}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
 
                 <div className="flex-1">
                     <h1 className="font-semibold text-lg">{material.nome} (Syncfusion POC)</h1>

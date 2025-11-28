@@ -5,11 +5,12 @@ import { buscarMaterialEstudoPorId } from "@/interface/actions/material-estudo/l
 import { atualizarProgressoMaterial } from "@/interface/actions/material-estudo/update-progress"
 import SyncfusionPdfViewer from "@/components/pdf/SyncfusionPdfViewer"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Play, Pause, Save } from "lucide-react"
+import { ArrowLeft, Play, Pause, Save, Database, Wifi, WifiOff } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { AdicionarTempoCicloDialog } from "@/components/material-estudo/adicionar-tempo-ciclo-dialog"
+import { pdfCacheService } from "@/services/pdf-cache.service"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -21,6 +22,8 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     const [material, setMaterial] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [disciplinaIdFromUrl, setDisciplinaIdFromUrl] = useState<string>("")
+    const [pdfBlobUrl, setPdfBlobUrl] = useState<string>("")
+    const [fromCache, setFromCache] = useState<boolean>(false)
 
     // Estados do cronômetro
     const [elapsedTime, setElapsedTime] = useState(0) // em segundos
@@ -52,17 +55,53 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                 // Se tempUrl estiver presente, usar essa URL para o PDF
                 setMaterial({
                     id: id,
-                    nome: "Visualização Temporária", // Nome padrão para visualização temporária
+                    nome: "Visualização Temporária",
                     arquivoPdfUrl: tempUrl,
-                    paginasLidas: 0, // Não há progresso salvo para visualização temporária
-                    disciplinas: [] // Não há disciplinas associadas para visualização temporária
+                    paginasLidas: 0,
+                    disciplinas: []
                 })
+                setPdfBlobUrl(tempUrl)
+                setFromCache(false)
             } else {
-                // Caso contrário, carregar material do banco de dados
+                // Carregar material do banco de dados
                 const materialResponse = await buscarMaterialEstudoPorId(id)
 
                 if (materialResponse.success && materialResponse.data) {
                     setMaterial(materialResponse.data)
+
+                    // Tentar buscar PDF do cache IndexedDB primeiro
+                    console.log('🔍 Verificando cache local para PDF...')
+                    const cachedPdf = await pdfCacheService.getPdf(id)
+
+                    if (cachedPdf) {
+                        // PDF encontrado no cache
+                        const blobUrl = URL.createObjectURL(cachedPdf)
+                        setPdfBlobUrl(blobUrl)
+                        setFromCache(true)
+                        console.log('📦 PDF carregado do cache local!')
+                        toast.success('PDF carregado do cache local', {
+                            description: 'Carregamento instantâneo',
+                            icon: <Database className="h-4 w-4" />
+                        })
+                    } else if (materialResponse.data.arquivoPdfUrl) {
+                        // PDF não está no cache, buscar do servidor
+                        console.log('🌐 Baixando PDF do servidor...')
+                        try {
+                            const response = await fetch(materialResponse.data.arquivoPdfUrl)
+                            const blob = await response.blob()
+                            const blobUrl = URL.createObjectURL(blob)
+                            setPdfBlobUrl(blobUrl)
+                            setFromCache(false)
+
+                            // Salvar no cache para próxima vez
+                            const fileName = materialResponse.data.arquivoPdfUrl.split('/').pop() || 'documento.pdf'
+                            await pdfCacheService.savePdfFromBlob(id, blob, fileName)
+                            console.log('💾 PDF salvo no cache local para próximo acesso')
+                        } catch (error) {
+                            console.error('❌ Erro ao baixar PDF do servidor:', error)
+                            toast.error('Erro ao carregar PDF')
+                        }
+                    }
                 }
             }
             setLoading(false)
@@ -325,7 +364,9 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     // Verificar se há uma URL temporária nos parâmetros
     const searchParams = new URLSearchParams(window.location.search)
     const tempUrl = searchParams.get('tempUrl')
-    const pdfUrl = tempUrl || material.arquivoPdfUrl || ''
+
+    // Usar a URL do blob (que pode vir do cache ou do servidor)
+    const pdfUrl = pdfBlobUrl || material.arquivoPdfUrl || ''
 
     // Determinar a URL de retorno
     const getBackUrl = () => {
@@ -359,10 +400,24 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                 </Button>
 
                 <div className="flex-1">
-                    <h1 className="font-semibold text-lg">{material.nome} (Syncfusion POC)</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="font-semibold text-lg">{material.nome} (Syncfusion POC)</h1>
+                        {fromCache && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full border border-green-200">
+                                <Database className="h-3 w-3" />
+                                Cache Local
+                            </span>
+                        )}
+                    </div>
                     {tempUrl && (
                         <p className="text-xs text-amber-600 mt-0.5">
                             📄 Visualizando arquivo temporário do upload
+                        </p>
+                    )}
+                    {fromCache && (
+                        <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1">
+                            <WifiOff className="h-3 w-3" />
+                            Disponível offline
                         </p>
                     )}
                 </div>
@@ -418,7 +473,7 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             <div className="flex-1 bg-white p-4 overflow-hidden">
                 <div className="h-full rounded-lg overflow-hidden shadow-sm">
                     <SyncfusionPdfViewer
-                        pdfUrl={material.arquivoPdfUrl || ''}
+                        pdfUrl={pdfUrl}
                         paginaProgresso={material.paginasLidas}
                         onPageChange={handlePageChange}
                     />

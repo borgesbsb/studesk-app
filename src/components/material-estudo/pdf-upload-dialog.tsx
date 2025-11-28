@@ -2,9 +2,10 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Upload, FileText, X } from "lucide-react"
+import { Upload, FileText, X, Database } from "lucide-react"
 import { useState, useRef } from "react"
 import { toast } from "sonner"
+import { pdfCacheService } from "@/services/pdf-cache.service"
 
 interface PdfUploadDialogProps {
     open: boolean
@@ -70,44 +71,58 @@ export function PdfUploadDialog({
     }
 
     const handleUpload = async () => {
-        if (!selectedFile) return
+        if (!selectedFile || !materialId) return
 
         setUploading(true)
         try {
-            // Criar FormData para enviar o arquivo
-            const formData = new FormData()
-            formData.append('file', selectedFile)
-            if (materialId) {
-                formData.append('materialId', materialId)
-            }
+            // 1. Salvar no cache IndexedDB (client-side)
+            console.log('💾 Salvando PDF no cache local (IndexedDB)...')
+            await pdfCacheService.savePdf(materialId, selectedFile)
 
-            // Upload para API temporária
+            // 2. Criar URL de objeto local para visualização imediata
+            const blob = new Blob([selectedFile], { type: 'application/pdf' })
+            const blobUrl = URL.createObjectURL(blob)
+
+            toast.success('PDF salvo no cache local!', {
+                description: 'Carregamento offline disponível',
+                icon: <Database className="h-4 w-4" />
+            })
+
+            // 3. Upload opcional para servidor (em background, não bloqueia)
+            // Isso garante backup no servidor mas não impacta a experiência
+            uploadToServerInBackground(selectedFile, materialId)
+
+            // 4. Chamar callback com a URL do blob local
+            onUploadComplete(blobUrl)
+
+            // 5. Limpar estado e fechar diálogo
+            setSelectedFile(null)
+            onOpenChange(false)
+        } catch (error) {
+            console.error('Erro ao processar upload:', error)
+            toast.error('Erro ao salvar PDF no cache local')
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    // Upload para servidor em background (não bloqueia UI)
+    const uploadToServerInBackground = async (file: File, matId: string) => {
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('materialId', matId)
+
             const response = await fetch('/api/material/upload-temp-pdf', {
                 method: 'POST',
                 body: formData
             })
 
-            if (!response.ok) {
-                throw new Error('Erro ao fazer upload do arquivo')
+            if (response.ok) {
+                console.log('✅ Backup no servidor concluído')
             }
-
-            const data = await response.json()
-
-            toast.success('Upload concluído!', {
-                description: 'Abrindo visualizador...'
-            })
-
-            // Chamar callback com a URL do arquivo
-            onUploadComplete(data.fileUrl)
-
-            // Limpar estado e fechar diálogo
-            setSelectedFile(null)
-            onOpenChange(false)
         } catch (error) {
-            console.error('Erro ao fazer upload:', error)
-            toast.error('Erro ao fazer upload do arquivo')
-        } finally {
-            setUploading(false)
+            console.warn('⚠️ Falha no backup do servidor (PDF permanece no cache local):', error)
         }
     }
 
@@ -131,8 +146,14 @@ export function PdfUploadDialog({
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold">Upload de PDF</DialogTitle>
-                    <DialogDescription className="text-sm">
-                        {materialNome ? `Envie um arquivo PDF para "${materialNome}"` : 'Selecione um arquivo PDF do seu computador'}
+                    <DialogDescription className="text-sm space-y-1">
+                        <div>
+                            {materialNome ? `Envie um arquivo PDF para "${materialNome}"` : 'Selecione um arquivo PDF do seu computador'}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded inline-flex">
+                            <Database className="h-3 w-3" />
+                            <span>Salvo localmente para acesso offline</span>
+                        </div>
                     </DialogDescription>
                 </DialogHeader>
 

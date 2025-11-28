@@ -113,9 +113,6 @@ export class MaterialEstudoService {
         where: { id },
         include: {
           disciplinas: true,
-          historicoPontuacoes: true,
-          progressoAdaptativo: true,
-          sessoes: true,
           historicoLeitura: true,
           anotacoes: true
         }
@@ -127,19 +124,12 @@ export class MaterialEstudoService {
 
       console.log('📊 Relações encontradas:', {
         disciplinas: material.disciplinas.length,
-        historicoPontuacoes: material.historicoPontuacoes.length,
-        progressoAdaptativo: material.progressoAdaptativo ? 1 : 0,
-        sessoes: material.sessoes.length,
         historicoLeitura: material.historicoLeitura.length,
         anotacoes: material.anotacoes.length
       })
 
       // Remover relações que não têm cascade
       await prisma.disciplinaMaterial.deleteMany({
-        where: { materialId: id }
-      })
-
-      await prisma.chunkUtilizado.deleteMany({
         where: { materialId: id }
       })
 

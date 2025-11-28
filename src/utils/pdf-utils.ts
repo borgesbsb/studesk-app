@@ -218,7 +218,7 @@ export async function extractTextFromPdf(pdfUrl: string): Promise<string[]> {
     const loadingTask = pdfjsLib.getDocument({ url: absoluteUrl })
     const pdf = await loadingTask.promise
     const totalPages = pdf.numPages
-    let pageContents: string[] = []
+    const pageContents: string[] = []
 
     // Extrair texto de cada página
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {

@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { getFileApiUrl } from '@/lib/utils'
+import WebViewer from '@pdftron/webviewer'
+import { Play, Pause } from 'lucide-react'
 
 interface WebViewerCleanModalProps {
   open: boolean
@@ -39,6 +41,7 @@ export default function WebViewerCleanModal({
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
   const [elapsedTime, setElapsedTime] = useState(0) // em segundos
   const [isTimerRunning, setIsTimerRunning] = useState(false)
+  const [timerInitialized, setTimerInitialized] = useState(false) // Rastreia se o timer já foi inicializado nesta sessão
   const [isNavigatingToProgress, setIsNavigatingToProgress] = useState(false)
   const [assuntoInput, setAssuntoInput] = useState('')
   const [adicionandoAssunto, setAdicionandoAssunto] = useState(false)
@@ -274,18 +277,55 @@ export default function WebViewerCleanModal({
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
+  // Função para alternar pausa/play do cronômetro
+  const toggleTimer = () => {
+    setIsTimerRunning(prev => !prev)
+    if (!isTimerRunning) {
+      toast.success('Cronômetro retomado')
+    } else {
+      toast.info('Cronômetro pausado')
+    }
+  }
+
   // Iniciar cronômetro quando modal abre
   useEffect(() => {
-    if (open && !isTimerRunning) {
+    if (open && !timerInitialized) {
+      // Só inicia o cronômetro na primeira vez que o modal abre
       console.log('⏱️ Iniciando cronômetro de sessão...')
       setSessionStartTime(new Date())
       setIsTimerRunning(true)
       setElapsedTime(0)
-    } else if (!open && isTimerRunning) {
-      console.log('⏱️ Parando cronômetro de sessão...')
+      setTimerInitialized(true)
+    } else if (!open) {
+      // Quando o modal fecha, reseta tudo
+      console.log('⏱️ Resetando cronômetro (modal fechado)...')
       setIsTimerRunning(false)
       setSessionStartTime(null)
       setElapsedTime(0)
+      setTimerInitialized(false)
+    }
+  }, [open, timerInitialized])
+
+  // Controlar pausa do cronômetro quando aba muda
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isTimerRunning) {
+        console.log('⏸️ Aba oculta - pausando cronômetro')
+        setIsTimerRunning(false)
+      } else if (!document.hidden && open && timerInitialized && !isTimerRunning) {
+        // Só retoma automaticamente se o timer foi iniciado e está pausado
+        console.log('▶️ Aba visível - retomando cronômetro')
+        setIsTimerRunning(true)
+      }
+    }
+
+    // Adicionar listener apenas se o modal estiver aberto
+    if (open) {
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [open, isTimerRunning])
 
@@ -496,6 +536,80 @@ export default function WebViewerCleanModal({
     setSelectedTheme(savedTheme)
   }, [])
 
+  // Função para limpar cache e reinicializar WebViewer
+  const handleWebViewerTrialExpired = useCallback(async () => {
+    console.warn('🚨 WebViewer trial expirado detectado, limpando cache...')
+    
+    try {
+      // Limpar todos os tipos de cache do browser
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(name => caches.delete(name)))
+        console.log('✅ Cache de Service Workers limpo')
+      }
+      
+      // Limpar localStorage e sessionStorage (mas preservar tema)
+      const savedTheme = localStorage.getItem('pdf-filter-theme')
+      localStorage.clear()
+      sessionStorage.clear()
+      if (savedTheme) {
+        localStorage.setItem('pdf-filter-theme', savedTheme)
+      }
+      console.log('✅ Local/Session Storage limpo')
+      
+      // Limpar IndexedDB se disponível
+      if ('indexedDB' in window) {
+        try {
+          const databases = await indexedDB.databases()
+          await Promise.all(databases.map(db => {
+            if (db.name) {
+              const deleteReq = indexedDB.deleteDatabase(db.name)
+              return new Promise((resolve) => {
+                deleteReq.onsuccess = () => resolve(true)
+                deleteReq.onerror = () => resolve(false)
+              })
+            }
+          }))
+          console.log('✅ IndexedDB limpo')
+        } catch (e) {
+          console.log('⚠️ Não foi possível limpar IndexedDB:', e)
+        }
+      }
+      
+      toast.info('Cache limpo! Reinicializando PDF...', {
+        duration: 2000
+      })
+      
+      // Limpar instância do WebViewer atual
+      if (webViewerInstanceRef.current) {
+        webViewerInstanceRef.current = null
+      }
+      
+      // Limpar o container
+      if (viewerRef.current) {
+        viewerRef.current.innerHTML = ''
+      }
+      
+      // Fechar modal e aguardar um pouco antes de reabrir
+      onOpenChange(false)
+      
+      setTimeout(() => {
+        console.log('🔄 Reabrindo modal PDF após limpeza de cache...')
+        // Forçar timestamp para evitar cache
+        forcePdfReload()
+        onOpenChange(true)
+      }, 2000)
+      
+    } catch (error) {
+      console.error('❌ Erro ao limpar cache:', error)
+      // Fallback: apenas recarregar a página
+      toast.info('Recarregando página...', { duration: 2000 })
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    }
+  }, [onOpenChange, forcePdfReload])
+
   // Aplicar tema salvo ao container quando estiver pronto
   useEffect(() => {
     if (viewerRef.current && selectedTheme) {
@@ -505,6 +619,41 @@ export default function WebViewerCleanModal({
       }
     }
   }, [selectedTheme, open])
+
+  // Listener global para erros não capturados do WebViewer
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      const errorMessage = event.message || event.error?.message || ''
+      if (errorMessage.includes('trial has expired') || 
+          errorMessage.includes('7-day trial') ||
+          errorMessage.includes('Thank you for evaluating WebViewer')) {
+        console.warn('🚨 Trial do WebViewer expirado detectado (erro global)!')
+        event.preventDefault()
+        handleWebViewerTrialExpired()
+      }
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const errorMessage = event.reason?.message || event.reason?.toString() || ''
+      if (errorMessage.includes('trial has expired') || 
+          errorMessage.includes('7-day trial') ||
+          errorMessage.includes('Thank you for evaluating WebViewer')) {
+        console.warn('🚨 Trial do WebViewer expirado detectado (promise rejeitada)!')
+        event.preventDefault()
+        handleWebViewerTrialExpired()
+      }
+    }
+
+    if (open) {
+      window.addEventListener('error', handleGlobalError)
+      window.addEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+
+    return () => {
+      window.removeEventListener('error', handleGlobalError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+  }, [open, handleWebViewerTrialExpired])
 
   // Fechar menu ao clicar fora
   useEffect(() => {
@@ -856,9 +1005,7 @@ export default function WebViewerCleanModal({
       const initWebViewer = async () => {
         try {
           const element = await waitForElement(() => viewerRef.current)
-          
-          const { default: WebViewer } = await import('@pdftron/webviewer')
-          
+
           const instance = await WebViewer({
             path: '/lib/webviewer',
             licenseKey: process.env.NEXT_PUBLIC_PDFTRON_LICENSE_KEY,
@@ -1039,10 +1186,28 @@ export default function WebViewerCleanModal({
 
           documentViewer.addEventListener('error', (err) => {
             console.error('❌ Erro no WebViewer:', err)
+            
+            // Verificar se é erro de trial expirado
+            const errorMessage = err?.message || err?.toString() || ''
+            if (errorMessage.includes('trial has expired') || 
+                errorMessage.includes('7-day trial') ||
+                errorMessage.includes('Thank you for evaluating WebViewer')) {
+              console.warn('🚨 Trial do WebViewer expirado detectado!')
+              handleWebViewerTrialExpired()
+            }
           })
 
         } catch (error) {
           console.error('❌ Erro ao inicializar WebViewer:', error)
+          
+          // Verificar se é erro de trial expirado na inicialização
+          const errorMessage = (error as any)?.message || error?.toString() || ''
+          if (errorMessage.includes('trial has expired') || 
+              errorMessage.includes('7-day trial') ||
+              errorMessage.includes('Thank you for evaluating WebViewer')) {
+            console.warn('🚨 Trial do WebViewer expirado detectado na inicialização!')
+            handleWebViewerTrialExpired()
+          }
         }
       }
 
@@ -1173,10 +1338,23 @@ export default function WebViewerCleanModal({
                 
                 {/* Cronômetro */}
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className={`w-2 h-2 rounded-full ${isTimerRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                   <span className="text-sm text-gray-700 font-medium font-mono">
                     ⏱️ {formatTime(elapsedTime)}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleTimer}
+                    className="h-6 w-6 p-0 hover:bg-gray-100 rounded-full"
+                    title={isTimerRunning ? 'Pausar cronômetro' : 'Retomar cronômetro'}
+                  >
+                    {isTimerRunning ? (
+                      <Pause className="h-3 w-3 text-gray-600" />
+                    ) : (
+                      <Play className="h-3 w-3 text-gray-600" />
+                    )}
+                  </Button>
                 </div>
               </div>
               

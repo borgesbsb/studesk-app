@@ -6,7 +6,6 @@ const prisma = new PrismaClient()
 export interface CreatePlanoEstudoData {
   nome: string
   descricao?: string
-  concursoId?: string
   dataInicio: Date
   dataFim: Date
   semanas: CreateSemanaEstudoData[]
@@ -34,10 +33,14 @@ export interface CreateDisciplinaSemanaData {
 
 export interface UpdateProgressoData {
   disciplinaSemanaId: string
-  horasRealizadas: number
-  concluida: boolean
+  horasRealizadas?: number
+  concluida?: boolean
   observacoes?: string
   questoesRealizadas?: number
+  horasPlanejadas?: number
+  questoesPlanejadas?: number
+  disciplinaId?: string
+  diasEstudo?: string
 }
 
 export class PlanoEstudoService {
@@ -45,12 +48,14 @@ export class PlanoEstudoService {
     try {
       return await prisma.planoEstudo.findMany({
         include: {
-          concurso: true,
           semanas: {
             include: {
               disciplinas: {
                 include: {
                   disciplina: true
+                },
+                orderBy: {
+                  prioridade: 'asc'
                 }
               }
             },
@@ -73,12 +78,14 @@ export class PlanoEstudoService {
     return await prisma.planoEstudo.findUnique({
       where: { id },
       include: {
-        concurso: true,
         semanas: {
           include: {
             disciplinas: {
               include: {
                 disciplina: true
+              },
+              orderBy: {
+                prioridade: 'asc'
               }
             }
           },
@@ -96,7 +103,6 @@ export class PlanoEstudoService {
         data: {
           nome: data.nome,
           descricao: data.descricao,
-          concursoId: data.concursoId,
           dataInicio: data.dataInicio,
           dataFim: data.dataFim,
           semanas: {
@@ -125,7 +131,6 @@ export class PlanoEstudoService {
           }
         },
         include: {
-          concurso: true,
           semanas: {
             include: {
               disciplinas: {
@@ -146,7 +151,7 @@ export class PlanoEstudoService {
     }
   }
 
-  static async criarSimples(data: { nome: string; concursoId?: string }) {
+  static async criarSimples(data: { nome: string }) {
     try {
       // Cria um plano básico sem semanas nem disciplinas
       // Usa datas padrão (hoje e hoje + 30 dias)
@@ -157,13 +162,11 @@ export class PlanoEstudoService {
       return await prisma.planoEstudo.create({
         data: {
           nome: data.nome,
-          concursoId: data.concursoId,
           dataInicio,
           dataFim,
           ativo: true
         },
         include: {
-          concurso: true,
           semanas: {
             include: {
               disciplinas: {
@@ -190,12 +193,10 @@ export class PlanoEstudoService {
       data: {
         nome: data.nome,
         descricao: data.descricao,
-        concursoId: data.concursoId,
         dataInicio: data.dataInicio,
         dataFim: data.dataFim
       },
       include: {
-        concurso: true,
         semanas: {
           include: {
             disciplinas: {
@@ -254,30 +255,47 @@ export class PlanoEstudoService {
   }
 
   static async atualizarProgresso(data: UpdateProgressoData) {
+    const updateData: any = {}
+    
+    if (typeof data.horasRealizadas === 'number') updateData.horasRealizadas = data.horasRealizadas
+    if (typeof data.concluida === 'boolean') updateData.concluida = data.concluida
+    if (data.observacoes !== undefined) updateData.observacoes = data.observacoes
+    if (typeof data.questoesRealizadas === 'number') updateData.questoesRealizadas = data.questoesRealizadas
+    if (typeof data.horasPlanejadas === 'number') updateData.horasPlanejadas = data.horasPlanejadas
+    if (typeof data.questoesPlanejadas === 'number') updateData.questoesPlanejadas = data.questoesPlanejadas
+    if (data.disciplinaId) updateData.disciplinaId = data.disciplinaId
+    if (data.diasEstudo !== undefined) updateData.diasEstudo = data.diasEstudo
+
+    console.log('🔄 Atualizando no banco:', { disciplinaSemanaId: data.disciplinaSemanaId, updateData }) // Debug
+
     const disciplinaSemana = await prisma.disciplinaSemana.update({
       where: { id: data.disciplinaSemanaId },
-      data: {
-        horasRealizadas: data.horasRealizadas,
-        concluida: data.concluida,
-        observacoes: data.observacoes,
-        ...(typeof data.questoesRealizadas === 'number' ? { questoesRealizadas: data.questoesRealizadas } : {})
-      },
+      data: updateData,
       include: {
         disciplina: true,
         semana: true
       }
     })
 
-    // Atualizar total de horas realizadas da semana
-    const totalHorasRealizadas = await prisma.disciplinaSemana.aggregate({
-      where: { semanaId: disciplinaSemana.semanaId },
-      _sum: { horasRealizadas: true }
-    })
+    console.log('✅ Resultado do banco:', disciplinaSemana) // Debug
+
+    // Atualizar totais da semana
+    const [totalHorasRealizadas, totalHorasPlanejadas] = await Promise.all([
+      prisma.disciplinaSemana.aggregate({
+        where: { semanaId: disciplinaSemana.semanaId },
+        _sum: { horasRealizadas: true }
+      }),
+      prisma.disciplinaSemana.aggregate({
+        where: { semanaId: disciplinaSemana.semanaId },
+        _sum: { horasPlanejadas: true }
+      })
+    ])
 
     await prisma.semanaEstudo.update({
       where: { id: disciplinaSemana.semanaId },
       data: {
-        horasRealizadas: totalHorasRealizadas._sum.horasRealizadas || 0
+        horasRealizadas: totalHorasRealizadas._sum.horasRealizadas || 0,
+        totalHoras: totalHorasPlanejadas._sum.horasPlanejadas || 0
       }
     })
 
@@ -322,6 +340,103 @@ export class PlanoEstudoService {
       percentualDisciplinas: disciplinasTotal > 0 
         ? Math.round((disciplinasConcluidas / disciplinasTotal) * 100) 
         : 0
+    }
+  }
+
+  static async adicionarDisciplinaSemana(data: CreateDisciplinaSemanaData & { semanaId: string }) {
+    try {
+      // Verificar se já existe uma disciplina com o mesmo disciplinaId na mesma semana
+      const existente = await prisma.disciplinaSemana.findFirst({
+        where: {
+          semanaId: data.semanaId,
+          disciplinaId: data.disciplinaId
+        }
+      })
+
+      if (existente) {
+        throw new Error('Esta disciplina já existe neste ciclo de estudo')
+      }
+
+      // Buscar a prioridade máxima atual para esta semana
+      const maxPrioridade = await prisma.disciplinaSemana.aggregate({
+        where: {
+          semanaId: data.semanaId
+        },
+        _max: {
+          prioridade: true
+        }
+      })
+
+      const novaPrioridade = (maxPrioridade._max.prioridade || 0) + 1
+
+      return await prisma.disciplinaSemana.create({
+        data: {
+          semanaId: data.semanaId,
+          disciplinaId: data.disciplinaId,
+          horasPlanejadas: data.horasPlanejadas || 1,
+          horasRealizadas: 0,
+          prioridade: novaPrioridade,
+          concluida: false,
+          observacoes: data.parametro || '',
+          questoesPlanejadas: data.questoesPlanejadas || 0,
+          questoesRealizadas: 0,
+          tempoVideoPlanejado: data.tempoVideoPlanejado || 0,
+          tempoVideoRealizado: 0,
+          paginasLidas: 0,
+          totalPaginas: 0,
+          tipoVeiculo: data.tipoVeiculo || 'pdf',
+          materialNome: data.materialNome,
+          materialUrl: null,
+          diasEstudo: data.diasEstudo || '[]'
+        },
+        include: {
+          disciplina: true
+        }
+      })
+    } catch (error) {
+      const errorLog = logError(error, 'adicionarDisciplinaSemana')
+      throw new Error(formatPrismaError(error))
+    }
+  }
+
+  static async excluirDisciplinaSemana(disciplinaSemanaId: string) {
+    try {
+      return await prisma.disciplinaSemana.delete({
+        where: { id: disciplinaSemanaId }
+      })
+    } catch (error) {
+      const errorLog = logError(error, 'excluirDisciplinaSemana')
+      throw new Error(formatPrismaError(error))
+    }
+  }
+
+  static async atualizarSemana(data: { semanaId: string, dataInicio?: string, dataFim?: string }) {
+    try {
+      const updateData: any = {}
+      // Criar datas locais sem conversão de fuso horário
+      if (data.dataInicio) {
+        const [ano, mes, dia] = data.dataInicio.split('-').map(Number)
+        updateData.dataInicio = new Date(ano, mes - 1, dia, 12, 0, 0)
+      }
+      if (data.dataFim) {
+        const [ano, mes, dia] = data.dataFim.split('-').map(Number)
+        updateData.dataFim = new Date(ano, mes - 1, dia, 12, 0, 0)
+      }
+
+      return await prisma.semanaEstudo.update({
+        where: { id: data.semanaId },
+        data: updateData,
+        include: {
+          disciplinas: {
+            include: {
+              disciplina: true
+            }
+          }
+        }
+      })
+    } catch (error) {
+      const errorLog = logError(error, 'atualizarSemana')
+      throw new Error(formatPrismaError(error))
     }
   }
 }

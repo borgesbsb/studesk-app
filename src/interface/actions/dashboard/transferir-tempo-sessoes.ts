@@ -115,8 +115,8 @@ export async function transferirTempoSessoes(disciplinaId: string, data?: Date) 
       }
     });
 
-    // Marcar as sessões como "transferidas" adicionando uma observação
-    await prisma.historicoLeitura.updateMany({
+    // Buscar históricos para marcar como transferidos
+    const historicosParaTransferir = await prisma.historicoLeitura.findMany({
       where: {
         material: {
           disciplinas: {
@@ -130,39 +130,30 @@ export async function transferirTempoSessoes(disciplinaId: string, data?: Date) 
           lte: semanaAtual.dataFim
         },
         nomeSessao: { not: null },
-        assuntosEstudados: { not: null }
-      },
-      data: {
         assuntosEstudados: { 
-          endsWith: '[TEMPO TRANSFERIDO]' 
+          not: null
+        },
+        NOT: {
+          assuntosEstudados: { contains: '[TEMPO TRANSFERIDO]' }
         }
       }
     });
 
-    // Para marcar como transferido, vamos usar uma abordagem mais segura
-    const historicoIds = materiaisDisciplina.flatMap(disciplinaMaterial => 
-      disciplinaMaterial.material.historicoLeitura.map(h => h.id)
-    );
-
-    for (const historicoId of historicoIds) {
-      const historico = await prisma.historicoLeitura.findUnique({
-        where: { id: historicoId }
+    // Marcar históricos como transferidos
+    for (const historico of historicosParaTransferir) {
+      await prisma.historicoLeitura.update({
+        where: { id: historico.id },
+        data: {
+          assuntosEstudados: `${historico.assuntosEstudados} [TEMPO TRANSFERIDO]`
+        }
       });
-
-      if (historico && !historico.assuntosEstudados?.includes('[TEMPO TRANSFERIDO]')) {
-        await prisma.historicoLeitura.update({
-          where: { id: historicoId },
-          data: {
-            assuntosEstudados: `${historico.assuntosEstudados} [TEMPO TRANSFERIDO]`
-          }
-        });
-      }
     }
+
 
     console.log('✅ Tempo transferido com sucesso:', {
       tempoTransferido: tempoSessoesPdfHoras,
       novoTempoRealizado,
-      historicoIds: historicoIds.length
+      historicosTransferidos: historicosParaTransferir.length
     });
 
     // Revalidar o cache da página do dashboard

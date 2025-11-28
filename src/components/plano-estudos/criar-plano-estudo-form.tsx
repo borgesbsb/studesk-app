@@ -1,48 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createPlanoEstudoSimples } from '@/interface/actions/plano-estudo/create'
-import { listarConcursos } from '@/interface/actions/concurso/list'
 import { Save, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
-interface Concurso {
-  id: string
-  nome: string
-  orgao: string
-  cargo: string
-}
-
 export function CriarPlanoEstudoForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [concursos, setConcursos] = useState<Concurso[]>([])
   
   const [formData, setFormData] = useState({
-    nome: '',
-    concursoId: ''
+    nome: ''
   })
-
-  useEffect(() => {
-    const carregarConcursos = async () => {
-      try {
-        const resultado = await listarConcursos()
-        if (resultado.success) {
-          setConcursos(resultado.data)
-        }
-      } catch (error) {
-        console.error('Erro ao carregar concursos:', error)
-      }
-    }
-    carregarConcursos()
-  }, [])
 
 
 
@@ -52,8 +27,7 @@ export function CriarPlanoEstudoForm() {
 
     try {
       const resultado = await createPlanoEstudoSimples({
-        nome: formData.nome,
-        concursoId: formData.concursoId || undefined
+        nome: formData.nome
       })
 
       if (resultado.success) {
@@ -82,7 +56,7 @@ export function CriarPlanoEstudoForm() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Criar Plano de Estudos</h1>
           <p className="text-muted-foreground">
-            Crie um plano básico com nome e concurso
+            Crie um plano básico com nome
           </p>
         </div>
       </div>
@@ -106,36 +80,6 @@ export function CriarPlanoEstudoForm() {
                   placeholder="Ex: Concurso Auditor 2024"
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="concurso">Concurso (Opcional)</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={formData.concursoId || undefined}
-                    onValueChange={(value) => setFormData({ ...formData, concursoId: value || '' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um concurso (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {concursos.map(concurso => (
-                        <SelectItem key={concurso.id} value={concurso.id}>
-                          {concurso.nome} - {concurso.cargo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.concursoId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFormData({ ...formData, concursoId: '' })}
-                    >
-                      Limpar
-                    </Button>
-                  )}
-                </div>
               </div>
             </div>
             

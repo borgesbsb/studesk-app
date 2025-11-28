@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { getAllPlanosEstudo } from '@/interface/actions/plano-estudo/get-all'
-import { Calendar, Clock, Target, Trash2, Eye } from 'lucide-react'
+import { Calendar, Clock, Target, Trash2, Eye, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -14,16 +14,10 @@ import { ptBR } from 'date-fns/locale'
 interface PlanoEstudo {
   id: string
   nome: string
-  descricao?: string
-  dataInicio: string
-  dataFim: string
+  descricao?: string | null
+  dataInicio: string | Date
+  dataFim: string | Date
   ativo: boolean
-  concurso?: {
-    id: string
-    nome: string
-    orgao: string
-    cargo: string
-  }
   semanas: Array<{
     id: string
     numeroSemana: number
@@ -49,7 +43,7 @@ export function PlanosEstudoGrid() {
     const carregarPlanos = async () => {
       try {
         const resultado = await getAllPlanosEstudo()
-        if (resultado.success) {
+        if (resultado.success && resultado.data) {
           setPlanos(resultado.data)
         }
       } catch (error) {
@@ -121,21 +115,11 @@ export function PlanosEstudoGrid() {
                 <div className="space-y-1">
                   <CardTitle className="text-lg">{plano.nome}</CardTitle>
                   <CardDescription>{plano.descricao}</CardDescription>
-                  {plano.concurso && (
-                    <div className="text-xs text-muted-foreground">
-                      <strong>{plano.concurso.nome}</strong> - {plano.concurso.cargo}
-                    </div>
-                  )}
                 </div>
                 <div className="flex flex-col gap-2">
                   <Badge variant={plano.ativo ? "default" : "secondary"}>
                     {plano.ativo ? "Ativo" : "Inativo"}
                   </Badge>
-                  {plano.concurso && (
-                    <Badge variant="outline" className="text-xs">
-                      {plano.concurso.orgao}
-                    </Badge>
-                  )}
                 </div>
               </div>
             </CardHeader>
@@ -181,6 +165,11 @@ export function PlanosEstudoGrid() {
                   <Button variant="outline" size="sm" className="w-full">
                     <Eye className="h-4 w-4 mr-2" />
                     Ver Detalhes
+                  </Button>
+                </Link>
+                <Link href={`/plano-estudos/${plano.id}/editar`}>
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-4 w-4" />
                   </Button>
                 </Link>
                 <Button variant="outline" size="sm">

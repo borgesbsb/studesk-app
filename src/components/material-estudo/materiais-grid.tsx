@@ -6,9 +6,10 @@ import { Trash2, BookOpen, Clock, FileText, TrendingUp, Eye } from "lucide-react
 import { useState, useEffect } from "react"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { deletarMaterialEstudo } from "@/interface/actions/material-estudo/delete"
+import { atualizarProgressoLeitura } from "@/interface/actions/material-estudo/update"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useRouter } from "next/navigation"
+import WebViewerPdfModal from './webviewer-clean'
 
 // Componente de progresso circular elegante
 interface ProgressCircleProps {
@@ -93,9 +94,10 @@ interface MaterialEstudoResponse {
 }
 
 export function MateriaisGrid({ disciplinaId }: MateriaisGridProps) {
-  const router = useRouter()
   const [materiais, setMateriais] = useState<MaterialEstudoResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialEstudoResponse | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const carregarMateriais = async () => {
     try {
@@ -131,6 +133,25 @@ export function MateriaisGrid({ disciplinaId }: MateriaisGridProps) {
       }
     } catch (error) {
       toast.error("Erro ao excluir material")
+    }
+  }
+
+  const handleOpenPdf = (material: MaterialEstudoResponse) => {
+    if (material.arquivoPdfUrl) {
+      setSelectedMaterial(material)
+      setIsModalOpen(true)
+    }
+  }
+
+  const handleAtualizarProgresso = async (pagina: number) => {
+    if (!selectedMaterial) return
+
+    try {
+      await atualizarProgressoLeitura(selectedMaterial.id, pagina)
+      // Reload materials to update the progress display
+      await carregarMateriais()
+    } catch (error) {
+      console.error('Erro ao atualizar progresso:', error)
     }
   }
 
@@ -198,10 +219,10 @@ export function MateriaisGrid({ disciplinaId }: MateriaisGridProps) {
         const statusInfo = getStatusInfo(progresso)
 
         return (
-          <Card 
-            key={material.id} 
+          <Card
+            key={material.id}
             className="group border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 bg-white hover:border-gray-300 cursor-pointer"
-            onClick={() => router.push(`/material/${material.id}`)}
+            onClick={() => handleOpenPdf(material)}
           >
             <CardContent className="p-5 space-y-4">
               {/* Header com status */}
@@ -254,10 +275,10 @@ export function MateriaisGrid({ disciplinaId }: MateriaisGridProps) {
                   className="flex-1 bg-gray-900 hover:bg-gray-800 text-white border-0 shadow-sm hover:shadow-md transition-all duration-200"
                   onClick={(e) => {
                     e.stopPropagation()
-                    router.push(`/material/${material.id}`)
+                    handleOpenPdf(material)
                   }}
                 >
-                  <Eye className="h-4 w-4 mr-2" />
+                  <FileText className="h-4 w-4 mr-2" />
                   Abrir Material
                 </Button>
 
@@ -278,6 +299,18 @@ export function MateriaisGrid({ disciplinaId }: MateriaisGridProps) {
           </Card>
         )
       })}
+
+      {/* Modal PDF */}
+      {selectedMaterial && selectedMaterial.arquivoPdfUrl && (
+        <WebViewerPdfModal
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          pdfUrl={selectedMaterial.arquivoPdfUrl}
+          paginaProgresso={selectedMaterial.paginasLidas}
+          onAtualizarProgresso={handleAtualizarProgresso}
+          materialId={selectedMaterial.id}
+        />
+      )}
     </div>
   )
 } 

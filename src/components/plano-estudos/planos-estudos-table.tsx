@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { getAllPlanosEstudo } from '@/interface/actions/plano-estudo/get-all'
 import { deletePlanoEstudo } from '@/interface/actions/plano-estudo/delete'
-import { Calendar, Eye, Trash2, Plus } from 'lucide-react'
+import { Calendar, Eye, Trash2, Plus, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -30,12 +30,6 @@ interface PlanoEstudo {
   dataInicio: string | Date
   dataFim: string | Date
   ativo: boolean
-  concurso?: {
-    id: string
-    nome: string
-    orgao: string
-    cargo: string
-  }
   semanas: Array<{
     id: string
     numeroSemana: number
@@ -167,7 +161,7 @@ export function PlanosEstudoTable() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
-              <TableHead>Concurso</TableHead>
+              <TableHead>Período</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -190,16 +184,15 @@ export function PlanosEstudoTable() {
                   </TableCell>
                   
                   <TableCell>
-                    {plano.concurso ? (
-                      <div className="space-y-1">
-                        <div className="font-medium text-sm">{plano.concurso.nome}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {plano.concurso.orgao} - {plano.concurso.cargo}
-                        </div>
+                    <div className="space-y-1">
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(plano.dataInicio), "dd/MM/yyyy", { locale: ptBR })} - {" "}
+                        {format(new Date(plano.dataFim), "dd/MM/yyyy", { locale: ptBR })}
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
+                      <div className="text-xs text-muted-foreground">
+                        {plano.semanas.length} semana{plano.semanas.length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
                   </TableCell>
                   
                   <TableCell>
@@ -210,8 +203,8 @@ export function PlanosEstudoTable() {
                   
                   <TableCell className="text-right">
                     <div className="flex gap-2 justify-end">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setPlanoSelecionado(plano.id)}
                       >
@@ -224,8 +217,13 @@ export function PlanosEstudoTable() {
                           Ver
                         </Button>
                       </Link>
-                      <Button 
-                        variant="outline" 
+                      <Link href={`/plano-estudos/${plano.id}/editar`}>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setPlanoParaExcluir(plano)}
                       >

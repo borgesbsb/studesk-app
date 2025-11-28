@@ -27,10 +27,12 @@ export default async function PlanoEstudoDetalhePage({ params }: PlanoEstudoDeta
               </p>
             </div>
           </div>
-          <Button variant="outline">
-            <Edit className="h-4 w-4 mr-2" />
-            Editar Plano
-          </Button>
+          <Link href={`/plano-estudos/${id}/editar`}>
+            <Button variant="outline">
+              <Edit className="h-4 w-4 mr-2" />
+              Editar Plano
+            </Button>
+          </Link>
         </div>
 
       {/* Detalhes do plano */}

@@ -98,9 +98,16 @@ export function PlanejamentoRapido({
   }, [])
 
   useEffect(() => {
-    // Marcar disciplinas já selecionadas
+    // Marcar disciplinas já selecionadas apenas na inicialização
     const disciplinasExistentes = new Set(disciplinasPlanejadas.map(d => d.disciplinaId))
-    setDisciplinasSelecionadas(disciplinasExistentes)
+    setDisciplinasSelecionadas(prev => {
+      // Se não há seleções anteriores (estado inicial), usar as existentes
+      if (prev.size === 0) {
+        return disciplinasExistentes
+      }
+      // Caso contrário, manter as seleções do usuário
+      return prev
+    })
   }, [disciplinasPlanejadas])
 
   const carregarDisciplinas = async () => {
@@ -292,7 +299,17 @@ export function PlanejamentoRapido({
                 <Checkbox
                   id={disciplina.id}
                   checked={disciplinasSelecionadas.has(disciplina.id)}
-                  onCheckedChange={() => toggleDisciplina(disciplina.id)}
+                  onCheckedChange={(checked) => {
+                    setDisciplinasSelecionadas(prev => {
+                      const novaSelecao = new Set(prev)
+                      if (checked) {
+                        novaSelecao.add(disciplina.id)
+                      } else {
+                        novaSelecao.delete(disciplina.id)
+                      }
+                      return novaSelecao
+                    })
+                  }}
                 />
                 <Label htmlFor={disciplina.id} className="text-sm cursor-pointer">
                   {disciplina.nome}

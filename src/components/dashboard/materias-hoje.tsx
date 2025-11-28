@@ -3,11 +3,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Clock, BookOpen, CheckCircle, ExternalLink, ArrowRight, Plus } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Clock, BookOpen, CheckCircle, FolderOpen, ArrowRightCircle, Timer, ClipboardList, Plus } from "lucide-react";
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
+import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
 import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual";
+import { adicionarQuestoes } from "@/interface/actions/dashboard/adicionar-questoes";
 import { transferirTempoSessoes } from "@/interface/actions/dashboard/transferir-tempo-sessoes";
 import { useDashboard } from "@/contexts/dashboard-context";
 import { useSaveStatus } from "@/contexts/save-status-context";
@@ -29,39 +31,86 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
     return Math.min((realizadas / planejadas) * 100, 100);
   };
 
+  const formatarTempo = (horas: number) => {
+    if (horas < 1) {
+      const minutos = Math.round(horas * 60);
+      return `${minutos}m`;
+    }
+    return `${horas}h`;
+  };
+
   const calcularProgressoQuestoes = (realizadas: number, planejadas: number) => {
     if (planejadas === 0) return 0;
     return Math.min((realizadas / planejadas) * 100, 100);
   };
 
-  const handleAdicionarTempo = async (disciplinaId: string, horas: number, minutos: number) => {
+  const getPizzaEmoji = (progresso: number) => {
+    if (progresso === 0) return "○"; // 0%
+    if (progresso < 25) return "◔"; // 1-25%
+    if (progresso < 50) return "◑"; // 25-50%
+    if (progresso < 75) return "◕"; // 50-75%
+    return "●"; // 75%+
+  };
+
+  const handleAdicionarTempo = async (disciplinaId: string, minutos: number) => {
     try {
-      console.log(`Adicionando ${horas}h ${minutos}min para disciplina ${disciplinaId} na data ${selectedDate.toISOString()}`);
+      console.log(`🕒 [INICIO] Adicionando ${minutos} minutos para disciplina ${disciplinaId} na data ${selectedDate.toISOString()}`);
       
-      const resultado = await adicionarTempoManual(disciplinaId, horas, minutos, selectedDate);
+      const resultado = await adicionarTempoManual(disciplinaId, minutos, selectedDate);
+      
+      console.log('🕒 [RESULTADO]', resultado);
       
       if (resultado.success) {
-        console.log('✅ Tempo adicionado com sucesso:', resultado.message);
+        console.log('✅ [SUCCESS] Tempo adicionado com sucesso:', resultado.message);
         setSuccess(resultado.message);
         if (onTempoAdicionado) {
-          onTempoAdicionado();
+          console.log('🔄 [REFRESH] Chamando callback onTempoAdicionado');
+          await onTempoAdicionado();
+          console.log('✅ [REFRESH] Callback executado com sucesso');
         }
       } else {
-        console.error('❌ Erro ao adicionar tempo:', resultado.message);
+        console.error('❌ [ERROR] Erro ao adicionar tempo:', resultado.message);
         setError(resultado.message);
       }
     } catch (error) {
-      console.error('❌ Erro inesperado:', error);
+      console.error('❌ [EXCEPTION] Erro inesperado:', error);
       setError('Erro inesperado ao adicionar tempo');
+    }
+  };
+
+
+  const handleAdicionarQuestoes = async (disciplinaId: string, quantidade: number) => {
+    try {
+      console.log(`📝 [INICIO] Adicionando ${quantidade} questões para disciplina ${disciplinaId} na data ${selectedDate.toISOString()}`);
+
+      const resultado = await adicionarQuestoes(disciplinaId, quantidade, selectedDate);
+
+      console.log('📝 [RESULTADO]', resultado);
+
+      if (resultado.success) {
+        console.log('✅ [SUCCESS] Questões adicionadas com sucesso:', resultado.message);
+        setSuccess(resultado.message);
+        if (onTempoAdicionado) {
+          console.log('🔄 [REFRESH] Chamando callback onTempoAdicionado');
+          await onTempoAdicionado();
+          console.log('✅ [REFRESH] Callback executado com sucesso');
+        }
+      } else {
+        console.error('❌ [ERROR] Erro ao adicionar questões:', resultado.message);
+        setError(resultado.message);
+      }
+    } catch (error) {
+      console.error('❌ [EXCEPTION] Erro inesperado:', error);
+      setError('Erro inesperado ao adicionar questões');
     }
   };
 
   const handleTransferirTempo = async (disciplinaId: string) => {
     try {
       console.log(`Transferindo tempo das sessões PDF para disciplina ${disciplinaId} na data ${selectedDate.toISOString()}`);
-      
+
       const resultado = await transferirTempoSessoes(disciplinaId, selectedDate);
-      
+
       if (resultado.success) {
         console.log('✅ Tempo transferido com sucesso:', resultado.message);
         setSuccess(resultado.message);
@@ -83,14 +132,14 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
   const materiasCompletas = materias.filter(materia => materia.concluida).length;
 
   return (
-    <Card className="h-full">
-      <CardHeader>
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <BookOpen className="h-5 w-5" />
           Matérias para Estudar
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex flex-col min-h-0">
         {materias.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <div className="p-4 rounded-full bg-muted/20">
@@ -111,7 +160,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 flex-shrink-0">
               <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                 <BookOpen className="h-8 w-8 text-primary" />
                 <div>
@@ -126,10 +175,10 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                 <div>
                   <p className="text-sm font-medium">Horas Estudadas</p>
                   <p className="text-2xl font-bold">
-                    {totalHorasReais}h
+                    {formatarTempo(totalHorasReais)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    de {totalHorasPlanejadas}h planejadas
+                    de {formatarTempo(totalHorasPlanejadas)} planejadas
                   </p>
                 </div>
               </div>
@@ -138,110 +187,149 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                 <div>
                   <p className="text-sm font-medium">Progresso</p>
                   <p className="text-2xl font-bold">
-                    {materias.length > 0 ? Math.round((materiasCompletas / materias.length) * 100) : 0}%
+                    {totalHorasPlanejadas > 0 ? Math.round((totalHorasReais / totalHorasPlanejadas) * 100) : 0}%
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-4">
-              {materias.map((materia) => {
-                const cardClasses = materia.concluida 
-                  ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
-                  : "bg-background border-border";
-                  
-                return (
-                  <div 
-                    key={materia.id}
-                    className={`p-4 rounded-lg border transition-all ${cardClasses}`}
-                  >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-lg">
-                              {materia.disciplinaNome}
-                            </h4>
-                            {materia.concluida && (
-                              <CheckCircle className="h-5 w-5 text-green-600" />
-                            )}
-                            <Link 
-                              href={`/disciplina/${materia.disciplinaId}/materiais`}
-                              className="ml-auto"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
-                            </Link>
-                          </div>
-                          {materia.materialNome && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {materia.materialNome}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <AdicionarTempoModal
-                            disciplinaNome={materia.disciplinaNome}
-                            onAdicionarTempo={(horas, minutos) => handleAdicionarTempo(materia.disciplinaId, horas, minutos)}
-                          />
-                          <Badge variant={materia.prioridade === 1 ? "destructive" : materia.prioridade === 2 ? "default" : "secondary"}>
-                            {materia.prioridade === 1 ? "Alta" : materia.prioridade === 2 ? "Média" : "Baixa"}
-                          </Badge>
-                        </div>
-                      </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[250px]">Disciplina</TableHead>
+                      <TableHead className="w-[200px]">Assuntos</TableHead>
+                      <TableHead className="w-[140px] text-center">Tempo</TableHead>
+                      <TableHead className="w-[140px] text-center">Questões</TableHead>
+                      <TableHead className="w-[120px] text-center">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {materias.map((materia) => {
+                      const progressoTempo = calcularProgressoHoras(materia.tempoRealEstudo, materia.horasPlanejadas);
+                      const progressoQuestoes = calcularProgressoQuestoes(materia.questoesRealizadas, materia.questoesPlanejadas);
+                      const rowClasses = materia.concluida
+                        ? "bg-green-50 dark:bg-green-950/20"
+                        : "";
 
-                      <div className="space-y-3">
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              Tempo Real de Estudo
-                            </span>
-                            <span>{materia.tempoRealEstudo}h de {materia.horasPlanejadas}h</span>
-                          </div>
-                          <Progress 
-                            value={calcularProgressoHoras(materia.tempoRealEstudo, materia.horasPlanejadas)}
-                            className="h-2"
-                          />
-                        </div>
-
-                        {materia.tempoSessoesPdf > 0 && (
-                          <div className="flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleTransferirTempo(materia.disciplinaId);
-                              }}
-                              className="h-6 px-2 text-xs hover:bg-primary/10"
-                              title="Transferir tempo das sessões PDF para Tempo Real de Estudo"
-                            >
-                              <ArrowRight className="h-3 w-3 mr-1" />
-                              Transferir Sessões PDF ({materia.tempoSessoesPdf}h)
-                            </Button>
-                          </div>
-                        )}
-
-                        {materia.questoesPlanejadas > 0 && (
-                          <div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="flex items-center gap-1">
-                                <BookOpen className="h-4 w-4" />
-                                Questões
-                              </span>
-                              <span>{materia.questoesRealizadas} / {materia.questoesPlanejadas}</span>
+                      return (
+                        <TableRow key={materia.id} className={rowClasses}>
+                          {/* Disciplina */}
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                {materia.concluida && (
+                                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                )}
+                                <span className="font-semibold text-sm">
+                                  {materia.disciplinaNome}
+                                </span>
+                              </div>
+                              <Badge
+                                variant={materia.prioridade === 1 ? "destructive" : materia.prioridade === 2 ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {materia.prioridade === 1 ? "Alta" : materia.prioridade === 2 ? "Média" : "Baixa"}
+                              </Badge>
                             </div>
-                            <Progress 
-                              value={calcularProgressoQuestoes(materia.questoesRealizadas, materia.questoesPlanejadas)}
-                              className="h-2"
-                            />
-                          </div>
-                        )}
-                      </div>
-                  </div>
-                );
-              })}
+                          </TableCell>
+
+                          {/* Assuntos */}
+                          <TableCell>
+                            <div className="text-xs text-muted-foreground">
+                              {materia.observacoes || (
+                                <span className="italic">Sem assuntos definidos</span>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* Tempo com Pizza */}
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{getPizzaEmoji(progressoTempo)}</span>
+                                <span className="text-sm font-medium">{Math.round(progressoTempo)}%</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatarTempo(materia.tempoRealEstudo)} / {formatarTempo(materia.horasPlanejadas)}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* Questões com Pizza */}
+                          <TableCell className="text-center">
+                            {materia.questoesPlanejadas > 0 ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-2xl">{getPizzaEmoji(progressoQuestoes)}</span>
+                                  <span className="text-sm font-medium">{Math.round(progressoQuestoes)}%</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {materia.questoesRealizadas} / {materia.questoesPlanejadas}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">N/A</span>
+                            )}
+                          </TableCell>
+
+                          {/* Ações */}
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <Link
+                                href={`/disciplina/${materia.disciplinaId}/materiais`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1.5 rounded-md hover:bg-primary/10 transition-colors group"
+                                title="📂 Abrir materiais"
+                              >
+                                <FolderOpen className="h-4 w-4 text-primary group-hover:text-primary/80" />
+                              </Link>
+                              <AdicionarTempoModal
+                                disciplinaNome={materia.disciplinaNome}
+                                onAdicionarTempo={(minutos) => handleAdicionarTempo(materia.disciplinaId, minutos)}
+                              />
+                              {materia.questoesPlanejadas > 0 && (
+                                <AdicionarQuestoesModal
+                                  disciplinaNome={materia.disciplinaNome}
+                                  onAdicionarQuestoes={(quantidade) => handleAdicionarQuestoes(materia.disciplinaId, quantidade)}
+                                />
+                              )}
+                              {materia.tempoSessoesPdf > 0 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleTransferirTempo(materia.disciplinaId);
+                                  }}
+                                  className="h-8 w-8 p-0 hover:bg-purple-50 hover:border-purple-400 dark:hover:bg-purple-950/20"
+                                  title="🔄 Transferir tempo das sessões PDF"
+                                >
+                                  <ArrowRightCircle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Legenda das Pizzas */}
+              <div className="mt-3 p-2 bg-muted/30 rounded-md">
+                <p className="text-xs text-muted-foreground text-center">
+                  <span className="font-medium">Legenda:</span>
+                  {" "}● = 75%+{" · "}
+                  ◕ = 50-75%{" · "}
+                  ◑ = 25-50%{" · "}
+                  ◔ = 1-25%{" · "}
+                  ○ = 0%
+                </p>
+              </div>
             </div>
           </>
         )}

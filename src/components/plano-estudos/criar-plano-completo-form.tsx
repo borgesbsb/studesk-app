@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { createPlanoEstudo } from '@/interface/actions/plano-estudo/create'
-import { listarConcursos } from '@/interface/actions/concurso/list'
 import { GerenciarCiclos } from './gerenciar-ciclos'
 import { DisciplinaPlanejada } from './planejamento-disciplinas'
 import { Save, ArrowLeft, Calendar, Target, CheckCircle2 } from 'lucide-react'
@@ -20,12 +19,6 @@ import Link from 'next/link'
 import { addWeeks, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-interface Concurso {
-  id: string
-  nome: string
-  orgao: string
-  cargo: string
-}
 
 interface Semana {
   numero: number
@@ -37,31 +30,16 @@ interface Semana {
 export function CriarPlanoCompletoForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [concursos, setConcursos] = useState<Concurso[]>([])
   const [activeTab, setActiveTab] = useState('basico')
   const [semanas, setSemanas] = useState<Semana[]>([])
   
   const [formData, setFormData] = useState({
     nome: '',
     descricao: '',
-    concursoId: '',
     dataInicio: '',
     dataFim: ''
   })
 
-  useEffect(() => {
-    const carregarConcursos = async () => {
-      try {
-        const resultado = await listarConcursos()
-        if (resultado.success) {
-          setConcursos(resultado.data)
-        }
-      } catch (error) {
-        console.error('Erro ao carregar concursos:', error)
-      }
-    }
-    carregarConcursos()
-  }, [])
 
   // Gerar semanas quando as datas mudarem
   useEffect(() => {
@@ -131,7 +109,6 @@ export function CriarPlanoCompletoForm() {
       const resultado = await createPlanoEstudo({
         nome: formData.nome,
         descricao: formData.descricao,
-        concursoId: formData.concursoId || undefined,
         dataInicio: new Date(formData.dataInicio),
         dataFim: new Date(formData.dataFim),
         semanas: semanasData
@@ -218,36 +195,6 @@ export function CriarPlanoCompletoForm() {
                       placeholder="Ex: Concurso Auditor 2024"
                       required
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="concurso">Concurso (Opcional)</Label>
-                    <div className="flex gap-2">
-                      <Select
-                        value={formData.concursoId || undefined}
-                        onValueChange={(value) => setFormData({ ...formData, concursoId: value || '' })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um concurso (opcional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {concursos.map(concurso => (
-                            <SelectItem key={concurso.id} value={concurso.id}>
-                              {concurso.nome} - {concurso.cargo}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {formData.concursoId && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setFormData({ ...formData, concursoId: '' })}
-                        >
-                          Limpar
-                        </Button>
-                      )}
-                    </div>
                   </div>
                 </div>
                 
@@ -361,11 +308,6 @@ export function CriarPlanoCompletoForm() {
                         <p><span className="font-medium">Nome:</span> {formData.nome}</p>
                         <p><span className="font-medium">Período:</span> {formData.dataInicio} a {formData.dataFim}</p>
                         <p><span className="font-medium">Total de semanas:</span> {semanas.length}</p>
-                        {formData.concursoId && (
-                          <p><span className="font-medium">Concurso:</span> {
-                            concursos.find(c => c.id === formData.concursoId)?.nome
-                          }</p>
-                        )}
                       </div>
                     </div>
                     

@@ -93,7 +93,7 @@ export function PlanejamentoDisciplinas({
   const atualizarDisciplina = (index: number, campo: string, valor: any) => {
     const novaLista = disciplinasPlanejadas.map((disciplina, i) => {
       if (i === index) {
-        let disciplinaAtualizada = { ...disciplina, [campo]: valor }
+        const disciplinaAtualizada = { ...disciplina, [campo]: valor }
         
         // Se mudou a disciplina, atualizar o nome
         if (campo === 'disciplinaId') {

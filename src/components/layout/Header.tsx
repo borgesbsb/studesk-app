@@ -13,7 +13,7 @@ interface HeaderProps {
 
 export function Header({ isOpen, setIsOpen }: HeaderProps) {
   const { status, message } = useSaveStatus()
-  const { customContent, title } = useHeader()
+  const { customContent, title, backButton } = useHeader()
 
   return (
     <header className="h-16 bg-background shadow-sm flex items-center px-6 sticky top-0 z-10 border-b">
@@ -27,6 +27,10 @@ export function Header({ isOpen, setIsOpen }: HeaderProps) {
           <Menu className="h-5 w-5" />
         </Button>
       )}
+
+      {/* Botão de voltar customizado */}
+      {backButton}
+
       <h1 className="text-xl font-semibold">{title}</h1>
 
       {/* Conteúdo customizado ou status de salvamento centralizado */}

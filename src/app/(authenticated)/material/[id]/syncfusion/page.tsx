@@ -25,7 +25,7 @@ interface InlineNotification {
 
 export default function SyncfusionViewerPage({ params }: PageProps) {
     const router = useRouter()
-    const { setCustomContent, setTitle } = useHeader()
+    const { setCustomContent, setTitle, setBackButton } = useHeader()
     const [materialId, setMaterialId] = useState<string>("")
     const [material, setMaterial] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -386,19 +386,22 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
         // Atualizar título do header
         setTitle(material.nome)
 
+        // Criar botão de voltar (aparecerá ANTES do título)
+        const backBtn = (
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBack}
+                className="shrink-0 hover:bg-accent mr-2"
+            >
+                <ArrowLeft className="h-5 w-5" />
+            </Button>
+        )
+        setBackButton(backBtn)
+
         // Criar conteúdo customizado para o header
         const headerContent = (
             <div className="flex items-center gap-3 w-full">
-                {/* Botão Voltar - primeiro elemento */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleBack}
-                    className="shrink-0 hover:bg-accent"
-                >
-                    <ArrowLeft className="h-5 w-5" />
-                </Button>
-
                 {/* Badges e informações */}
                 <div className="flex items-center gap-2">
                     {fromCache && (
@@ -525,9 +528,10 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
         // Cleanup: remover conteúdo customizado quando desmontar
         return () => {
             setCustomContent(null)
+            setBackButton(null)
             setTitle("Dashboard")
         }
-    }, [material, fromCache, tempUrl, notification, elapsedTime, isTimerRunning, savingProgress, setCustomContent, setTitle])
+    }, [material, fromCache, tempUrl, notification, elapsedTime, isTimerRunning, savingProgress, setCustomContent, setTitle, setBackButton])
 
     if (loading) {
         return (

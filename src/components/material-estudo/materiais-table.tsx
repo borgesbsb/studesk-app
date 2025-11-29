@@ -18,13 +18,6 @@ import { deletarMaterialEstudo } from "@/interface/actions/material-estudo/delet
 import { atualizarProgressoLeitura } from "@/interface/actions/material-estudo/update"
 import { toast } from "sonner"
 import { MaterialEstudo } from "@/domain/entities/MaterialEstudo"
-import dynamic from 'next/dynamic'
-
-const WebViewerPdfModal = dynamic(() => import('./webviewer-clean'), {
-  ssr: false,
-})
-
-import { PdfSourceDialog } from './pdf-source-dialog'
 import { PdfUploadDialog } from './pdf-upload-dialog'
 
 interface MateriaisTableProps {
@@ -34,11 +27,7 @@ interface MateriaisTableProps {
 export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const [materiais, setMateriais] = useState<MaterialEstudo[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedMaterial, setSelectedMaterial] = useState<MaterialEstudo | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [atualizandoProgresso, setAtualizandoProgresso] = useState(false)
   const [horasPorMaterialSegundos, setHorasPorMaterialSegundos] = useState<Record<string, number>>({})
-  const [showPdfSourceDialog, setShowPdfSourceDialog] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [pendingMaterial, setPendingMaterial] = useState<MaterialEstudo | null>(null)
 
@@ -86,27 +75,6 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     return `${minutos}m`
   }
 
-  // Listener para abrir modal de visualização
-  useEffect(() => {
-    const handleOpenModal = (event: any) => {
-      setSelectedMaterial(event.detail.material)
-      setIsModalOpen(true)
-    }
-
-    // Listener para gerenciar assuntos estudados
-    const handleOpenAssuntos = (event: any) => {
-      setSelectedMaterial(event.detail.material)
-      setIsModalOpen(true) // Assuming assuntos modal is also a PDF modal
-    }
-
-    window.addEventListener('openPdfModal', handleOpenModal)
-    window.addEventListener('openAssuntosModal', handleOpenAssuntos)
-
-    return () => {
-      window.removeEventListener('openPdfModal', handleOpenModal)
-      window.removeEventListener('openAssuntosModal', handleOpenAssuntos)
-    }
-  }, [])
 
   const carregarMateriais = async () => {
     try {
@@ -148,56 +116,17 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     }
   }
 
-  const handleProgressUpdate = async (id: string, paginasLidas: number) => {
-    try {
-      const response = await atualizarProgressoLeitura(id, paginasLidas)
-      if (response.success) {
-        toast.success("Progresso atualizado com sucesso!")
-        carregarMateriais()
-      } else {
-        toast.error(response.error || "Erro ao atualizar progresso")
-      }
-    } catch (error) {
-      toast.error("Erro ao atualizar progresso")
-    }
-  }
-
-  const handleAtualizarProgresso = async (pagina: number) => {
-    if (!selectedMaterial) return
-
-    try {
-      await handleProgressUpdate(selectedMaterial.id, pagina)
-    } catch (error) {
-      console.error('Erro ao atualizar progresso:', error)
-    }
-  }
 
   const handleOpenPdf = (material: MaterialEstudo) => {
-    if (material.arquivoPdfUrl) {
-      setSelectedMaterial(material)
-      setIsModalOpen(true)
-    }
+    // Redirecionar direto para o Syncfusion Viewer
+    window.location.href = `/material/${material.id}/syncfusion?disciplinaId=${disciplinaId}`
   }
 
-  const handleOpenPoc2 = (material: MaterialEstudo) => {
+  const handleUploadPdf = (material: MaterialEstudo) => {
     setPendingMaterial(material)
-    setShowPdfSourceDialog(true)
+    setShowUploadDialog(true)
   }
 
-  const handlePdfSourceSelect = (source: 'local' | 'drive') => {
-    if (!pendingMaterial) return
-
-    if (source === 'local') {
-      // Abrir diálogo de upload
-      setShowUploadDialog(true)
-    } else if (source === 'drive') {
-      // TODO: Implementar integração com Google Drive
-      toast.info('Integração com Google Drive em desenvolvimento', {
-        description: 'Esta funcionalidade estará disponível em breve!'
-      })
-      setPendingMaterial(null)
-    }
-  }
 
   const handleUploadComplete = (fileUrl: string) => {
     if (!pendingMaterial) return
@@ -232,13 +161,15 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
             return (
               <div
                 key={material.id}
-                className="group border border-gray-200 rounded-xl p-5 bg-white hover:border-gray-300 hover:shadow-lg transition-all duration-200 cursor-pointer"
-                onClick={() => handleOpenPdf(material)}
+                className="group relative border border-gray-200 rounded-xl p-5 bg-white hover:border-blue-300 hover:shadow-lg transition-all duration-200"
               >
                 {/* Header do Card */}
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-1" title={material.nome}>
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer"
+                    onClick={() => handleOpenPdf(material)}
+                  >
+                    <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-1 group-hover:text-blue-600 transition-colors" title={material.nome}>
                       {material.nome}
                     </h3>
                     <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
@@ -248,13 +179,15 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                   </div>
 
                   {/* Botões de ação */}
-                  <div className="flex items-center gap-1 ml-2">
+                  <div className="flex items-center gap-1 ml-2 relative z-10">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDelete(material.id)
+                        if (confirm(`Deseja realmente excluir "${material.nome}"?`)) {
+                          handleDelete(material.id)
+                        }
                       }}
                       title="Excluir material"
                       className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-red-600 hover:bg-red-50"
@@ -264,41 +197,24 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                   </div>
                 </div>
 
-                {/* Botões de Visualização - Sempre visíveis */}
-                <div className="flex gap-2 mb-4">
-                  <Link
-                    href={`/material/${material.id}/syncfusion?disciplinaId=${disciplinaId}`}
-                    className="flex-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs h-8 border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 font-medium shadow-sm"
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1.5" />
-                      POC 2
-                    </Button>
-                  </Link>
+                {/* Botão de Ação Principal */}
+                <div className="mb-4">
                   <Button
-                    variant="outline"
+                    variant="default"
                     size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenPoc2(material)
-                    }}
-                    title="Escolher fonte do PDF (Upload, Google Drive, etc)"
-                    className="flex-1 text-xs h-8 border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 hover:text-purple-800 font-medium shadow-sm"
+                    onClick={() => handleOpenPdf(material)}
+                    className="w-full text-xs h-9 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow-md transition-all"
                   >
-                    <svg className="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    Carregar
+                    <Eye className="h-4 w-4 mr-2" />
+                    Abrir Material
                   </Button>
                 </div>
 
                 {/* Pizza de Progresso Gigante */}
-                <div className="flex flex-col items-center justify-center py-6">
+                <div
+                  className="flex flex-col items-center justify-center py-6 cursor-pointer"
+                  onClick={() => handleOpenPdf(material)}
+                >
                   <div className="relative w-32 h-32">
                     <svg className="transform -rotate-90 w-32 h-32">
                       {/* Círculo de fundo */}
@@ -351,26 +267,6 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
           })}
         </div>
       )}
-
-      {/* Modal PDF Normal */}
-      {selectedMaterial && selectedMaterial.arquivoPdfUrl && (
-        <WebViewerPdfModal
-          open={isModalOpen}
-          onOpenChange={setIsModalOpen}
-          pdfUrl={selectedMaterial.arquivoPdfUrl}
-          paginaProgresso={selectedMaterial.paginasLidas}
-          onAtualizarProgresso={handleAtualizarProgresso}
-          materialId={selectedMaterial.id}
-        />
-      )}
-
-      {/* Diálogo de escolha de fonte PDF (POC 2) */}
-      <PdfSourceDialog
-        open={showPdfSourceDialog}
-        onOpenChange={setShowPdfSourceDialog}
-        onSelectSource={handlePdfSourceSelect}
-        materialNome={pendingMaterial?.nome}
-      />
 
       {/* Diálogo de upload de PDF */}
       <PdfUploadDialog

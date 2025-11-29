@@ -203,10 +203,12 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                     variant="default"
                     size="sm"
                     onClick={() => handleOpenPdf(material)}
-                    className="w-full text-xs h-9 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow-md transition-all"
+                    title="Clique para abrir e estudar este material no visualizador"
+                    aria-label={`Abrir material ${material.nome}`}
+                    className="w-full text-sm h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm hover:shadow-md transition-all"
                   >
                     <Eye className="h-4 w-4 mr-2" />
-                    Abrir Material
+                    Estudar
                   </Button>
                 </div>
 

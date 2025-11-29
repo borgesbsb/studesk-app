@@ -2,7 +2,14 @@
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
+import { registerLicense } from '@syncfusion/ej2-base';
 import { PdfViewerComponent, Toolbar, Magnification, Navigation, LinkAnnotation, BookmarkView, ThumbnailView, Print, TextSelection, TextSearch, FormFields, FormDesigner, Inject, Annotation, ToolbarSettingsModel, CustomToolbarItemModel } from '@syncfusion/ej2-react-pdfviewer';
+
+// Registrar licença do Syncfusion (lê do .env)
+const licenseKey = process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY;
+if (licenseKey) {
+    registerLicense(licenseKey);
+}
 
 // Import Syncfusion styles
 import '@syncfusion/ej2-base/styles/material.css';

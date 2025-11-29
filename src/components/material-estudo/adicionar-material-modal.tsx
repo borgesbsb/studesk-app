@@ -8,7 +8,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,6 +15,7 @@ import { Plus, Upload, Loader2, FileText, CheckCircle2 } from "lucide-react"
 import { useState, useRef } from "react"
 import { toast } from "sonner"
 import { criarMaterialEstudo } from "@/interface/actions/material-estudo/create"
+import { PdfSourceDialog } from "./pdf-source-dialog"
 import * as pdfjsLib from 'pdfjs-dist'
 
 // Configurar o worker do PDF.js
@@ -29,6 +29,8 @@ interface AdicionarMaterialModalProps {
 
 export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: AdicionarMaterialModalProps) {
   const [open, setOpen] = useState(false)
+  const [showSourceDialog, setShowSourceDialog] = useState(false)
+  const [selectedSource, setSelectedSource] = useState<'local' | 'drive' | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingPdf, setLoadingPdf] = useState(false)
   const [nome, setNome] = useState("")
@@ -44,8 +46,24 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
     setArquivoPdfUrl("")
     setSelectedFile(null)
     setPdfCarregado(false)
+    setSelectedSource(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
+    }
+  }
+
+  const handleSourceSelect = (source: 'local' | 'drive') => {
+    setSelectedSource(source)
+    setShowSourceDialog(false)
+
+    if (source === 'drive') {
+      toast.info('Integração com Google Drive em desenvolvimento', {
+        description: 'Esta funcionalidade estará disponível em breve!'
+      })
+      setOpen(false)
+    } else {
+      // Abre o modal principal para upload local
+      setOpen(true)
     }
   }
 
@@ -139,23 +157,35 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
   }
 
   return (
-    <Dialog open={open} onOpenChange={(newOpen) => {
-      setOpen(newOpen)
-      if (!newOpen) resetForm()
-    }}>
-      <DialogTrigger asChild>
-        <Button className={className}>
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Material
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Adicionar Material de Estudo</DialogTitle>
-          <DialogDescription>
-            Faça upload de um PDF para adicionar à disciplina
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      {/* Botão que abre o dialog de escolha de fonte */}
+      <Button
+        className={className}
+        onClick={() => setShowSourceDialog(true)}
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Adicionar Material
+      </Button>
+
+      {/* Dialog de escolha de fonte (Disco Local ou Google Drive) */}
+      <PdfSourceDialog
+        open={showSourceDialog}
+        onOpenChange={setShowSourceDialog}
+        onSelectSource={handleSourceSelect}
+      />
+
+      {/* Dialog principal de upload */}
+      <Dialog open={open} onOpenChange={(newOpen) => {
+        setOpen(newOpen)
+        if (!newOpen) resetForm()
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Material de Estudo</DialogTitle>
+            <DialogDescription>
+              Faça upload de um PDF do seu computador
+            </DialogDescription>
+          </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Nome do Material */}
@@ -239,7 +269,8 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

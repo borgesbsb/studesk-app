@@ -5,12 +5,6 @@ import { createPortal } from 'react-dom';
 import { registerLicense } from '@syncfusion/ej2-base';
 import { PdfViewerComponent, Toolbar, Magnification, Navigation, LinkAnnotation, BookmarkView, ThumbnailView, Print, TextSelection, TextSearch, FormFields, FormDesigner, Inject, Annotation, ToolbarSettingsModel, CustomToolbarItemModel } from '@syncfusion/ej2-react-pdfviewer';
 
-// Registrar licença do Syncfusion (lê do .env)
-const licenseKey = process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY;
-if (licenseKey) {
-    registerLicense(licenseKey);
-}
-
 // Import Syncfusion styles
 import '@syncfusion/ej2-base/styles/material.css';
 import '@syncfusion/ej2-buttons/styles/material.css';
@@ -40,6 +34,14 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
     const [mounted, setMounted] = React.useState(false);
     const [readingMode, setReadingMode] = React.useState<ReadingMode>('normal');
     const [isProcessingBlob, setIsProcessingBlob] = React.useState(false);
+
+    // Registrar licença do Syncfusion apenas no cliente
+    React.useEffect(() => {
+        const licenseKey = process.env.NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY;
+        if (licenseKey && typeof window !== 'undefined') {
+            registerLicense(licenseKey);
+        }
+    }, []);
 
     React.useEffect(() => {
         setMounted(true);

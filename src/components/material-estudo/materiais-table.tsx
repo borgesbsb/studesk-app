@@ -200,12 +200,11 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                 {/* Botão de Ação Principal */}
                 <div className="mb-4">
                   <Button
-                    variant="default"
                     size="sm"
                     onClick={() => handleOpenPdf(material)}
                     title="Clique para abrir e estudar este material no visualizador"
                     aria-label={`Abrir material ${material.nome}`}
-                    className="w-full text-sm h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm hover:shadow-md transition-all"
+                    className="w-full text-sm h-10 !bg-blue-600 hover:!bg-blue-700 !text-white font-bold shadow-md hover:shadow-lg transition-all border-0"
                   >
                     <Eye className="h-4 w-4 mr-2" />
                     Estudar

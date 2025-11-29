@@ -24,7 +24,7 @@ export interface CreateMaterialEstudoDTO {
   nome: string
   totalPaginas: number
   paginasLidas?: number
-  arquivoPdfUrl: string
+  arquivoPdfUrl?: string // Opcional - PDFs armazenados no IndexedDB
   disciplinaIds: string[]
 }
 

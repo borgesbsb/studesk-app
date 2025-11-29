@@ -69,8 +69,8 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                 if (materialResponse.success && materialResponse.data) {
                     setMaterial(materialResponse.data)
 
-                    // Tentar buscar PDF do cache IndexedDB primeiro
-                    console.log('🔍 Verificando cache local para PDF...')
+                    // Buscar PDF APENAS do cache IndexedDB
+                    console.log('🔍 Buscando PDF do cache local...')
                     const cachedPdf = await pdfCacheService.getPdf(id)
 
                     if (cachedPdf) {
@@ -80,27 +80,15 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                         setFromCache(true)
                         console.log('📦 PDF carregado do cache local!')
                         toast.success('PDF carregado do cache local', {
-                            description: 'Carregamento instantâneo',
+                            description: 'Armazenado no seu navegador',
                             icon: <Database className="h-4 w-4" />
                         })
-                    } else if (materialResponse.data.arquivoPdfUrl) {
-                        // PDF não está no cache, buscar do servidor
-                        console.log('🌐 Baixando PDF do servidor...')
-                        try {
-                            const response = await fetch(materialResponse.data.arquivoPdfUrl)
-                            const blob = await response.blob()
-                            const blobUrl = URL.createObjectURL(blob)
-                            setPdfBlobUrl(blobUrl)
-                            setFromCache(false)
-
-                            // Salvar no cache para próxima vez
-                            const fileName = materialResponse.data.arquivoPdfUrl.split('/').pop() || 'documento.pdf'
-                            await pdfCacheService.savePdfFromBlob(id, blob, fileName)
-                            console.log('💾 PDF salvo no cache local para próximo acesso')
-                        } catch (error) {
-                            console.error('❌ Erro ao baixar PDF do servidor:', error)
-                            toast.error('Erro ao carregar PDF')
-                        }
+                    } else {
+                        // PDF não encontrado no cache
+                        console.warn('⚠️ PDF não encontrado no cache local')
+                        toast.error('PDF não encontrado no cache', {
+                            description: 'Faça upload novamente do material'
+                        })
                     }
                 }
             }
@@ -422,52 +410,54 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                     )}
                 </div>
 
-                {/* Cronômetro */}
-                <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className={`text-sm font-mono font-semibold ${isTimerRunning ? 'text-blue-600' : 'text-gray-500'}`}>
+                {/* Área de Controles de Estudo */}
+                <div className="flex items-center gap-3">
+                    {/* Cronômetro */}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 rounded-full border border-blue-200 shadow-sm">
+                        <div className={`flex items-center justify-center w-6 h-6 rounded-full ${isTimerRunning ? 'bg-blue-500' : 'bg-gray-400'} transition-colors`}>
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <span className={`text-base font-mono font-bold min-w-[3.5rem] ${isTimerRunning ? 'text-blue-700' : 'text-gray-600'} transition-colors`}>
                             {formatTime(elapsedTime)}
                         </span>
+                        <button
+                            onClick={toggleTimer}
+                            className={`flex items-center justify-center w-7 h-7 rounded-full transition-all ${
+                                isTimerRunning
+                                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                    : 'bg-gray-400 hover:bg-gray-500 text-white'
+                            }`}
+                            title={isTimerRunning ? 'Pausar cronômetro' : 'Retomar cronômetro'}
+                        >
+                            {isTimerRunning ? (
+                                <Pause className="h-3.5 w-3.5" fill="currentColor" />
+                            ) : (
+                                <Play className="h-3.5 w-3.5 ml-0.5" fill="currentColor" />
+                            )}
+                        </button>
                     </div>
 
+                    {/* Botão Marcar Progresso */}
                     <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleTimer}
-                        className="h-8 w-8 p-0"
-                        title={isTimerRunning ? 'Pausar cronômetro' : 'Retomar cronômetro'}
+                        onClick={handleSaveProgress}
+                        disabled={savingProgress}
+                        className="h-9 px-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold shadow-md hover:shadow-lg transition-all border-0 rounded-full"
                     >
-                        {isTimerRunning ? (
-                            <Pause className="h-3.5 w-3.5 text-blue-600" />
+                        {savingProgress ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                <span className="text-sm">Salvando...</span>
+                            </>
                         ) : (
-                            <Play className="h-3.5 w-3.5 text-gray-500" />
+                            <>
+                                <Save className="h-4 w-4 mr-2" />
+                                <span className="text-sm">Salvar Progresso</span>
+                            </>
                         )}
                     </Button>
                 </div>
-
-                {/* Botão Marcar Progresso */}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSaveProgress}
-                    disabled={savingProgress}
-                    className="text-xs h-8 px-3 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 shadow-sm"
-                >
-                    {savingProgress ? (
-                        <>
-                            <div className="w-3 h-3 border border-green-300 border-t-green-600 rounded-full animate-spin mr-1" />
-                            Salvando...
-                        </>
-                    ) : (
-                        <>
-                            <Save className="h-3.5 w-3.5 mr-1.5" />
-                            Marcar Progresso
-                        </>
-                    )}
-                </Button>
             </div>
 
             <div className="flex-1 bg-white p-4 overflow-hidden">

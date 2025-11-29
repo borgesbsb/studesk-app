@@ -24,7 +24,7 @@ model MaterialEstudo {
   nome             String
   totalPaginas     Int
   paginasLidas     Int                  @default(0)
-  arquivoPdfUrl    String
+  arquivoPdfUrl    String?              // Opcional - PDFs armazenados apenas no IndexedDB
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   anotacoes        Anotacao[]

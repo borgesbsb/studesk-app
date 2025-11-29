@@ -16,6 +16,7 @@ import { useState, useRef } from "react"
 import { toast } from "sonner"
 import { criarMaterialEstudo } from "@/interface/actions/material-estudo/create"
 import { PdfSourceDialog } from "./pdf-source-dialog"
+import { pdfCacheService } from "@/services/pdf-cache.service"
 import * as pdfjsLib from 'pdfjs-dist'
 
 // Configurar o worker do PDF.js
@@ -87,35 +88,21 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
   const handleLoadPdf = async (file: File) => {
     setLoadingPdf(true)
     try {
-      // Upload do arquivo
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.error || "Erro ao enviar arquivo")
-      }
-
-      setArquivoPdfUrl(data.fileUrl)
-
       // Contar páginas do PDF
       const arrayBuffer = await file.arrayBuffer()
       const typedArray = new Uint8Array(arrayBuffer)
       const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise
       setTotalPaginas(pdf.numPages)
+
+      // Marca como carregado (não faz upload ao servidor)
       setPdfCarregado(true)
-      toast.success(`PDF carregado: ${pdf.numPages} páginas`)
+      toast.success(`PDF carregado: ${pdf.numPages} páginas`, {
+        description: 'Será salvo apenas no seu navegador'
+      })
 
     } catch (error) {
       console.error('Erro ao carregar PDF:', error)
-      toast.error("Erro ao carregar o PDF")
-      setArquivoPdfUrl("")
+      toast.error("Erro ao processar o PDF")
       setPdfCarregado(false)
     } finally {
       setLoadingPdf(false)
@@ -125,7 +112,7 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!arquivoPdfUrl) {
+    if (!selectedFile || !pdfCarregado) {
       toast.error("Aguarde o carregamento do PDF")
       return
     }
@@ -133,21 +120,31 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
     setLoading(true)
 
     try {
+      // 1. Criar material no banco (sem arquivoPdfUrl)
       const response = await criarMaterialEstudo({
         nome,
         totalPaginas,
-        arquivoPdfUrl,
+        arquivoPdfUrl: '', // Não salva URL do servidor
         disciplinaIds: [disciplinaId],
       })
 
-      if (response.success) {
-        toast.success("Material adicionado com sucesso!")
-        setOpen(false)
-        resetForm()
-        onSuccess?.()
-      } else {
-        toast.error(response.error || "Erro ao adicionar material")
+      if (!response.success || !response.data) {
+        throw new Error(response.error || "Erro ao criar material")
       }
+
+      const materialId = response.data.id
+
+      // 2. Salvar PDF no IndexedDB (cache local)
+      await pdfCacheService.savePdf(materialId, selectedFile)
+
+      toast.success("Material adicionado com sucesso!", {
+        description: 'PDF salvo no cache local do navegador'
+      })
+
+      setOpen(false)
+      resetForm()
+      onSuccess?.()
+
     } catch (error) {
       console.error('Erro ao processar:', error)
       toast.error(error instanceof Error ? error.message : "Erro ao adicionar material")

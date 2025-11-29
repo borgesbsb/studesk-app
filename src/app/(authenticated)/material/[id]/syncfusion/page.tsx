@@ -388,13 +388,13 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
 
         // Criar conteúdo customizado para o header
         const headerContent = (
-            <>
-                {/* Botão Voltar */}
+            <div className="flex items-center gap-3 w-full">
+                {/* Botão Voltar - primeiro elemento */}
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleBack}
-                    className="shrink-0 hover:bg-accent absolute left-16"
+                    className="shrink-0 hover:bg-accent"
                 >
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
@@ -420,6 +420,9 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                         </span>
                     )}
                 </div>
+
+                {/* Espaçador flex-1 */}
+                <div className="flex-1" />
 
                 {/* Notificação Inline */}
                 {notification && (
@@ -514,7 +517,7 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                         </>
                     )}
                 </Button>
-            </>
+            </div>
         )
 
         setCustomContent(headerContent)

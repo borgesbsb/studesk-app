@@ -23,8 +23,8 @@ export async function atualizarProgressoMaterial({
       },
     })
 
-    revalidatePath('/materiais')
-    revalidatePath(`/materiais/${materialId}`)
+    // Não faz revalidate para evitar reload da página
+    // O estado local já é atualizado no componente
 
     return {
       success: true,

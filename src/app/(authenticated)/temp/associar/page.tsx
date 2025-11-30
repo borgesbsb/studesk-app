@@ -1,5 +1,7 @@
 import { associarMaterialADisciplina } from '@/interface/actions/temp/associar-material'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TempAssociarPage() {
   const resultado = await associarMaterialADisciplina()
   

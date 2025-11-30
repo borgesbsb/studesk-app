@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "copy-webviewer": "mkdir -p ./public/lib/webviewer && cp -a ./node_modules/@pdftron/webviewer/public/* ./public/lib/webviewer",
-    "dev": "npm run copy-webviewer && next dev -p 3030",
-    "build": "npm run copy-webviewer && cp node_modules/pdfjs-dist/build/pdf.worker.min.js public/ && NEXT_TELEMETRY_DISABLED=1 SKIP_TYPE_CHECK=true next build --no-lint",
+    "dev": "next dev -p 3030",
+    "build": "cp node_modules/pdfjs-dist/build/pdf.worker.min.js public/ && NEXT_TELEMETRY_DISABLED=1 SKIP_TYPE_CHECK=true next build --no-lint",
     "start": "next start -p 3030",
     "lint": "next lint",
     "migrate-pdf-urls": "node scripts/migrate-pdf-urls.js",

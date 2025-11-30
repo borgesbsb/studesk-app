@@ -17,24 +17,28 @@ export function Header({ isOpen, setIsOpen }: HeaderProps) {
 
   return (
     <header className="h-16 bg-background shadow-sm flex items-center px-6 sticky top-0 z-10 border-b">
-      {!isOpen && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsOpen(true)}
-          className="mr-4 hover:bg-accent rounded-full"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-      )}
+      {/* Lado esquerdo: Menu e Botão Voltar */}
+      <div className="flex items-center">
+        {!isOpen && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsOpen(true)}
+            className="mr-4 hover:bg-accent rounded-full"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
+        {backButton}
+      </div>
 
-      {/* Botão de voltar customizado */}
-      {backButton}
+      {/* Centro: Título centralizado */}
+      <div className="flex-1 flex justify-center">
+        <h1 className="text-xl font-semibold">{title}</h1>
+      </div>
 
-      <h1 className="text-xl font-semibold">{title}</h1>
-
-      {/* Conteúdo customizado ou status de salvamento centralizado */}
-      <div className="flex-1 flex justify-center items-center gap-4">
+      {/* Direita: Conteúdo customizado ou status de salvamento */}
+      <div className="flex items-center gap-4">
         {customContent ? (
           customContent
         ) : (
@@ -48,9 +52,8 @@ export function Header({ isOpen, setIsOpen }: HeaderProps) {
             </div>
           )
         )}
+        <ThemeToggle />
       </div>
-
-      <ThemeToggle />
     </header>
   )
 } 

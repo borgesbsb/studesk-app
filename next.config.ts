@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  
+
   // Configuração para servir arquivos estáticos do PDF.js e WebViewer
   async headers() {
     return [
@@ -46,6 +46,20 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Headers para Syncfusion PDF Viewer
+      {
+        source: '/ej2-pdfviewer-lib/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+        ],
+      },
     ];
   },
 
@@ -79,6 +93,11 @@ const nextConfig: NextConfig = {
       test: /\.node$/,
       use: "ignore-loader",
     });
+
+    // Desabilitar minificação para módulos Syncfusion em produção
+    if (!isServer && config.optimization) {
+      config.optimization.minimize = false;
+    }
 
     return config;
   },

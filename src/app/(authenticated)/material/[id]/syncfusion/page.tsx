@@ -1,15 +1,31 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import dynamic from "next/dynamic"
 import { buscarMaterialEstudoPorId } from "@/interface/actions/material-estudo/list"
 import { atualizarProgressoMaterial } from "@/interface/actions/material-estudo/update-progress"
-import SyncfusionPdfViewer from "@/components/pdf/SyncfusionPdfViewer"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Play, Pause, Save, Database, WifiOff, CheckCircle2, XCircle, Info, AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { AdicionarTempoCicloDialog } from "@/components/material-estudo/adicionar-tempo-ciclo-dialog"
 import { pdfCacheService } from "@/services/pdf-cache.service"
 import { useHeader } from "@/contexts/header-context"
+
+// Carregar Syncfusion apenas no cliente para evitar problemas de SSR
+const SyncfusionPdfViewer = dynamic(
+    () => import("@/components/pdf/SyncfusionPdfViewer"),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="h-full w-full flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600 font-medium">Carregando visualizador...</p>
+                </div>
+            </div>
+        )
+    }
+)
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -25,7 +41,7 @@ interface InlineNotification {
 
 export default function SyncfusionViewerPage({ params }: PageProps) {
     const router = useRouter()
-    const { setCustomContent, setTitle, setBackButton } = useHeader()
+    const { setCustomContent, setTitle, setBackButton, setFullWidth } = useHeader()
     const [materialId, setMaterialId] = useState<string>("")
     const [material, setMaterial] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -386,6 +402,9 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
         // Atualizar título do header
         setTitle(material.nome)
 
+        // Ativar modo full-width (sem padding)
+        setFullWidth(true)
+
         // Criar botão de voltar (aparecerá ANTES do título)
         const backBtn = (
             <Button
@@ -401,31 +420,14 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
 
         // Criar conteúdo customizado para o header
         const headerContent = (
-            <div className="flex items-center gap-3 w-full">
-                {/* Badges e informações */}
-                <div className="flex items-center gap-2">
-                    {fromCache && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-md border border-emerald-200">
-                            <Database className="h-3 w-3" />
-                            Cache Local
-                        </span>
-                    )}
-                    {tempUrl && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-md border border-amber-200">
-                            <AlertCircle className="h-3 w-3" />
-                            Visualização temporária
-                        </span>
-                    )}
-                    {fromCache && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-md border border-gray-200">
-                            <WifiOff className="h-3 w-3" />
-                            Offline
-                        </span>
-                    )}
-                </div>
-
-                {/* Espaçador flex-1 */}
-                <div className="flex-1" />
+            <>
+                {/* Badge de visualização temporária (se aplicável) */}
+                {tempUrl && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-md border border-amber-200">
+                        <AlertCircle className="h-3 w-3" />
+                        Visualização temporária
+                    </span>
+                )}
 
                 {/* Notificação Inline */}
                 {notification && (
@@ -464,63 +466,47 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                     </div>
                 )}
 
-                {/* Cronômetro */}
-                <div className="flex items-center gap-2.5 px-4 py-2 bg-background rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow">
-                    <div className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
-                        isTimerRunning
-                            ? 'bg-blue-500 shadow-md shadow-blue-200'
-                            : 'bg-gray-300'
-                    }`}>
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                            Tempo
-                        </span>
-                        <span className={`text-lg font-mono font-bold leading-none ${
-                            isTimerRunning ? 'text-blue-600' : 'text-muted-foreground'
-                        } transition-colors`}>
-                            {formatTime(elapsedTime)}
-                        </span>
-                    </div>
+                {/* Cronômetro - Design Discreto */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/50 transition-colors">
                     <button
                         onClick={toggleTimer}
-                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
-                            isTimerRunning
-                                ? 'bg-blue-100 hover:bg-blue-200 text-blue-600'
-                                : 'bg-gray-200 hover:bg-gray-300 text-gray-600'
-                        }`}
+                        className="flex items-center gap-2 group"
                         title={isTimerRunning ? 'Pausar cronômetro' : 'Retomar cronômetro'}
                     >
                         {isTimerRunning ? (
-                            <Pause className="h-4 w-4" fill="currentColor" />
+                            <Pause className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                         ) : (
-                            <Play className="h-4 w-4 ml-0.5" fill="currentColor" />
+                            <Play className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                         )}
+                        <span className={`text-sm font-mono tabular-nums ${
+                            isTimerRunning ? 'text-foreground' : 'text-muted-foreground'
+                        }`}>
+                            {formatTime(elapsedTime)}
+                        </span>
                     </button>
                 </div>
 
-                {/* Botão Salvar Progresso */}
+                {/* Botão Salvar Progresso - Design Discreto */}
                 <Button
                     onClick={handleSaveProgress}
                     disabled={savingProgress}
-                    className="h-10 px-5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-md hover:shadow-lg transition-all border-0 disabled:opacity-60"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 px-3 hover:bg-accent disabled:opacity-50"
                 >
                     {savingProgress ? (
                         <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                            <span>Salvando...</span>
+                            <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                            <span className="text-sm">Salvando...</span>
                         </>
                     ) : (
                         <>
                             <Save className="h-4 w-4 mr-2" />
-                            <span>Salvar Progresso</span>
+                            <span className="text-sm">Salvar</span>
                         </>
                     )}
                 </Button>
-            </div>
+            </>
         )
 
         setCustomContent(headerContent)
@@ -530,8 +516,9 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             setCustomContent(null)
             setBackButton(null)
             setTitle("Dashboard")
+            setFullWidth(false)
         }
-    }, [material, fromCache, tempUrl, notification, elapsedTime, isTimerRunning, savingProgress, setCustomContent, setTitle, setBackButton])
+    }, [material, fromCache, tempUrl, notification, elapsedTime, isTimerRunning, savingProgress, setCustomContent, setTitle, setBackButton, setFullWidth])
 
     if (loading) {
         return (
@@ -553,13 +540,19 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
 
     return (
         <>
-            {/* PDF Viewer em tela cheia */}
-            <div className="h-[calc(100vh-4rem)]">
-                <SyncfusionPdfViewer
-                    pdfUrl={pdfUrl}
-                    paginaProgresso={material.paginasLidas}
-                    onPageChange={handlePageChange}
-                />
+            <div style={{ height: 'calc(100vh - 4rem)', width: '100%' }}>
+                {/* PDF Viewer em tela cheia */}
+                {pdfUrl ? (
+                    <SyncfusionPdfViewer
+                        pdfUrl={pdfUrl}
+                        paginaProgresso={material.paginasLidas}
+                        onPageChange={handlePageChange}
+                    />
+                ) : (
+                    <div className="h-full w-full flex items-center justify-center">
+                        <p className="text-gray-500">Aguardando URL do PDF...</p>
+                    </div>
+                )}
             </div>
 
             {/* Diálogo para adicionar tempo ao ciclo */}

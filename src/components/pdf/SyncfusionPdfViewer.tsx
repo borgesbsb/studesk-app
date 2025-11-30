@@ -34,6 +34,7 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
     const [mounted, setMounted] = React.useState(false);
     const [readingMode, setReadingMode] = React.useState<ReadingMode>('normal');
     const [isProcessingBlob, setIsProcessingBlob] = React.useState(false);
+    const containerRef = React.useRef<HTMLDivElement>(null);
 
     // Registrar licença do Syncfusion apenas no cliente
     React.useEffect(() => {
@@ -45,7 +46,8 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
 
     React.useEffect(() => {
         setMounted(true);
-        setResourceUrl(`${window.location.origin}/ej2-pdfviewer-lib`);
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        setResourceUrl(`${baseUrl}/ej2-pdfviewer-lib`);
 
         // Convert Blob URLs to Base64 data URLs for Syncfusion compatibility
         const processPdfUrl = async () => {
@@ -56,7 +58,6 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
 
             // Check if it's a blob URL
             if (pdfUrl.startsWith('blob:')) {
-                console.log('🔄 Convertendo Blob URL para Base64...');
                 setIsProcessingBlob(true);
                 try {
                     const response = await fetch(pdfUrl);
@@ -65,20 +66,19 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
 
                     reader.onloadend = () => {
                         const base64data = reader.result as string;
-                        console.log('✅ Blob convertido para Base64 com sucesso');
                         setAbsolutePdfUrl(base64data);
                         setIsProcessingBlob(false);
                     };
 
                     reader.onerror = (error) => {
-                        console.error('❌ Erro ao converter Blob para Base64:', error);
+                        console.error('Erro ao converter Blob para Base64:', error);
                         setAbsolutePdfUrl(pdfUrl); // Fallback to original URL
                         setIsProcessingBlob(false);
                     };
 
                     reader.readAsDataURL(blob);
                 } catch (error) {
-                    console.error('❌ Erro ao processar Blob URL:', error);
+                    console.error('Erro ao processar Blob URL:', error);
                     setAbsolutePdfUrl(pdfUrl); // Fallback to original URL
                     setIsProcessingBlob(false);
                 }
@@ -140,6 +140,7 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
             'UndoRedoTool',
             'AnnotationEditTool',
             'FormDesignerEditTool',
+            'CommentTool',
             {
                 prefixIcon: 'e-icons e-full-screen',
                 id: 'fullscreen',
@@ -199,34 +200,21 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
 
     // Handler para quando o documento for carregado
     const handleDocumentLoad = () => {
-        console.log('📄 Documento Syncfusion carregado com sucesso');
-
-        // Log the source of the PDF
-        if (pdfUrl.startsWith('blob:')) {
-            console.log('✅ PDF carregado do cache local (via Blob convertido para Base64)');
-        } else if (pdfUrl.startsWith('data:')) {
-            console.log('✅ PDF carregado de Data URL');
-        } else {
-            console.log('✅ PDF carregado do servidor');
-        }
-
         // Navegar para a página de progresso se for maior que 1
         if (paginaProgresso && paginaProgresso > 1 && viewerRef.current) {
             setTimeout(() => {
                 try {
-                    console.log(`🎯 Navegando para página de progresso: ${paginaProgresso}`);
                     viewerRef.current?.navigation.goToPage(paginaProgresso);
                 } catch (error) {
-                    console.error('❌ Erro ao navegar para página de progresso:', error);
+                    console.error('Erro ao navegar para página de progresso:', error);
                 }
-            }, 500); // Pequeno delay para garantir que o documento está totalmente carregado
+            }, 500);
         }
     };
 
     // Handler para quando a página mudar
     const handlePageChange = (args: any) => {
         const currentPage = args.currentPageNumber;
-        console.log(`📄 Página mudou para: ${currentPage}`);
 
         if (onPageChange) {
             onPageChange(currentPage);
@@ -249,20 +237,45 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
     }
 
     return (
-        <div className="h-full w-full relative">
-            <PdfViewerComponent
-                id="container"
-                ref={viewerRef}
-                documentPath={absolutePdfUrl}
-                resourceUrl={resourceUrl}
-                style={{ height: '100%', filter: getFilterStyle() }}
-                toolbarSettings={toolbarSettings}
-                toolbarClick={toolbarClick}
-                documentLoad={handleDocumentLoad}
-                pageChange={handlePageChange}
-            >
-                <Inject services={[Toolbar, Magnification, Navigation, LinkAnnotation, BookmarkView, ThumbnailView, Print, TextSelection, TextSearch, FormFields, FormDesigner, Annotation]} />
-            </PdfViewerComponent>
+        <div ref={containerRef} style={{ height: '100%', width: '100%', position: 'relative' }}>
+            {mounted && resourceUrl && absolutePdfUrl && (
+                <PdfViewerComponent
+                    id="container"
+                    ref={viewerRef}
+                    documentPath={absolutePdfUrl}
+                    resourceUrl={resourceUrl}
+                    style={{ height: '100%', width: '100%', filter: getFilterStyle() }}
+                    toolbarSettings={toolbarSettings}
+                    toolbarClick={toolbarClick}
+                    documentLoad={handleDocumentLoad}
+                    pageChange={handlePageChange}
+                    enableAnnotation={true}
+                    enableStickyNotesAnnotation={true}
+                    enableTextMarkupAnnotation={true}
+                    enableShapeAnnotation={true}
+                    enableMeasureAnnotation={true}
+                    enableStampAnnotations={true}
+                    enableHandwrittenSignature={true}
+                    enableFreeText={true}
+                    enableInkAnnotation={true}
+                    enableTextSelection={true}
+                    enablePinchZoom={true}
+                    enableHyperlink={true}
+                    enableDownload={true}
+                    enablePrint={true}
+                    enableNavigationToolbar={true}
+                >
+                    <Inject services={[Toolbar, Magnification, Navigation, LinkAnnotation, BookmarkView, ThumbnailView, Print, TextSelection, TextSearch, FormFields, FormDesigner, Annotation]} />
+                </PdfViewerComponent>
+            )}
+            {(!mounted || !resourceUrl || !absolutePdfUrl) && (
+                <div className="h-full w-full flex items-center justify-center bg-gray-50">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600 font-medium">Carregando visualizador...</p>
+                    </div>
+                </div>
+            )}
 
             {mounted && showDisplaySettings && createPortal(
                 <div

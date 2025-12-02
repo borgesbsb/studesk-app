@@ -2,11 +2,26 @@
 
 import { PrismaClient } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth-helpers'
 
 const prisma = new PrismaClient()
 
 export async function deleteCiclo(cicloId: string, planoId: string) {
   try {
+    const { userId } = await requireAuth()
+
+    // Verifica se o plano pertence ao usuário
+    const plano = await prisma.planoEstudo.findUnique({
+      where: { id: planoId, userId }
+    })
+
+    if (!plano) {
+      return {
+        success: false,
+        error: 'Plano não encontrado ou sem permissão'
+      }
+    }
+
     // Buscar o ciclo a ser excluído
     const cicloParaExcluir = await prisma.semanaEstudo.findUnique({
       where: { id: cicloId },
@@ -46,7 +61,7 @@ export async function deleteCiclo(cicloId: string, planoId: string) {
 
     // Renumerar os ciclos posteriores
     const ciclosPosteriores = await prisma.semanaEstudo.findMany({
-      where: { 
+      where: {
         planoId,
         numeroSemana: { gt: cicloParaExcluir.numeroSemana }
       },
@@ -65,9 +80,9 @@ export async function deleteCiclo(cicloId: string, planoId: string) {
     return { success: true }
   } catch (error) {
     console.error('Erro ao excluir ciclo:', error)
-    return { 
-      success: false, 
-      error: 'Erro interno. Tente novamente.' 
+    return {
+      success: false,
+      error: 'Erro interno. Tente novamente.'
     }
   }
 }

@@ -2,6 +2,7 @@
 
 import { PlanoEstudoService } from '@/application/services/plano-estudo.service'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth-helpers'
 
 export interface UpdatePlanoEstudoData {
   nome?: string
@@ -12,7 +13,8 @@ export interface UpdatePlanoEstudoData {
 
 export async function updatePlanoEstudo(id: string, data: UpdatePlanoEstudoData) {
   try {
-    const plano = await PlanoEstudoService.atualizar(id, data)
+    const { userId } = await requireAuth()
+    const plano = await PlanoEstudoService.atualizar(userId, id, data)
     revalidatePath('/plano-estudos')
     revalidatePath(`/plano-estudos/${id}`)
     return { success: true, data: plano }

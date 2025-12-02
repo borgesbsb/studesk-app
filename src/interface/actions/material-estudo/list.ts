@@ -1,10 +1,12 @@
 'use server'
 
 import { MaterialEstudoService } from "@/application/services/material-estudo.service"
+import { requireAuth } from "@/lib/auth-helpers"
 
 export async function listarMateriaisEstudo() {
   try {
-    const materiais = await MaterialEstudoService.listarMateriaisEstudo()
+    const { userId } = await requireAuth()
+    const materiais = await MaterialEstudoService.listarMateriaisEstudo(userId)
     return { success: true, data: materiais }
   } catch (error) {
     return {
@@ -16,7 +18,8 @@ export async function listarMateriaisEstudo() {
 
 export async function buscarMaterialEstudoPorId(id: string) {
   try {
-    const material = await MaterialEstudoService.buscarMaterialEstudoPorId(id)
+    const { userId } = await requireAuth()
+    const material = await MaterialEstudoService.buscarMaterialEstudoPorId(userId, id)
     return { success: true, data: material }
   } catch (error) {
     return {

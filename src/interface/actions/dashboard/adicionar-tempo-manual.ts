@@ -2,9 +2,11 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { requireAuth } from '@/lib/auth-helpers';
 
 export async function adicionarTempoManual(disciplinaId: string, minutos: number, data?: Date) {
   try {
+    const { userId } = await requireAuth();
     const diaConsultado = data || new Date();
     console.log('🕒 Adicionando tempo manual:', {
       disciplinaId,
@@ -15,9 +17,10 @@ export async function adicionarTempoManual(disciplinaId: string, minutos: number
     // Não é necessário ter material para adicionar tempo de estudo
     // O tempo será adicionado diretamente à disciplina na semana de estudo
 
-    // Buscar a semana de estudo ativa para a disciplina
+    // Buscar a semana de estudo ativa para a disciplina do usuário
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
+        userId,
         ativo: true,
         dataInicio: {
           lte: diaConsultado

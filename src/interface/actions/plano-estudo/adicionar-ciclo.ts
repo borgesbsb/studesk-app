@@ -3,27 +3,29 @@
 import { PlanoEstudoService } from '@/application/services/plano-estudo.service'
 import { DisciplinaPlanejada } from '@/components/plano-estudos/planejamento-disciplinas'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth-helpers'
 
 export async function adicionarCicloAoPlano(
-  planoId: string, 
-  numeroSemana: number, 
+  planoId: string,
+  numeroSemana: number,
   disciplinas: DisciplinaPlanejada[],
   dataInicio?: string,
   dataFim?: string
 ) {
   try {
+    const { userId } = await requireAuth()
     console.log('🔄 Iniciando adicionarCicloAoPlano:', { planoId, numeroSemana, disciplinas: disciplinas.length, dataInicio, dataFim })
     // Criar datas locais sem conversão de fuso horário
     let inicioDate: Date
     let fimDate: Date
-    
+
     if (dataInicio) {
       const [ano, mes, dia] = dataInicio.split('-').map(Number)
       inicioDate = new Date(ano, mes - 1, dia, 12, 0, 0)
     } else {
       inicioDate = new Date()
     }
-    
+
     if (dataFim) {
       const [ano, mes, dia] = dataFim.split('-').map(Number)
       fimDate = new Date(ano, mes - 1, dia, 12, 0, 0)
@@ -36,7 +38,7 @@ export async function adicionarCicloAoPlano(
       fimDate = new Date()
       fimDate.setDate(fimDate.getDate() + 6)
     }
-    
+
     // Converter disciplinas para o formato esperado pelo service
     const semanaData = {
       numeroSemana,
@@ -56,15 +58,15 @@ export async function adicionarCicloAoPlano(
     }
 
     console.log('📋 Dados da semana preparados:', semanaData)
-    const resultado = await PlanoEstudoService.adicionarSemana(planoId, semanaData)
+    const resultado = await PlanoEstudoService.adicionarSemana(userId, planoId, semanaData)
     console.log('✅ Semana adicionada com sucesso:', resultado.id)
     revalidatePath('/plano-estudos')
     return { success: true, data: resultado }
   } catch (error) {
     console.error('Erro ao adicionar ciclo:', error)
-    return { 
-      success: false, 
-      error: 'Erro ao adicionar ciclo. Tente novamente.' 
+    return {
+      success: false,
+      error: 'Erro ao adicionar ciclo. Tente novamente.'
     }
   }
 }

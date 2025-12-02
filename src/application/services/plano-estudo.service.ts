@@ -44,9 +44,10 @@ export interface UpdateProgressoData {
 }
 
 export class PlanoEstudoService {
-  static async listarPlanos() {
+  static async listarPlanos(userId: string) {
     try {
       return await prisma.planoEstudo.findMany({
+        where: { userId },
         include: {
           semanas: {
             include: {
@@ -74,9 +75,9 @@ export class PlanoEstudoService {
     }
   }
 
-  static async buscarPorId(id: string) {
+  static async buscarPorId(userId: string, id: string) {
     return await prisma.planoEstudo.findUnique({
-      where: { id },
+      where: { id, userId },
       include: {
         semanas: {
           include: {
@@ -97,10 +98,11 @@ export class PlanoEstudoService {
     })
   }
 
-  static async criar(data: CreatePlanoEstudoData) {
+  static async criar(userId: string, data: CreatePlanoEstudoData) {
     try {
       return await prisma.planoEstudo.create({
         data: {
+          userId,
           nome: data.nome,
           descricao: data.descricao,
           dataInicio: data.dataInicio,
@@ -151,7 +153,7 @@ export class PlanoEstudoService {
     }
   }
 
-  static async criarSimples(data: { nome: string }) {
+  static async criarSimples(userId: string, data: { nome: string }) {
     try {
       // Cria um plano básico sem semanas nem disciplinas
       // Usa datas padrão (hoje e hoje + 30 dias)
@@ -161,6 +163,7 @@ export class PlanoEstudoService {
 
       return await prisma.planoEstudo.create({
         data: {
+          userId,
           nome: data.nome,
           dataInicio,
           dataFim,
@@ -187,7 +190,16 @@ export class PlanoEstudoService {
     }
   }
 
-  static async atualizar(id: string, data: Partial<CreatePlanoEstudoData>) {
+  static async atualizar(userId: string, id: string, data: Partial<CreatePlanoEstudoData>) {
+    // Verifica se pertence ao usuário
+    const plano = await prisma.planoEstudo.findUnique({
+      where: { id, userId }
+    })
+
+    if (!plano) {
+      throw new Error('Plano não encontrado ou sem permissão')
+    }
+
     return await prisma.planoEstudo.update({
       where: { id },
       data: {
@@ -210,14 +222,32 @@ export class PlanoEstudoService {
     })
   }
 
-  static async excluir(id: string) {
+  static async excluir(userId: string, id: string) {
+    // Verifica se pertence ao usuário
+    const plano = await prisma.planoEstudo.findUnique({
+      where: { id, userId }
+    })
+
+    if (!plano) {
+      throw new Error('Plano não encontrado ou sem permissão')
+    }
+
     return await prisma.planoEstudo.delete({
       where: { id }
     })
   }
 
-  static async adicionarSemana(planoId: string, semanaData: CreateSemanaEstudoData) {
+  static async adicionarSemana(userId: string, planoId: string, semanaData: CreateSemanaEstudoData) {
     try {
+      // Verifica se o plano pertence ao usuário
+      const plano = await prisma.planoEstudo.findUnique({
+        where: { id: planoId, userId }
+      })
+
+      if (!plano) {
+        throw new Error('Plano não encontrado ou sem permissão')
+      }
+
       return await prisma.semanaEstudo.create({
         data: {
           planoId: planoId,
@@ -254,9 +284,25 @@ export class PlanoEstudoService {
     }
   }
 
-  static async atualizarProgresso(data: UpdateProgressoData) {
+  static async atualizarProgresso(userId: string, data: UpdateProgressoData) {
+    // Primeiro, verifica se a disciplinaSemana pertence a um plano do usuário
+    const disciplinaSemanaExistente = await prisma.disciplinaSemana.findUnique({
+      where: { id: data.disciplinaSemanaId },
+      include: {
+        semana: {
+          include: {
+            plano: true
+          }
+        }
+      }
+    })
+
+    if (!disciplinaSemanaExistente || disciplinaSemanaExistente.semana.plano.userId !== userId) {
+      throw new Error('Disciplina não encontrada ou sem permissão')
+    }
+
     const updateData: any = {}
-    
+
     if (typeof data.horasRealizadas === 'number') updateData.horasRealizadas = data.horasRealizadas
     if (typeof data.concluida === 'boolean') updateData.concluida = data.concluida
     if (data.observacoes !== undefined) updateData.observacoes = data.observacoes
@@ -343,8 +389,18 @@ export class PlanoEstudoService {
     }
   }
 
-  static async adicionarDisciplinaSemana(data: CreateDisciplinaSemanaData & { semanaId: string }) {
+  static async adicionarDisciplinaSemana(userId: string, data: CreateDisciplinaSemanaData & { semanaId: string }) {
     try {
+      // Verifica se a semana pertence a um plano do usuário
+      const semana = await prisma.semanaEstudo.findUnique({
+        where: { id: data.semanaId },
+        include: { plano: true }
+      })
+
+      if (!semana || semana.plano.userId !== userId) {
+        throw new Error('Semana não encontrada ou sem permissão')
+      }
+
       // Verificar se já existe uma disciplina com o mesmo disciplinaId na mesma semana
       const existente = await prisma.disciplinaSemana.findFirst({
         where: {
@@ -399,8 +455,24 @@ export class PlanoEstudoService {
     }
   }
 
-  static async excluirDisciplinaSemana(disciplinaSemanaId: string) {
+  static async excluirDisciplinaSemana(userId: string, disciplinaSemanaId: string) {
     try {
+      // Verifica se a disciplinaSemana pertence a um plano do usuário
+      const disciplinaSemana = await prisma.disciplinaSemana.findUnique({
+        where: { id: disciplinaSemanaId },
+        include: {
+          semana: {
+            include: {
+              plano: true
+            }
+          }
+        }
+      })
+
+      if (!disciplinaSemana || disciplinaSemana.semana.plano.userId !== userId) {
+        throw new Error('Disciplina não encontrada ou sem permissão')
+      }
+
       return await prisma.disciplinaSemana.delete({
         where: { id: disciplinaSemanaId }
       })
@@ -410,8 +482,18 @@ export class PlanoEstudoService {
     }
   }
 
-  static async atualizarSemana(data: { semanaId: string, dataInicio?: string, dataFim?: string }) {
+  static async atualizarSemana(userId: string, data: { semanaId: string, dataInicio?: string, dataFim?: string }) {
     try {
+      // Verifica se a semana pertence a um plano do usuário
+      const semana = await prisma.semanaEstudo.findUnique({
+        where: { id: data.semanaId },
+        include: { plano: true }
+      })
+
+      if (!semana || semana.plano.userId !== userId) {
+        throw new Error('Semana não encontrada ou sem permissão')
+      }
+
       const updateData: any = {}
       // Criar datas locais sem conversão de fuso horário
       if (data.dataInicio) {

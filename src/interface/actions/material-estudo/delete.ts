@@ -2,10 +2,12 @@
 
 import { MaterialEstudoService } from "@/application/services/material-estudo.service"
 import { revalidatePath } from "next/cache"
+import { requireAuth } from "@/lib/auth-helpers"
 
 export async function deletarMaterialEstudo(id: string) {
   try {
-    await MaterialEstudoService.deletarMaterialEstudo(id)
+    const { userId } = await requireAuth()
+    await MaterialEstudoService.deletarMaterialEstudo(userId, id)
     revalidatePath('/disciplina')
     return { success: true }
   } catch (error) {

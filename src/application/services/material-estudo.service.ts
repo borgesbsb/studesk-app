@@ -3,13 +3,14 @@ import { MaterialEstudo, CreateMaterialEstudoDTO, UpdateMaterialEstudoDTO } from
 import { logError, formatPrismaError } from "@/lib/error-handler"
 
 export class MaterialEstudoService {
-  static async criarMaterialEstudo(data: CreateMaterialEstudoDTO) {
+  static async criarMaterialEstudo(userId: string, data: CreateMaterialEstudoDTO) {
     try {
       const { disciplinaIds, ...materialData } = data
-      
+
       return await prisma.materialEstudo.create({
         data: {
           ...materialData,
+          userId,
           disciplinas: {
             create: disciplinaIds.map(disciplinaId => ({
               disciplinaId
@@ -30,9 +31,10 @@ export class MaterialEstudoService {
     }
   }
 
-  static async listarMateriaisEstudo(): Promise<MaterialEstudo[]> {
+  static async listarMateriaisEstudo(userId: string): Promise<MaterialEstudo[]> {
     try {
       return await prisma.materialEstudo.findMany({
+        where: { userId },
         orderBy: { nome: "asc" },
         include: {
           disciplinas: {
@@ -48,10 +50,13 @@ export class MaterialEstudoService {
     }
   }
 
-  static async buscarMaterialEstudoPorId(id: string): Promise<MaterialEstudo | null> {
+  static async buscarMaterialEstudoPorId(userId: string, id: string): Promise<MaterialEstudo | null> {
     try {
       return await prisma.materialEstudo.findUnique({
-        where: { id },
+        where: {
+          id,
+          userId
+        },
         include: {
           disciplinas: {
             include: {
@@ -66,10 +71,19 @@ export class MaterialEstudoService {
     }
   }
 
-  static async atualizarMaterialEstudo(id: string, data: UpdateMaterialEstudoDTO) {
+  static async atualizarMaterialEstudo(userId: string, id: string, data: UpdateMaterialEstudoDTO) {
     try {
+      // Primeiro verifica se o material pertence ao usuário
+      const material = await prisma.materialEstudo.findUnique({
+        where: { id, userId }
+      })
+
+      if (!material) {
+        throw new Error('Material não encontrado ou sem permissão')
+      }
+
       const { disciplinaIds, ...materialData } = data
-      
+
       // Se houver disciplinaIds, atualiza as relações
       if (disciplinaIds) {
         // Primeiro, remove todas as relações existentes
@@ -104,13 +118,13 @@ export class MaterialEstudoService {
     }
   }
 
-  static async deletarMaterialEstudo(id: string) {
+  static async deletarMaterialEstudo(userId: string, id: string) {
     try {
       console.log('🗑️ Iniciando deleção do material:', id)
 
-      // Verificar se o material existe
+      // Verificar se o material existe e pertence ao usuário
       const material = await prisma.materialEstudo.findUnique({
-        where: { id },
+        where: { id, userId },
         include: {
           disciplinas: true,
           historicoLeitura: true,
@@ -119,7 +133,7 @@ export class MaterialEstudoService {
       })
 
       if (!material) {
-        throw new Error('Material não encontrado')
+        throw new Error('Material não encontrado ou sem permissão')
       }
 
       console.log('📊 Relações encontradas:', {
@@ -185,10 +199,15 @@ export class MaterialEstudoService {
     }
   }
 
-  static async listarMateriaisDaDisciplina(disciplinaId: string) {
+  static async listarMateriaisDaDisciplina(userId: string, disciplinaId: string) {
     try {
       return await prisma.disciplinaMaterial.findMany({
-        where: { disciplinaId },
+        where: {
+          disciplinaId,
+          disciplina: {
+            userId
+          }
+        },
         include: {
           material: true
         },
@@ -202,13 +221,13 @@ export class MaterialEstudoService {
     }
   }
 
-  static async atualizarProgressoLeitura(id: string, paginasLidas: number) {
+  static async atualizarProgressoLeitura(userId: string, id: string, paginasLidas: number) {
     try {
       console.log('📝 Service - Atualizando progresso:', { id, paginasLidas })
 
-      // Primeiro verifica se o material existe
+      // Primeiro verifica se o material existe e pertence ao usuário
       const materialExistente = await prisma.materialEstudo.findUnique({
-        where: { id },
+        where: { id, userId },
         select: {
           id: true,
           totalPaginas: true,
@@ -217,8 +236,8 @@ export class MaterialEstudoService {
       })
 
       if (!materialExistente) {
-        console.log('❌ Service - Material não encontrado:', id)
-        throw new Error('Material não encontrado')
+        console.log('❌ Service - Material não encontrado ou sem permissão:', id)
+        throw new Error('Material não encontrado ou sem permissão')
       }
 
       console.log('📚 Service - Material existente:', materialExistente)

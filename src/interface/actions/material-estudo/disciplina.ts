@@ -2,9 +2,11 @@
 
 import { MaterialEstudoService } from "@/application/services/material-estudo.service"
 import { revalidatePath } from "next/cache"
+import { requireAuth } from "@/lib/auth-helpers"
 
 export async function adicionarMaterialADisciplina(disciplinaId: string, materialId: string) {
   try {
+    await requireAuth() // Apenas valida autenticação
     const relacao = await MaterialEstudoService.adicionarMaterialADisciplina(disciplinaId, materialId)
     revalidatePath('/disciplina')
     return { success: true, data: relacao }
@@ -18,6 +20,7 @@ export async function adicionarMaterialADisciplina(disciplinaId: string, materia
 
 export async function removerMaterialDaDisciplina(disciplinaId: string, materialId: string) {
   try {
+    await requireAuth() // Apenas valida autenticação
     await MaterialEstudoService.removerMaterialDaDisciplina(disciplinaId, materialId)
     revalidatePath('/disciplina')
     return { success: true }
@@ -31,7 +34,8 @@ export async function removerMaterialDaDisciplina(disciplinaId: string, material
 
 export async function listarMateriaisDaDisciplina(disciplinaId: string) {
   try {
-    const materiais = await MaterialEstudoService.listarMateriaisDaDisciplina(disciplinaId)
+    const { userId } = await requireAuth()
+    const materiais = await MaterialEstudoService.listarMateriaisDaDisciplina(userId, disciplinaId)
     return { success: true, data: materiais }
   } catch (error) {
     return {

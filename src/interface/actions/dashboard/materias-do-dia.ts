@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { startOfDay, endOfDay } from 'date-fns'
+import { requireAuth } from '@/lib/auth-helpers'
 
 export interface MateriaDoDia {
   id: string
@@ -61,6 +62,7 @@ function isDiaDeEstudo(diasEstudo: string | null, diaAtual: string): boolean {
 
 export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
   try {
+    const { userId } = await requireAuth();
     // Normalizar a data recebida para o início do dia
     const diaConsultado = data ? startOfDay(data) : startOfDay(new Date())
     const inicioDia = startOfDay(diaConsultado)
@@ -80,9 +82,10 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
       }
     })
 
-    // Primeiro, buscar TODOS os planos ativos para debug
+    // Primeiro, buscar TODOS os planos ativos do usuário para debug
     const todosPlanos = await prisma.planoEstudo.findMany({
       where: {
+        userId,
         ativo: true
       },
       select: {
@@ -105,10 +108,11 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
       }))
     })
 
-    // Busca o plano de estudo ativo que contenha o dia consultado
+    // Busca o plano de estudo ativo do usuário que contenha o dia consultado
     // Importante: comparar apenas as DATAS, ignorando horários
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
+        userId,
         ativo: true,
         // Comparar se diaConsultado está entre dataInicio e dataFim (ignorando horários)
         AND: [

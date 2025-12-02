@@ -1,11 +1,27 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-helpers'
 
 export async function debugSemana(semanaId: string, disciplinaId: string) {
   try {
+    const { userId } = await requireAuth()
+
+    // Verifica se a semana pertence a um plano do usuário
+    const semana = await prisma.semanaEstudo.findUnique({
+      where: { id: semanaId },
+      include: { plano: true }
+    })
+
+    if (!semana || semana.plano.userId !== userId) {
+      return {
+        success: false,
+        error: 'Semana não encontrada ou sem permissão'
+      }
+    }
+
     console.log('🔍 DEBUG: Verificando disciplinas na semana:', { semanaId, disciplinaId })
-    
+
     // Listar todas as disciplinas da semana
     const disciplinasSemana = await prisma.disciplinaSemana.findMany({
       where: {
@@ -63,8 +79,23 @@ export async function debugSemana(semanaId: string, disciplinaId: string) {
 
 export async function limparDisciplinasOrfas(semanaId: string) {
   try {
+    const { userId } = await requireAuth()
+
+    // Verifica se a semana pertence a um plano do usuário
+    const semana = await prisma.semanaEstudo.findUnique({
+      where: { id: semanaId },
+      include: { plano: true }
+    })
+
+    if (!semana || semana.plano.userId !== userId) {
+      return {
+        success: false,
+        error: 'Semana não encontrada ou sem permissão'
+      }
+    }
+
     console.log('🧹 Limpando possíveis disciplinas órfãs na semana:', semanaId)
-    
+
     // Buscar disciplinas com disciplinaId inválido
     const todasDisciplinas = await prisma.disciplinaSemana.findMany({
       where: {

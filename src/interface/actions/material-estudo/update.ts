@@ -3,10 +3,12 @@
 import { MaterialEstudoService } from "@/application/services/material-estudo.service"
 import { UpdateMaterialEstudoDTO } from "@/domain/entities/MaterialEstudo"
 import { revalidatePath } from "next/cache"
+import { requireAuth } from "@/lib/auth-helpers"
 
 export async function atualizarMaterialEstudo(id: string, data: UpdateMaterialEstudoDTO) {
   try {
-    const material = await MaterialEstudoService.atualizarMaterialEstudo(id, data)
+    const { userId } = await requireAuth()
+    const material = await MaterialEstudoService.atualizarMaterialEstudo(userId, id, data)
     revalidatePath('/disciplina')
     return { success: true, data: material }
   } catch (error) {
@@ -19,7 +21,8 @@ export async function atualizarMaterialEstudo(id: string, data: UpdateMaterialEs
 
 export async function atualizarProgressoLeitura(id: string, paginasLidas: number) {
   try {
-    const material = await MaterialEstudoService.atualizarProgressoLeitura(id, paginasLidas)
+    const { userId } = await requireAuth()
+    const material = await MaterialEstudoService.atualizarProgressoLeitura(userId, id, paginasLidas)
     revalidatePath('/disciplina')
     return { success: true, data: material }
   } catch (error) {

@@ -3,9 +3,11 @@
 import { prisma } from '@/lib/prisma';
 import { startOfDay, endOfDay } from 'date-fns';
 import { revalidatePath } from 'next/cache';
+import { requireAuth } from '@/lib/auth-helpers';
 
 export async function transferirTempoSessoes(disciplinaId: string, data?: Date) {
   try {
+    const { userId } = await requireAuth();
     const diaConsultado = data || new Date();
     const inicioDia = startOfDay(diaConsultado);
     const fimDia = endOfDay(diaConsultado);
@@ -15,9 +17,10 @@ export async function transferirTempoSessoes(disciplinaId: string, data?: Date) 
       data: diaConsultado.toISOString()
     });
 
-    // Busca o plano de estudo ativo que contenha o dia consultado
+    // Busca o plano de estudo ativo do usuário que contenha o dia consultado
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
+        userId,
         ativo: true,
         dataInicio: {
           lte: diaConsultado

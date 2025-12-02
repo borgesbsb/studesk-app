@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { startOfMonth, endOfMonth, addDays } from "date-fns"
+import { requireAuth } from "@/lib/auth-helpers"
 
 export interface DisciplinaAgenda {
   id: string
@@ -35,16 +36,20 @@ const coresDisciplinas = [
 ]
 
 export async function getAgendaMensal(ano: number, mes: number): Promise<AgendaMensal> {
+  const { userId } = await requireAuth()
   const dataInicio = startOfMonth(new Date(ano, mes - 1, 1))
   const dataFim = endOfMonth(dataInicio)
-  
+
   console.log(`[AGENDA DEBUG] Buscando agenda para ${ano}/${mes}`)
   console.log(`[AGENDA DEBUG] Período: ${dataInicio.toISOString()} até ${dataFim.toISOString()}`)
-  
+
   try {
-    // Buscar todas as semanas que intersectam com o mês
+    // Buscar todas as semanas do usuário que intersectam com o mês
     const semanasDoMes = await prisma.semanaEstudo.findMany({
       where: {
+        plano: {
+          userId
+        },
         AND: [
           { dataInicio: { lte: dataFim } },
           { dataFim: { gte: dataInicio } }
@@ -68,8 +73,11 @@ export async function getAgendaMensal(ano: number, mes: number): Promise<AgendaM
       disciplinasCount: s.disciplinas.length
     })))
 
-    // Buscar todas as disciplinas para criar mapeamento de cores
+    // Buscar todas as disciplinas do usuário para criar mapeamento de cores
     const todasDisciplinas = await prisma.disciplina.findMany({
+      where: {
+        userId
+      },
       select: {
         id: true,
         nome: true

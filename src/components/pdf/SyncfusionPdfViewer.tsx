@@ -200,15 +200,21 @@ export default function SyncfusionPdfViewer({ pdfUrl, paginaProgresso = 1, onPag
 
     // Handler para quando o documento for carregado
     const handleDocumentLoad = () => {
+        console.log('📄 PDF carregado! Página de progresso:', paginaProgresso);
+
         // Navegar para a página de progresso se for maior que 1
         if (paginaProgresso && paginaProgresso > 1 && viewerRef.current) {
+            console.log(`⏭️ Navegando para página ${paginaProgresso}...`);
             setTimeout(() => {
                 try {
                     viewerRef.current?.navigation.goToPage(paginaProgresso);
+                    console.log(`✅ Navegação para página ${paginaProgresso} concluída`);
                 } catch (error) {
-                    console.error('Erro ao navegar para página de progresso:', error);
+                    console.error('❌ Erro ao navegar para página de progresso:', error);
                 }
             }, 500);
+        } else {
+            console.log('ℹ️ Permanecendo na página 1 (progresso:', paginaProgresso, ')');
         }
     };
 

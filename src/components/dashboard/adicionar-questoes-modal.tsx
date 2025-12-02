@@ -53,7 +53,7 @@ export function AdicionarQuestoesModal({ disciplinaNome, onAdicionarQuestoes }: 
 
   const totalQuestoes = parseInt(quantidade) || 0;
   const textoQuestoes = totalQuestoes > 0
-    ? `${totalQuestoes} questão${totalQuestoes !== 1 ? 'ões' : ''}`
+    ? `${totalQuestoes} ${totalQuestoes !== 1 ? 'questões' : 'questão'}`
     : "";
 
   return (

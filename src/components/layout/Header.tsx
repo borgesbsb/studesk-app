@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { UserMenu } from "@/components/layout/user-menu"
 import { useSaveStatus } from "@/contexts/save-status-context"
 import { useHeader } from "@/contexts/header-context"
 
@@ -53,6 +54,7 @@ export function Header({ isOpen, setIsOpen }: HeaderProps) {
           )
         )}
         <ThemeToggle />
+        <UserMenu />
       </div>
     </header>
   )

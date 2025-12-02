@@ -82,17 +82,23 @@ export function AdicionarTempoCicloDialog({
       fetch(`/api/disciplina/${disciplinaSelecionada}/ciclo-atual`)
         .then(res => {
           if (!res.ok) {
-            throw new Error('Ciclo não encontrado')
+            // Não lançar erro, apenas retornar null para tratar graciosamente
+            return null
           }
           return res.json()
         })
         .then(data => {
-          setCicloAtual(data)
+          if (data) {
+            setCicloAtual(data)
+          } else {
+            setCicloAtual(null)
+            toast.error('Esta disciplina não está no ciclo de estudos atual')
+          }
         })
         .catch(error => {
-          console.error('Erro ao carregar ciclo atual:', error)
+          // Apenas capturar erros reais de rede
+          console.error('Erro de rede ao carregar ciclo:', error)
           setCicloAtual(null)
-          toast.error('Esta disciplina não está no ciclo de estudos atual')
         })
         .finally(() => {
           setLoading(false)

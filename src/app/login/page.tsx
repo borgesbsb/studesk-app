@@ -115,14 +115,6 @@ export default function LoginPage() {
               </Link>
             </p>
           </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Credenciais padrão para teste:
-              <br />
-              <span className="font-mono">borges.bnjamin@gmail.com / 123456</span>
-            </p>
-          </div>
         </div>
       </div>
     </div>

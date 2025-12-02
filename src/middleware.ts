@@ -18,6 +18,13 @@ function isValidHashFormat(hash: string): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Permitir acesso a arquivos estáticos da pasta public (incluindo pdf.worker.min.js)
+  if (
+    pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|eot|json|xml|pdf)$/)
+  ) {
+    return NextResponse.next()
+  }
+
   // Permitir acesso a rotas públicas
   if (isPublicRoute(pathname)) {
     return NextResponse.next()
@@ -81,8 +88,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public files (public folder)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }

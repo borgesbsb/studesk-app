@@ -280,7 +280,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                           <TableCell>
                             <div className="flex items-center justify-center gap-1.5">
                               <Link
-                                href={`/disciplina/${materia.disciplinaId}/materiais`}
+                                href={`/${hash}/disciplina/${materia.disciplinaId}/materiais`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="p-1.5 rounded-md hover:bg-primary/10 transition-colors group"
                                 title="📂 Abrir materiais"

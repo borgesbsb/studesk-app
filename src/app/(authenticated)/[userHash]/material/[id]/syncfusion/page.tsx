@@ -53,6 +53,18 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     const [dialogTempoCicloOpen, setDialogTempoCicloOpen] = useState(false)
     const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0)
 
+    // Log para debug do progresso
+    useEffect(() => {
+        if (material) {
+            console.log('📊 Material carregado com progresso:', {
+                id: material.id,
+                nome: material.nome,
+                paginasLidas: material.paginasLidas,
+                totalPaginas: material.totalPaginas
+            });
+        }
+    }, [material]);
+
     // Carregar dados do material
     useEffect(() => {
         const loadMaterial = async () => {
@@ -499,7 +511,7 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                 {pdfUrl ? (
                     <SyncfusionPdfViewer
                         pdfUrl={pdfUrl}
-                        paginaProgresso={material.paginasLidas}
+                        paginaProgresso={material?.paginasLidas || 1}
                         onPageChange={handlePageChange}
                     />
                 ) : (

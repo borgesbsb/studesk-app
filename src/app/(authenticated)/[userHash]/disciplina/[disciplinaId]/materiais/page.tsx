@@ -11,14 +11,20 @@ import { buscarDisciplinaPorId } from "@/interface/actions/disciplina/list"
 import { Disciplina } from "@/domain/entities/Disciplina"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useUserHash } from "@/contexts/user-hash-context"
+import { useHeader } from "@/contexts/header-context"
 
 const MateriaisPage = () => {
   const { hash } = useUserHash()
+  const { setTitle } = useHeader()
   const params = useParams()
   const router = useRouter()
   const disciplinaId = params?.disciplinaId as string
   const [disciplina, setDisciplina] = useState<Disciplina | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setTitle("Materiais")
+  }, [setTitle])
 
   useEffect(() => {
     const carregarDisciplina = async () => {

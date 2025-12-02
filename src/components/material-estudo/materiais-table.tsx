@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress"
 import { FileText, Trash2, Video, Play, Eye } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { deletarMaterialEstudo } from "@/interface/actions/material-estudo/delete"
 import { atualizarProgressoLeitura } from "@/interface/actions/material-estudo/update"
@@ -26,12 +27,15 @@ interface MateriaisTableProps {
 }
 
 export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
+  const { data: session } = useSession()
   const [materiais, setMateriais] = useState<MaterialEstudo[]>([])
   const [loading, setLoading] = useState(true)
   const [horasPorMaterialSegundos, setHorasPorMaterialSegundos] = useState<Record<string, number>>({})
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [pendingMaterial, setPendingMaterial] = useState<MaterialEstudo | null>(null)
   const [activeTab, setActiveTab] = useState<'pdf' | 'video'>('pdf')
+
+  const userHash = session?.user?.hash
 
   useEffect(() => {
     carregarMateriais()
@@ -124,11 +128,16 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
 
 
   const handleOpenPdf = (material: MaterialEstudo) => {
+    if (!userHash) {
+      toast.error('Sessão não encontrada')
+      return
+    }
+
     // Redirecionar para o visualizador correto baseado no tipo
     if (material.tipo === 'VIDEO') {
-      window.location.href = `/material/${material.id}/video?disciplinaId=${disciplinaId}`
+      window.location.href = `/${userHash}/material/${material.id}/video?disciplinaId=${disciplinaId}`
     } else {
-      window.location.href = `/material/${material.id}/syncfusion?disciplinaId=${disciplinaId}`
+      window.location.href = `/${userHash}/material/${material.id}/syncfusion?disciplinaId=${disciplinaId}`
     }
   }
 
@@ -146,12 +155,17 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const handleUploadComplete = (fileUrl: string, mediaType: 'PDF' | 'VIDEO') => {
     if (!pendingMaterial) return
 
+    if (!userHash) {
+      toast.error('Sessão não encontrada')
+      return
+    }
+
     if (mediaType === 'PDF') {
       // Redirecionar para Syncfusion com URL temporária e disciplinaId
-      window.location.href = `/material/${pendingMaterial.id}/syncfusion?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
+      window.location.href = `/${userHash}/material/${pendingMaterial.id}/syncfusion?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
     } else {
       // Redirecionar para visualizador de vídeo com URL temporária e disciplinaId
-      window.location.href = `/material/${pendingMaterial.id}/video?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
+      window.location.href = `/${userHash}/material/${pendingMaterial.id}/video?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
     }
 
     setPendingMaterial(null)

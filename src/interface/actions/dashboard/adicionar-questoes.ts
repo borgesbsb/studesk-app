@@ -101,7 +101,7 @@ export async function adicionarQuestoes(disciplinaId: string, quantidade: number
 
     return {
       success: true,
-      message: `${quantidade} questão${quantidade !== 1 ? 'ões' : ''} adicionada${quantidade !== 1 ? 's' : ''} com sucesso!`,
+      message: `${quantidade} ${quantidade !== 1 ? 'questões adicionadas' : 'questão adicionada'} com sucesso!`,
       questoesAdicionadas: quantidade
     };
 

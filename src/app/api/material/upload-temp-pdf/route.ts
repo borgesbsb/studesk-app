@@ -2,9 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function POST(request: NextRequest) {
     try {
+        // Verificar autenticação
+        const session = await getServerSession(authOptions)
+        if (!session?.user?.id) {
+            return NextResponse.json(
+                { error: 'Não autorizado' },
+                { status: 401 }
+            )
+        }
+
         const formData = await request.formData()
         const file = formData.get('file') as File
         const materialId = formData.get('materialId') as string | null
@@ -24,16 +35,16 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Criar diretório temporário se não existir
-        const tempDir = join(process.cwd(), 'public', 'temp-uploads')
+        // Criar diretório temporário por usuário se não existir
+        const tempDir = join(process.cwd(), 'public', 'temp-uploads', session.user.id)
         if (!existsSync(tempDir)) {
             await mkdir(tempDir, { recursive: true })
         }
 
-        // Gerar nome único para o arquivo
+        // Gerar nome único para o arquivo incluindo userId
         const timestamp = Date.now()
         const randomStr = Math.random().toString(36).substring(7)
-        const fileName = `${timestamp}-${randomStr}-${file.name}`
+        const fileName = `${session.user.id}-${timestamp}-${randomStr}-${file.name}`
         const filePath = join(tempDir, fileName)
 
         // Converter file para buffer e salvar
@@ -41,8 +52,8 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(bytes)
         await writeFile(filePath, buffer)
 
-        // Retornar URL do arquivo temporário
-        const fileUrl = `/temp-uploads/${fileName}`
+        // Retornar URL do arquivo temporário com userId no path
+        const fileUrl = `/temp-uploads/${session.user.id}/${fileName}`
 
         return NextResponse.json({
             success: true,

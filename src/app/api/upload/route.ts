@@ -1,13 +1,24 @@
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import path from 'path'
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
-    
+
     if (!file) {
       return NextResponse.json(
         { error: "Nenhum arquivo enviado" },
@@ -29,12 +40,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Criar nome único para o arquivo
+    // Criar nome único para o arquivo incluindo userId para isolamento
     const timestamp = Date.now()
-    const fileName = `${timestamp}-${file.name.replace(/\s+/g, '-')}`
-    
-    // Definir caminho do arquivo - CORRIGIDO
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
+    const sanitizedFileName = file.name.replace(/\s+/g, '-')
+    const fileName = `${session.user.id}-${timestamp}-${sanitizedFileName}`
+
+    // Definir caminho do arquivo com diretório por usuário
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', session.user.id)
     const filePath = path.join(uploadsDir, fileName)
 
     console.log('Caminhos:', {
@@ -57,9 +69,9 @@ export async function POST(request: NextRequest) {
     // Salvar o arquivo
     await writeFile(filePath, buffer)
     console.log('Arquivo salvo com sucesso!')
-    
-    // Retornar o caminho da API para servir o arquivo
-    const fileUrl = `/api/uploads/${fileName}`
+
+    // Retornar o caminho da API para servir o arquivo (inclui userId no path)
+    const fileUrl = `/api/uploads/${session.user.id}/${fileName}`
     
     return NextResponse.json({ 
       success: true, 

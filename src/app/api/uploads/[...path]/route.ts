@@ -1,18 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return new NextResponse('Não autorizado', { status: 401 })
+    }
+
     // Aguardar os parâmetros
     const { path: pathSegments } = await params
-    
+
+    // O primeiro segmento do path deve ser o userId do dono do arquivo
+    const fileOwnerId = pathSegments[0]
+
+    // Verificar se o usuário está tentando acessar seus próprios arquivos
+    if (fileOwnerId !== session.user.id) {
+      return new NextResponse('Acesso negado', { status: 403 })
+    }
+
     // Construir o caminho do arquivo
     const filePath = path.join(process.cwd(), 'public', 'uploads', ...pathSegments)
-    
+
     // Verificar se o arquivo existe
     try {
       await fs.access(filePath)

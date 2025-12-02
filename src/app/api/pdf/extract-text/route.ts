@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 import fs from 'fs/promises'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 // Função alternativa usando pdf-parse como fallback
 async function extractTextWithPdfParse(buffer: Buffer): Promise<{
@@ -158,10 +160,20 @@ async function extractTextSimple(buffer: Buffer): Promise<{
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     console.log('=== INICIANDO EXTRAÇÃO DE PDF SIMPLIFICADA ===')
     console.log('Request URL:', request.url)
     console.log('Request method:', request.method)
-    
+    console.log('User ID:', session.user.id)
+
     let body
     try {
       body = await request.json()
@@ -189,12 +201,26 @@ export async function POST(request: NextRequest) {
 
     let absoluteUrl = pdfUrl
     let isLocalFile = false
-    
-    // Se a URL começar com /uploads, ajustar para o caminho do sistema de arquivos
-    if (pdfUrl.startsWith('/uploads/')) {
+
+    // Se a URL começar com /uploads ou /api/uploads, validar ownership
+    if (pdfUrl.startsWith('/uploads/') || pdfUrl.startsWith('/api/uploads/')) {
+      // Extrair path segments
+      const pathParts = pdfUrl.replace(/^\/api\/uploads\//, '').replace(/^\/uploads\//, '').split('/')
+
+      // O primeiro segmento deve ser o userId
+      const fileOwnerId = pathParts[0]
+
+      // Validar ownership
+      if (fileOwnerId !== session.user.id) {
+        return NextResponse.json(
+          { error: 'Você não tem permissão para processar este arquivo' },
+          { status: 403 }
+        )
+      }
+
       const uploadDir = path.join(process.cwd(), 'public', 'uploads')
       const fileName = pdfUrl.split('/').pop()
-      absoluteUrl = path.join(uploadDir, fileName || '')
+      absoluteUrl = path.join(uploadDir, fileOwnerId, fileName || '')
       isLocalFile = true
       
       console.log('Caminho da pasta uploads:', uploadDir)

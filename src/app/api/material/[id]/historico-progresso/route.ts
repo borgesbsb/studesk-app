@@ -1,19 +1,46 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const materialId = id
-    
+
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
     // Buscar dados dos últimos 30 dias
     const trinta_dias_atras = new Date()
     trinta_dias_atras.setDate(trinta_dias_atras.getDate() - 30)
-    
-    console.log('📊 API - Buscando histórico de progresso:', { materialId, desde: trinta_dias_atras })
+
+    console.log('📊 API - Buscando histórico de progresso:', { materialId, desde: trinta_dias_atras, userId: session.user.id })
 
     // Buscar histórico de leitura dos últimos 30 dias
     const historico = await prisma.historicoLeitura.findMany({

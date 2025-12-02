@@ -1,19 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const body = await request.json()
 
     const { paginasLidas, tempoAssistido } = body
 
-    // Buscar o material para verificar o tipo
+    // 2. Buscar o material e verificar ownership
     const material = await prisma.materialEstudo.findUnique({
-      where: { id }
+      where: {
+        id,
+        userId: session.user.id
+      }
     })
 
     if (!material) {

@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function POST(request: NextRequest) {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const {
       planoId,
@@ -24,14 +33,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar se o plano existe
+    // Verificar se o plano existe e pertence ao usuário
     const plano = await prisma.planoEstudo.findUnique({
-      where: { id: planoId }
+      where: {
+        id: planoId,
+        userId: session.user.id
+      }
     })
 
     if (!plano) {
       return NextResponse.json(
-        { error: 'Plano de estudos não encontrado' },
+        { error: 'Plano de estudos não encontrado ou sem permissão' },
         { status: 404 }
       )
     }

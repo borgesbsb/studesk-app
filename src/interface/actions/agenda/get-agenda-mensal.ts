@@ -164,58 +164,6 @@ export async function getAgendaMensal(ano: number, mes: number): Promise<AgendaM
     console.log(`[AGENDA DEBUG] Dias com disciplinas:`, Object.keys(diasAgenda).length)
     console.log(`[AGENDA DEBUG] Agenda final:`, diasAgenda)
 
-    // Se não encontrou dados reais, criar dados baseados nas disciplinas reais do banco
-    if (Object.keys(diasAgenda).length === 0) {
-      console.log(`[AGENDA DEBUG] Nenhum dado encontrado nas semanas, criando dados de teste com disciplinas reais`)
-      
-      // Usar as primeiras disciplinas do banco para teste
-      const dadosExemplo: Record<number, DisciplinaAgenda[]> = {}
-      if (todasDisciplinas.length > 0) {
-        dadosExemplo[12] = todasDisciplinas.slice(0, 3).map((d, index) => ({
-          id: d.id,
-          nome: d.nome,
-          cor: coresDisciplinas[index % coresDisciplinas.length]
-        }))
-        
-        if (todasDisciplinas.length > 3) {
-          dadosExemplo[15] = [
-            todasDisciplinas[0],
-            ...(todasDisciplinas.length > 4 ? [todasDisciplinas[4]] : [])
-          ].map((d, index) => ({
-            id: d.id,
-            nome: d.nome,
-            cor: coresDisciplinas[index % coresDisciplinas.length]
-          }))
-        }
-        
-        if (todasDisciplinas.length > 5) {
-          dadosExemplo[20] = todasDisciplinas.slice(1, 4).map((d, index) => ({
-            id: d.id,
-            nome: d.nome,
-            cor: coresDisciplinas[(index + 1) % coresDisciplinas.length]
-          }))
-        }
-      } else {
-        // Fallback se não tiver disciplinas
-        dadosExemplo[12] = [
-          { id: "exemplo1", nome: "Matemática", cor: "bg-blue-500" },
-          { id: "exemplo2", nome: "Português", cor: "bg-green-500" },
-          { id: "exemplo3", nome: "História", cor: "bg-purple-500" }
-        ]
-      }
-      
-      const meses = [
-        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-      ]
-      
-      return {
-        mes: meses[dataInicio.getMonth()],
-        ano,
-        dias: dadosExemplo
-      }
-    }
-
     const meses = [
       'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'

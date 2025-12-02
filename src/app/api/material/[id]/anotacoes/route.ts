@@ -1,12 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id: materialId } = await params
+
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
 
     const anotacoes = await prisma.anotacao.findMany({
       where: {
@@ -33,7 +60,33 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id: materialId } = await params
+
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
     const body = await request.json()
 
     // Se está salvando múltiplas anotações
@@ -91,7 +144,33 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id: materialId } = await params
+
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const anotacaoId = searchParams.get('anotacaoId')
 

@@ -1,24 +1,39 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   _request: Request,
   { params }: any
 ) {
-  // Aguarda a resolução dos parâmetros
-  const resolvedParams = await Promise.resolve(params)
-  const materialId = resolvedParams.id
-
-  if (!materialId) {
-    return NextResponse.json(
-      { error: 'ID do material não fornecido' },
-      { status: 400 }
-    )
-  }
-
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
+    // Aguarda a resolução dos parâmetros
+    const resolvedParams = await Promise.resolve(params)
+    const materialId = resolvedParams.id
+
+    if (!materialId) {
+      return NextResponse.json(
+        { error: 'ID do material não fornecido' },
+        { status: 400 }
+      )
+    }
+
+    // 2. Buscar material e verificar ownership
     const material = await prisma.materialEstudo.findUnique({
-      where: { id: materialId },
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
       select: {
         id: true,
         nome: true,

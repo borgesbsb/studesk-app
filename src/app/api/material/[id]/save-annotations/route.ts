@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir, readdir, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import * as path from 'path'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 // Função para limpar arquivos antigos do mesmo material
 async function cleanupOldFiles(materialId: string, currentFileName: string, originalFileName: string) {
@@ -63,11 +65,20 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id: materialId } = await params
     const formData = await request.formData()
-    
+
     const pdfFile = formData.get('pdf') as File
-    
+
     if (!pdfFile || !materialId) {
       return NextResponse.json(
         { error: 'PDF e materialId são obrigatórios' },
@@ -77,9 +88,12 @@ export async function POST(
 
     console.log('📥 Recebido PDF para salvar:', pdfFile.name, pdfFile.size, 'bytes')
 
-    // Verificar se o material existe
+    // 2. Verificar se o material existe e pertence ao usuário
     const material = await prisma.materialEstudo.findUnique({
-      where: { id: materialId }
+      where: {
+        id: materialId,
+        userId: session.user.id
+      }
     })
 
     if (!material) {

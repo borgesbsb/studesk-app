@@ -7,27 +7,26 @@
       - heading "Studesk" [level=1] [ref=e6]
       - paragraph [ref=e7]: Faça login para continuar
     - generic [ref=e8]:
-      - generic [ref=e9]: Email ou senha inválidos
-      - generic [ref=e10]:
-        - generic [ref=e11]: Email
-        - textbox "Email" [ref=e12]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: Email
+        - textbox "Email" [ref=e11]:
           - /placeholder: seu@email.com
           - text: user1@test.com
-      - generic [ref=e13]:
-        - generic [ref=e14]: Senha
-        - textbox "Senha" [ref=e15]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: Senha
+        - textbox "Senha" [ref=e14]:
           - /placeholder: ••••••••
           - text: "123456"
-      - button "Entrar" [ref=e16]
-    - paragraph [ref=e18]:
+      - button "Entrando..." [disabled] [ref=e15]
+    - paragraph [ref=e17]:
       - text: Não tem uma conta?
-      - link "Criar conta" [ref=e19] [cursor=pointer]:
+      - link "Criar conta" [ref=e18] [cursor=pointer]:
         - /url: /register
-    - paragraph [ref=e21]:
+    - paragraph [ref=e20]:
       - text: "Credenciais padrão para teste:"
       - text: borges.bnjamin@gmail.com / 123456
   - region "Notifications alt+T"
-  - alert [ref=e22]
-  - button "Open Next.js Dev Tools" [ref=e28] [cursor=pointer]:
-    - img [ref=e29]
+  - alert [ref=e21]
+  - button "Open Next.js Dev Tools" [ref=e27] [cursor=pointer]:
+    - img [ref=e28]
 ```

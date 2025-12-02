@@ -1,15 +1,42 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const materialId = id
 
-    console.log('📚 API - Buscando mini sessões não associadas:', { materialId })
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    console.log('📚 API - Buscando mini sessões não associadas:', { materialId, userId: session.user.id })
 
     // Buscar histórico de leitura que não tem assuntos estudados (não foi associado a uma sessão)
     const miniSessoes = await prisma.historicoLeitura.findMany({
@@ -109,14 +136,40 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { dataDia, assuntosEstudados } = await request.json()
     const { id } = await params
     const materialId = id
 
-    console.log('📝 API - Criando sessão de estudo para o dia:', { 
-      materialId, 
-      dataDia, 
-      assuntosEstudados
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    console.log('📝 API - Criando sessão de estudo para o dia:', {
+      materialId,
+      dataDia,
+      assuntosEstudados,
+      userId: session.user.id
     })
 
     if (!dataDia) {

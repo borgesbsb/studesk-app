@@ -1,12 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id: materialId } = await params
+
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
 
     // Buscar a última sessão (último dia com registros)
     const ultimoRegistro = await prisma.historicoLeitura.findFirst({

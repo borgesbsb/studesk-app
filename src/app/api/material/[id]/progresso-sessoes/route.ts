@@ -1,17 +1,44 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const materialId = id
 
-    console.log('📊 API - Calculando progresso baseado nas sessões:', { materialId })
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
 
-    // 1. Buscar todas as sessões de estudo (excluindo mini sessões individuais)
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    console.log('📊 API - Calculando progresso baseado nas sessões:', { materialId, userId: session.user.id })
+
+    // 3. Buscar todas as sessões de estudo (excluindo mini sessões individuais)
     const sessoesEstudo = await prisma.historicoLeitura.findMany({
       where: {
         materialId,
@@ -101,12 +128,37 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const materialId = id
 
-    console.log('📝 API - Atualizando progresso baseado nas sessões:', { materialId })
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
 
-    // 1. Calcular o progresso atual com base nas sessões
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    console.log('📝 API - Atualizando progresso baseado nas sessões:', { materialId, userId: session.user.id })
+
+    // 3. Calcular o progresso atual com base nas sessões
     const sessoesEstudo = await prisma.historicoLeitura.findMany({
       where: {
         materialId,

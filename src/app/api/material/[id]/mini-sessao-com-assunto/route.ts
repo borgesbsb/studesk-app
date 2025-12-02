@@ -1,20 +1,32 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { paginaAtual, tempoLeituraMinutos, assunto } = await request.json()
     const { id } = await params
     const materialId = id
 
-    console.log('📝 API - Criando mini sessão com assunto:', { 
-      materialId, 
-      paginaAtual, 
+    console.log('📝 API - Criando mini sessão com assunto:', {
+      materialId,
+      paginaAtual,
       tempoLeituraMinutos,
-      assunto 
+      assunto,
+      userId: session.user.id
     })
 
     if (!paginaAtual || paginaAtual <= 0) {
@@ -38,9 +50,12 @@ export async function POST(
       )
     }
 
-    // Verificar se o material existe
+    // 2. Verificar se o material existe e pertence ao usuário
     const material = await prisma.materialEstudo.findUnique({
-      where: { id: materialId }
+      where: {
+        id: materialId,
+        userId: session.user.id
+      }
     })
 
     if (!material) {

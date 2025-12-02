@@ -1,20 +1,47 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const materialId = id
-    
+
+    // 2. Verificar ownership do material
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
     // Data de hoje (início e fim do dia)
     const hoje = new Date()
     const inicioDodia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0)
     const fimDodia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59)
 
-    console.log('📊 API - Buscando estatísticas do dia:', { materialId, inicioDodia, fimDodia })
+    console.log('📊 API - Buscando estatísticas do dia:', { materialId, inicioDodia, fimDodia, userId: session.user.id })
 
     // Buscar histórico de leitura do dia
     const historicoHoje = await prisma.historicoLeitura.findMany({

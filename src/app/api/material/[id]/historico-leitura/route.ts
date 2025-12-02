@@ -1,15 +1,42 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const materialId = id
 
-    console.log('📚 API - Buscando histórico de leitura:', { materialId })
+    console.log('📚 API - Buscando histórico de leitura:', { materialId, userId: session.user.id })
+
+    // Verificar se o material existe e pertence ao usuário
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
 
     // Busca o histórico de leitura ordenado por data
     const historico = await prisma.historicoLeitura.findMany({
@@ -45,19 +72,45 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { sessaoId, assuntosEstudados } = await request.json()
     const { id } = await params
     const materialId = id
 
-    console.log('📝 API - Atualizando assuntos da sessão:', { 
-      materialId, 
-      sessaoId, 
-      assuntosEstudados 
+    console.log('📝 API - Atualizando assuntos da sessão:', {
+      materialId,
+      sessaoId,
+      assuntosEstudados,
+      userId: session.user.id
     })
+
+    // Verificar se o material existe e pertence ao usuário
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
 
     // Verifica se a sessão existe e pertence ao material
     const sessaoExistente = await prisma.historicoLeitura.findFirst({
-      where: { 
+      where: {
         id: sessaoId,
         materialId: materialId
       }
@@ -100,20 +153,33 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { paginaAtual, tempoLeituraSegundos, assuntosEstudados } = await request.json()
     const { id } = await params
     const materialId = id
 
-    console.log('📝 API - Salvando histórico de leitura:', { 
-      materialId, 
-      paginaAtual, 
-      tempoLeituraSegundos, 
-      assuntosEstudados 
+    console.log('📝 API - Salvando histórico de leitura:', {
+      materialId,
+      paginaAtual,
+      tempoLeituraSegundos,
+      assuntosEstudados,
+      userId: session.user.id
     })
 
-    // Verifica se o material existe
+    // Verifica se o material existe e pertence ao usuário
     const materialExistente = await prisma.materialEstudo.findUnique({
-      where: { id: materialId },
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
       select: { id: true, nome: true, tipo: true, totalPaginas: true }
     })
 
@@ -187,13 +253,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    // Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { sessaoId } = await request.json()
     const { id } = await params
     const materialId = id
 
-    console.log('🗑️ API - Excluindo mini sessão:', { 
-      materialId, 
-      sessaoId 
+    console.log('🗑️ API - Excluindo mini sessão:', {
+      materialId,
+      sessaoId,
+      userId: session.user.id
     })
 
     if (!sessaoId) {
@@ -203,9 +279,25 @@ export async function DELETE(
       )
     }
 
+    // Verificar se o material existe e pertence ao usuário
+    const material = await prisma.materialEstudo.findUnique({
+      where: {
+        id: materialId,
+        userId: session.user.id
+      },
+      select: { id: true }
+    })
+
+    if (!material) {
+      return NextResponse.json(
+        { error: 'Material não encontrado' },
+        { status: 404 }
+      )
+    }
+
     // Verificar se a sessão existe e pertence ao material
     const sessaoExistente = await prisma.historicoLeitura.findFirst({
-      where: { 
+      where: {
         id: sessaoId,
         materialId: materialId
       }

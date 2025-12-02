@@ -1,21 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { startOfDay, endOfDay } from 'date-fns'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const params = await context.params
     const disciplinaId = params.id
     const hoje = new Date()
     const inicioDia = startOfDay(hoje)
     const fimDia = endOfDay(hoje)
 
-    // Buscar plano ativo que contenha hoje
+    // 2. Buscar plano ativo do usuário que contenha hoje
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
+        userId: session.user.id,
         ativo: true,
         AND: [
           {

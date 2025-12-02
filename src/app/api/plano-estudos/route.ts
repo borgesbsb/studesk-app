@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 // GET - Listar todos os planos de estudo
 export async function GET() {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
+    // 2. Buscar apenas planos do usuário
     const planos = await prisma.planoEstudo.findMany({
+      where: {
+        userId: session.user.id
+      },
       include: {
         semanas: {
           include: {
@@ -37,15 +52,26 @@ export async function GET() {
 // POST - Criar um novo plano de estudo
 export async function POST(request: NextRequest) {
   try {
+    // 1. Verificar autenticação
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { nome, descricao, dataInicio, dataFim, semanas } = body
 
+    // 2. Criar plano associado ao userId
     const plano = await prisma.planoEstudo.create({
       data: {
         nome,
         descricao,
         dataInicio: new Date(dataInicio),
         dataFim: new Date(dataFim),
+        userId: session.user.id,
         semanas: {
           create: (Array.isArray(semanas) ? semanas : [])
             .filter((semana: any) => Array.isArray(semana.disciplinas) && semana.disciplinas.length > 0)

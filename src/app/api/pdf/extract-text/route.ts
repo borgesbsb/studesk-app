@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 import fs from 'fs/promises'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 
 // Função alternativa usando pdf-parse como fallback
 async function extractTextWithPdfParse(buffer: Buffer): Promise<{

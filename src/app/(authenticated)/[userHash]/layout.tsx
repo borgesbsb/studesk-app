@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import { getUserByHash } from '@/lib/user-hash'
 import { UserHashProvider } from '@/contexts/user-hash-context'
 import { AppLayout } from '@/components/layout/AppLayout'

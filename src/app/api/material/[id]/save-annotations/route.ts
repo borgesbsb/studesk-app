@@ -4,7 +4,7 @@ import { existsSync } from 'fs'
 import * as path from 'path'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 
 // Função para limpar arquivos antigos do mesmo material
 async function cleanupOldFiles(materialId: string, currentFileName: string, originalFileName: string) {

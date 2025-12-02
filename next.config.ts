@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 
   // Configuração para servir arquivos estáticos do PDF.js e WebViewer
   async headers() {

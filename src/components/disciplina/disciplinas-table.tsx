@@ -6,6 +6,7 @@ import { listarDisciplinas } from "@/interface/actions/disciplina/list"
 import { deletarDisciplina } from "@/interface/actions/disciplina/delete"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { useSaveStatus } from "@/contexts/save-status-context"
+import { useUserHash } from "@/contexts/user-hash-context"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -94,6 +95,7 @@ interface DisciplinaComMateriais {
 }
 
 export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
+  const { hash } = useUserHash()
   const { setSuccess, setError } = useSaveStatus()
   const router = useRouter()
   const [disciplinas, setDisciplinas] = useState<DisciplinaComMateriais[]>([])
@@ -321,7 +323,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/disciplina/${disciplina.disciplinaId}/materiais`)}
+                      onClick={() => router.push(`/${hash}/disciplina/${disciplina.disciplinaId}/materiais`)}
                       className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
                       title="Materiais de Estudo"
                     >

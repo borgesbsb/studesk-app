@@ -1,4 +1,3 @@
-import { AppLayout } from "@/components/layout/AppLayout"
 import { ReactNode } from "react"
 
 export default function AuthenticatedLayout({
@@ -6,5 +5,5 @@ export default function AuthenticatedLayout({
 }: {
   children: ReactNode
 }) {
-  return <AppLayout>{children}</AppLayout>
+  return <>{children}</>
 } 

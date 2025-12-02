@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 import { addWeeks, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useUserHash } from '@/contexts/user-hash-context'
 
 
 interface Semana {
@@ -28,6 +29,7 @@ interface Semana {
 }
 
 export function CriarPlanoCompletoForm() {
+  const { hash } = useUserHash()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('basico')
@@ -116,7 +118,7 @@ export function CriarPlanoCompletoForm() {
 
       if (resultado.success) {
         toast.success('Plano de estudo criado com sucesso!')
-        router.push('/plano-estudos')
+        router.push(`/${hash}/plano-estudos`)
       } else {
         toast.error(resultado.error || 'Erro ao criar plano')
       }
@@ -145,7 +147,7 @@ export function CriarPlanoCompletoForm() {
     <div className="space-y-6">
       {/* Header com botão voltar */}
       <div className="flex items-center gap-4">
-        <Link href="/plano-estudos">
+        <Link href={`/${hash}/plano-estudos`}>
           <Button variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
@@ -253,7 +255,7 @@ export function CriarPlanoCompletoForm() {
                 )}
                 
                 <div className="flex gap-4 justify-end">
-                  <Link href="/plano-estudos">
+                  <Link href={`/${hash}/plano-estudos`}>
                     <Button type="button" variant="outline">
                       Cancelar
                     </Button>

@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AdicionarCicloModal } from './adicionar-ciclo-modal'
 import { toast } from 'sonner'
+import { useUserHash } from '@/contexts/user-hash-context'
 
 interface PlanoEstudo {
   id: string
@@ -40,6 +41,7 @@ interface PlanoEstudo {
 }
 
 export function PlanosEstudoMetrics() {
+  const { hash } = useUserHash()
   const [planos, setPlanos] = useState<PlanoEstudo[]>([])
   const [loading, setLoading] = useState(true)
   const [planoSelecionado, setPlanoSelecionado] = useState<string | null>(null)
@@ -164,7 +166,7 @@ export function PlanosEstudoMetrics() {
           <p className="text-muted-foreground text-center mb-4">
             Comece criando seu primeiro plano de estudos para organizar sua rotina.
           </p>
-          <Link href="/plano-estudos/criar">
+          <Link href={`/${hash}/plano-estudos/criar`}>
             <Button>Criar Primeiro Plano</Button>
           </Link>
         </CardContent>
@@ -267,12 +269,12 @@ export function PlanosEstudoMetrics() {
 
                 {/* Coluna 5: Ações */}
                 <div className="p-2 flex items-center justify-center gap-1 bg-muted/20">
-                  <Link href={`/plano-estudos/${plano.id}`}>
+                  <Link href={`/${hash}/plano-estudos/${plano.id}`}>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Ver detalhes">
                       <Eye className="h-3.5 w-3.5" />
                     </Button>
                   </Link>
-                  <Link href={`/plano-estudos/${plano.id}/editar`}>
+                  <Link href={`/${hash}/plano-estudos/${plano.id}/editar`}>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Editar">
                       <Edit className="h-3.5 w-3.5" />
                     </Button>

@@ -8,6 +8,7 @@ import { listarDisciplinas } from "@/interface/actions/disciplina/list"
 import { deletarDisciplina } from "@/interface/actions/disciplina/delete"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { useRouter } from "next/navigation"
+import { useUserHash } from "@/contexts/user-hash-context"
 import { 
   Book, 
   GraduationCap, 
@@ -56,6 +57,7 @@ interface DisciplinaComMateriais {
 }
 
 export function DisciplinasGrid({ termoPesquisa }: DisciplinasGridProps) {
+  const { hash } = useUserHash()
   const { toast } = useToast()
   const [disciplinas, setDisciplinas] = useState<DisciplinaComMateriais[]>([])
   const [loading, setLoading] = useState(true)
@@ -214,7 +216,7 @@ export function DisciplinasGrid({ termoPesquisa }: DisciplinasGridProps) {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                    onClick={() => router.push(`/disciplina/${disciplina.disciplinaId}/materiais`)}
+                    onClick={() => router.push(`/${hash}/disciplina/${disciplina.disciplinaId}/materiais`)}
                     title="Materiais de Estudo"
                   >
                     <Book className="h-4 w-4" />

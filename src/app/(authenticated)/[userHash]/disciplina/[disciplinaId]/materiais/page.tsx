@@ -10,8 +10,10 @@ import { useEffect, useState } from "react"
 import { buscarDisciplinaPorId } from "@/interface/actions/disciplina/list"
 import { Disciplina } from "@/domain/entities/Disciplina"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useUserHash } from "@/contexts/user-hash-context"
 
 const MateriaisPage = () => {
+  const { hash } = useUserHash()
   const params = useParams()
   const router = useRouter()
   const disciplinaId = params?.disciplinaId as string
@@ -48,7 +50,7 @@ const MateriaisPage = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push(`/disciplinas`)}
+              onClick={() => router.push(`/${hash}/disciplinas`)}
               className="h-10 w-10 hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors duration-200"
             >
               <ArrowLeft className="h-4 w-4" />

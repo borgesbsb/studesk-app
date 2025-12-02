@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
 import { useHeader } from "@/contexts/header-context"
+import { useUserHash } from "@/contexts/user-hash-context"
 import { useEffect } from "react"
 
 export default function PlanosEstudoPage() {
   const { setTitle } = useHeader()
+  const { hash } = useUserHash()
 
   useEffect(() => {
     setTitle("Planos de Estudo")
@@ -24,7 +26,7 @@ export default function PlanosEstudoPage() {
             Visualize e gerencie todos os seus planos de estudo
           </p>
         </div>
-        <Link href="/plano-estudos/criar">
+        <Link href={`/${hash}/plano-estudos/criar`}>
           <Button size="lg" className="shadow-sm">
             <Plus className="h-5 w-5 mr-2" />
             Novo Plano

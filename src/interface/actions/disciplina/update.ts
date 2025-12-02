@@ -1,6 +1,7 @@
 "use server"
 
 import { DisciplinaService } from "@/application/services/disciplina.service"
+import { requireAuth } from "@/lib/auth-helpers"
 
 export interface UpdateDisciplinaData {
   nome?: string
@@ -11,7 +12,8 @@ export interface UpdateDisciplinaData {
 
 export async function atualizarDisciplina(id: string, data: UpdateDisciplinaData) {
   try {
-    const disciplina = await DisciplinaService.atualizarDisciplina(id, data)
+    const { userId } = await requireAuth()
+    const disciplina = await DisciplinaService.atualizarDisciplina(userId, id, data)
     return { success: true, data: disciplina }
   } catch (error) {
     return { success: false, error: (error as Error).message }

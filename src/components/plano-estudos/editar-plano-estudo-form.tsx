@@ -12,12 +12,14 @@ import { updatePlanoEstudo } from '@/interface/actions/plano-estudo/update'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { useUserHash } from '@/contexts/user-hash-context'
 
 interface EditarPlanoEstudoFormProps {
   planoId: string
 }
 
 export function EditarPlanoEstudoForm({ planoId }: EditarPlanoEstudoFormProps) {
+  const { hash } = useUserHash()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -42,12 +44,12 @@ export function EditarPlanoEstudoForm({ planoId }: EditarPlanoEstudoFormProps) {
           })
         } else {
           toast.error('Erro ao carregar plano de estudo')
-          router.push('/plano-estudos')
+          router.push(`/${hash}/plano-estudos`)
         }
       } catch (error) {
         console.error('Erro ao carregar plano:', error)
         toast.error('Erro ao carregar plano de estudo')
-        router.push('/plano-estudos')
+        router.push(`/${hash}/plano-estudos`)
       } finally {
         setLoading(false)
       }
@@ -89,7 +91,7 @@ export function EditarPlanoEstudoForm({ planoId }: EditarPlanoEstudoFormProps) {
 
       if (resultado.success) {
         toast.success('Plano de estudo atualizado com sucesso!')
-        router.push(`/plano-estudos/${planoId}`)
+        router.push(`/${hash}/plano-estudos/${planoId}`)
       } else {
         toast.error(resultado.error || 'Erro ao atualizar plano de estudo')
       }
@@ -175,7 +177,7 @@ export function EditarPlanoEstudoForm({ planoId }: EditarPlanoEstudoFormProps) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push(`/plano-estudos/${planoId}`)}
+              onClick={() => router.push(`/${hash}/plano-estudos/${planoId}`)}
               disabled={submitting}
             >
               Cancelar

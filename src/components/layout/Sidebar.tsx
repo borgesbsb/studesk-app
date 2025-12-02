@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useUserHash } from "@/contexts/user-hash-context"
 
 // Componentes de ícones inline para evitar problemas de HMR
 const XIcon = () => (
@@ -51,11 +52,11 @@ const CalendarIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-const sidebarLinks = [
-  { href: "/hoje", label: "Hoje", icon: LayoutDashboardIcon },
-  { href: "/agenda", label: "Agenda", icon: CalendarIcon },
-  { href: "/disciplinas", label: "Disciplinas", icon: BookOpenIcon },
-  { href: "/plano-estudos", label: "Gerenciador de Estudos", icon: CalendarIcon },
+const sidebarLinksBase = [
+  { path: "/hoje", label: "Hoje", icon: LayoutDashboardIcon },
+  { path: "/agenda", label: "Agenda", icon: CalendarIcon },
+  { path: "/disciplinas", label: "Disciplinas", icon: BookOpenIcon },
+  { path: "/plano-estudos", label: "Gerenciador de Estudos", icon: CalendarIcon },
 ]
 
 interface SidebarProps {
@@ -64,6 +65,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
+  const { hash } = useUserHash()
+
+  // Criar links com hash dinâmico
+  const sidebarLinks = sidebarLinksBase.map(link => ({
+    ...link,
+    href: `/${hash}${link.path}`
+  }))
+
   return (
     <aside 
       className={cn(

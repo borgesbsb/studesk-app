@@ -14,6 +14,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { AdicionarCicloModal } from './adicionar-ciclo-modal'
 import { toast } from 'sonner'
+import { useUserHash } from '@/contexts/user-hash-context'
 
 interface PlanoEstudo {
   id: string
@@ -40,6 +41,7 @@ interface PlanoEstudo {
 }
 
 export function PlanosEstudoGrid() {
+  const { hash } = useUserHash()
   const [planos, setPlanos] = useState<PlanoEstudo[]>([])
   const [loading, setLoading] = useState(true)
   const [planoSelecionado, setPlanoSelecionado] = useState<string | null>(null)
@@ -132,7 +134,7 @@ export function PlanosEstudoGrid() {
           <p className="text-muted-foreground text-center mb-4">
             Comece criando seu primeiro plano de estudos para organizar sua rotina.
           </p>
-          <Link href="/plano-estudos/criar">
+          <Link href={`/${hash}/plano-estudos/criar`}>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
               Criar Primeiro Plano
@@ -169,7 +171,7 @@ export function PlanosEstudoGrid() {
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
-                    <Link href={`/plano-estudos/${plano.id}`}>
+                    <Link href={`/${hash}/plano-estudos/${plano.id}`}>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -179,7 +181,7 @@ export function PlanosEstudoGrid() {
                         <Eye className="h-4 w-4" />
                       </Button>
                     </Link>
-                    <Link href={`/plano-estudos/${plano.id}/editar`}>
+                    <Link href={`/${hash}/plano-estudos/${plano.id}/editar`}>
                       <Button
                         variant="ghost"
                         size="icon"

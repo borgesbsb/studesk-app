@@ -15,6 +15,7 @@ import { useDashboard } from "@/contexts/dashboard-context";
 import { useSaveStatus } from "@/contexts/save-status-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUserHash } from "@/contexts/user-hash-context";
 
 interface MateriasHojeProps {
   materias: MateriaDoDia[];
@@ -22,6 +23,7 @@ interface MateriasHojeProps {
 }
 
 export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps) {
+  const { hash } = useUserHash();
   const { selectedDate } = useDashboard();
   const { setSuccess, setError } = useSaveStatus();
   const router = useRouter();
@@ -149,8 +151,8 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
               <h3 className="font-medium text-lg">Nenhuma matéria programada</h3>
               <p className="text-muted-foreground text-sm">Crie um ciclo de estudos para organizar seu aprendizado</p>
             </div>
-            <Button 
-              onClick={() => router.push('/plano-estudos')}
+            <Button
+              onClick={() => router.push(`/${hash}/plano-estudos`)}
               className="flex items-center gap-2 px-6 py-2 h-10"
               size="default"
             >

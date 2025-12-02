@@ -10,6 +10,7 @@ import { Calendar, Eye, Trash2, Plus, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useUserHash } from '@/contexts/user-hash-context'
 import {
   Table,
   TableBody,
@@ -48,6 +49,7 @@ interface PlanoEstudo {
 }
 
 export function PlanosEstudoTable() {
+  const { hash } = useUserHash()
   const [planos, setPlanos] = useState<PlanoEstudo[]>([])
   const [loading, setLoading] = useState(true)
   const [planoSelecionado, setPlanoSelecionado] = useState<string | null>(null)
@@ -140,7 +142,7 @@ export function PlanosEstudoTable() {
           <p className="text-muted-foreground text-center mb-4">
             Comece criando seu primeiro plano de estudos para organizar sua rotina.
           </p>
-          <Link href="/plano-estudos/criar">
+          <Link href={`/${hash}/plano-estudos/criar`}>
             <Button>Criar Primeiro Plano</Button>
           </Link>
         </CardContent>

@@ -12,10 +12,13 @@ type CreateDisciplinaInput = {
 type UpdateDisciplinaInput = Partial<CreateDisciplinaInput>
 
 export class DisciplinaService {
-  static async criarDisciplina(data: CreateDisciplinaInput) {
+  static async criarDisciplina(userId: string, data: CreateDisciplinaInput) {
     try {
       return await prisma.disciplina.create({
-        data,
+        data: {
+          ...data,
+          userId,
+        },
       })
     } catch (error) {
       const errorLog = logError(error, 'criarDisciplina')
@@ -23,9 +26,10 @@ export class DisciplinaService {
     }
   }
 
-  static async listarDisciplinas(): Promise<Disciplina[]> {
+  static async listarDisciplinas(userId: string): Promise<Disciplina[]> {
     try {
       return await prisma.disciplina.findMany({
+        where: { userId },
         orderBy: { nome: "asc" }
       })
     } catch (error) {
@@ -34,10 +38,13 @@ export class DisciplinaService {
     }
   }
 
-  static async buscarDisciplinaPorId(id: string): Promise<Disciplina | null> {
+  static async buscarDisciplinaPorId(userId: string, id: string): Promise<Disciplina | null> {
     try {
       return await prisma.disciplina.findUnique({
-        where: { id }
+        where: {
+          id,
+          userId
+        }
       })
     } catch (error) {
       const errorLog = logError(error, 'buscarDisciplinaPorId')
@@ -45,8 +52,17 @@ export class DisciplinaService {
     }
   }
 
-  static async atualizarDisciplina(id: string, data: UpdateDisciplinaInput) {
+  static async atualizarDisciplina(userId: string, id: string, data: UpdateDisciplinaInput) {
     try {
+      // Primeiro verifica se a disciplina pertence ao usuário
+      const disciplina = await prisma.disciplina.findUnique({
+        where: { id, userId }
+      })
+
+      if (!disciplina) {
+        throw new Error('Disciplina não encontrada ou sem permissão')
+      }
+
       return await prisma.disciplina.update({
         where: { id },
         data,
@@ -57,15 +73,24 @@ export class DisciplinaService {
     }
   }
 
-  static async deletarDisciplina(id: string) {
+  static async deletarDisciplina(userId: string, id: string) {
     try {
       // Usar transação para garantir integridade
       return await prisma.$transaction(async (tx) => {
+        // Primeiro verifica se a disciplina pertence ao usuário
+        const disciplina = await tx.disciplina.findUnique({
+          where: { id, userId }
+        })
+
+        if (!disciplina) {
+          throw new Error('Disciplina não encontrada ou sem permissão')
+        }
+
         // 1. Excluir todas as associações com materiais
         await tx.disciplinaMaterial.deleteMany({
           where: { disciplinaId: id }
         })
-        
+
         // 2. Excluir a disciplina
         return await tx.disciplina.delete({
           where: { id }

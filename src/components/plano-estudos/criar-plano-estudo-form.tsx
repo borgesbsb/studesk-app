@@ -10,8 +10,10 @@ import { createPlanoEstudoSimples } from '@/interface/actions/plano-estudo/creat
 import { Save, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { useUserHash } from '@/contexts/user-hash-context'
 
 export function CriarPlanoEstudoForm() {
+  const { hash } = useUserHash()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   
@@ -32,7 +34,7 @@ export function CriarPlanoEstudoForm() {
 
       if (resultado.success) {
         toast.success('Plano de estudo criado com sucesso!')
-        router.push('/plano-estudos')
+        router.push(`/${hash}/plano-estudos`)
       } else {
         toast.error(resultado.error || 'Erro ao criar plano')
       }
@@ -47,7 +49,7 @@ export function CriarPlanoEstudoForm() {
     <div className="space-y-6">
       {/* Header com botão voltar */}
       <div className="flex items-center gap-4">
-        <Link href="/plano-estudos">
+        <Link href={`/${hash}/plano-estudos`}>
           <Button variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
@@ -84,7 +86,7 @@ export function CriarPlanoEstudoForm() {
             </div>
             
             <div className="flex gap-4 justify-end pt-4">
-              <Link href="/plano-estudos">
+              <Link href={`/${hash}/plano-estudos`}>
                 <Button type="button" variant="outline">
                   Cancelar
                 </Button>

@@ -3,25 +3,24 @@
 import { useEffect, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import { buscarMaterialEstudoPorId } from "@/interface/actions/material-estudo/list"
-import { atualizarProgressoMaterial } from "@/interface/actions/material-estudo/update-progress"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Play, Pause, Save, AlertCircle } from "lucide-react"
+import { ArrowLeft, AlertCircle, Save } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { AdicionarTempoCicloDialog } from "@/components/material-estudo/adicionar-tempo-ciclo-dialog"
-import { pdfCacheService } from "@/services/pdf-cache.service"
+import { videoCacheService } from "@/services/video-cache.service"
 import { useHeader } from "@/contexts/header-context"
 import { toast } from "sonner"
 
-// Carregar Syncfusion apenas no cliente para evitar problemas de SSR
-const SyncfusionPdfViewer = dynamic(
-    () => import("@/components/pdf/SyncfusionPdfViewer"),
+// Carregar VideoPlayer apenas no cliente
+const VideoPlayer = dynamic(
+    () => import("@/components/video/VideoPlayer"),
     {
         ssr: false,
         loading: () => (
             <div className="h-full w-full flex items-center justify-center bg-gray-50">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600 font-medium">Carregando visualizador...</p>
+                    <p className="text-gray-600 font-medium">Carregando visualizador de vídeo...</p>
                 </div>
             </div>
         )
@@ -32,21 +31,21 @@ interface PageProps {
     params: Promise<{ id: string }>
 }
 
-export default function SyncfusionViewerPage({ params }: PageProps) {
+export default function VideoViewerPage({ params }: PageProps) {
     const router = useRouter()
     const { setCustomContent, setTitle, setBackButton, setFullWidth } = useHeader()
     const [materialId, setMaterialId] = useState<string>("")
     const [material, setMaterial] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [disciplinaIdFromUrl, setDisciplinaIdFromUrl] = useState<string>("")
-    const [pdfBlobUrl, setPdfBlobUrl] = useState<string>("")
+    const [videoBlobUrl, setVideoBlobUrl] = useState<string>("")
     const [fromCache, setFromCache] = useState<boolean>(false)
 
     // Estados do cronômetro
     const [elapsedTime, setElapsedTime] = useState(0) // em segundos
     const [isTimerRunning, setIsTimerRunning] = useState(false)
     const [timerInitialized, setTimerInitialized] = useState(false)
-    const [currentPage, setCurrentPage] = useState(1)
+    const [currentTime, setCurrentTime] = useState(0) // tempo atual do vídeo
 
     // Estados para marcar progresso
     const [savingProgress, setSavingProgress] = useState(false)
@@ -59,7 +58,7 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             const { id } = await params
             setMaterialId(id)
 
-            // Adicionar lógica para detectar tempUrl e disciplinaId nos parâmetros de busca
+            // Detectar tempUrl e disciplinaId nos parâmetros de busca
             const urlParams = new URLSearchParams(window.location.search)
             const tempUrl = urlParams.get('tempUrl')
             const disciplinaId = urlParams.get('disciplinaId')
@@ -69,15 +68,15 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             }
 
             if (tempUrl) {
-                // Se tempUrl estiver presente, usar essa URL para o PDF
+                // Se tempUrl estiver presente, usar essa URL para o vídeo
                 setMaterial({
                     id: id,
                     nome: "Visualização Temporária",
-                    arquivoPdfUrl: tempUrl,
-                    paginasLidas: 0,
+                    arquivoVideoUrl: tempUrl,
+                    tempoAssistido: 0,
                     disciplinas: []
                 })
-                setPdfBlobUrl(tempUrl)
+                setVideoBlobUrl(tempUrl)
                 setFromCache(false)
             } else {
                 // Carregar material do banco de dados
@@ -86,21 +85,21 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                 if (materialResponse.success && materialResponse.data) {
                     setMaterial(materialResponse.data)
 
-                    // Buscar PDF APENAS do cache IndexedDB
-                    console.log('🔍 Buscando PDF do cache local...')
-                    const cachedPdf = await pdfCacheService.getPdf(id)
+                    // Buscar vídeo APENAS do cache IndexedDB
+                    console.log('🔍 Buscando vídeo do cache local...')
+                    const cachedVideo = await videoCacheService.getVideo(id)
 
-                    if (cachedPdf) {
-                        // PDF encontrado no cache
-                        const blobUrl = URL.createObjectURL(cachedPdf)
-                        setPdfBlobUrl(blobUrl)
+                    if (cachedVideo) {
+                        // Vídeo encontrado no cache
+                        const blobUrl = URL.createObjectURL(cachedVideo.blob)
+                        setVideoBlobUrl(blobUrl)
                         setFromCache(true)
-                        console.log('📦 PDF carregado do cache local!')
-                        toast.success('PDF carregado do cache local')
+                        console.log('📦 Vídeo carregado do cache local!')
+                        toast.success('Vídeo carregado do cache local')
                     } else {
-                        // PDF não encontrado no cache
-                        console.warn('⚠️ PDF não encontrado no cache local')
-                        toast.error('PDF não encontrado no cache. Faça upload novamente do material')
+                        // Vídeo não encontrado no cache
+                        console.warn('⚠️ Vídeo não encontrado no cache local')
+                        toast.error('Vídeo não encontrado no cache. Faça upload novamente do material')
                     }
                 }
             }
@@ -113,7 +112,7 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     // Iniciar cronômetro automaticamente quando a página carregar
     useEffect(() => {
         if (material && !timerInitialized) {
-            console.log('⏱️ Iniciando cronômetro de leitura...')
+            console.log('⏱️ Iniciando cronômetro de visualização...')
             setIsTimerRunning(true)
             setElapsedTime(0)
             setTimerInitialized(true)
@@ -173,8 +172,14 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
         }
     }
 
-    // Função para salvar histórico de leitura
-    const saveReadingHistory = async (pagina: number, tempoSegundos: number) => {
+    // Callback quando o tempo do vídeo atualiza
+    const handleVideoTimeUpdate = (time: number) => {
+        setCurrentTime(time)
+        console.log(`📹 Tempo do vídeo: ${Math.floor(time)}s`)
+    }
+
+    // Função para salvar histórico de visualização
+    const saveWatchHistory = async (tempoSegundos: number, tempoVideoAtual: number) => {
         if (!materialId) return
 
         try {
@@ -184,34 +189,28 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    paginaAtual: pagina,
+                    paginaAtual: Math.floor(tempoVideoAtual), // Usar tempo do vídeo como "página"
                     tempoLeituraSegundos: tempoSegundos,
                     assuntosEstudados: null
                 }),
             })
 
             if (!response.ok) {
-                throw new Error('Erro ao salvar histórico de leitura')
+                throw new Error('Erro ao salvar histórico de visualização')
             }
 
             const result = await response.json()
-            console.log('✅ Histórico de leitura salvo:', result)
+            console.log('✅ Histórico de visualização salvo:', result)
             return result
         } catch (error) {
-            console.error('❌ Erro ao salvar histórico de leitura:', error)
+            console.error('❌ Erro ao salvar histórico de visualização:', error)
             throw error
         }
     }
 
-    // Callback para quando a página mudar
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page)
-        console.log(`📄 Página atual: ${page}`)
-    }
-
     // Refs para acesso no cleanup
     const elapsedTimeRef = useRef(elapsedTime)
-    const currentPageRef = useRef(currentPage)
+    const currentTimeRef = useRef(currentTime)
     const materialIdRef = useRef(materialId)
     const lastSavedElapsedSecondsRef = useRef(lastSavedElapsedSeconds)
 
@@ -220,8 +219,8 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     }, [elapsedTime])
 
     useEffect(() => {
-        currentPageRef.current = currentPage
-    }, [currentPage])
+        currentTimeRef.current = currentTime
+    }, [currentTime])
 
     useEffect(() => {
         materialIdRef.current = materialId
@@ -231,16 +230,16 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
         lastSavedElapsedSecondsRef.current = lastSavedElapsedSeconds
     }, [lastSavedElapsedSeconds])
 
-    // Salvar histórico de leitura ao sair da página
+    // Salvar histórico de visualização ao sair da página
     useEffect(() => {
         const handleBeforeUnload = () => {
             const currentElapsed = elapsedTimeRef.current
             const currentMatId = materialIdRef.current
-            const currentPg = currentPageRef.current
+            const videoTime = currentTimeRef.current
 
             if (currentElapsed > 0 && currentMatId) {
                 const data = JSON.stringify({
-                    paginaAtual: currentPg,
+                    paginaAtual: Math.floor(videoTime),
                     tempoLeituraSegundos: currentElapsed,
                     assuntosEstudados: null
                 })
@@ -260,25 +259,24 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             // Salvar ao desmontar o componente
             const currentElapsed = elapsedTimeRef.current
             const currentMatId = materialIdRef.current
-            const currentPg = currentPageRef.current
+            const videoTime = currentTimeRef.current
 
             if (currentElapsed > 0 && currentMatId) {
-                // Reimplementando a lógica de fetch aqui para garantir acesso aos valores atuais via ref
                 fetch(`/api/material/${currentMatId}/historico-leitura`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        paginaAtual: currentPg,
+                        paginaAtual: Math.floor(videoTime),
                         tempoLeituraSegundos: currentElapsed,
                         assuntosEstudados: null
                     }),
-                    keepalive: true // Importante para requisições durante unload
+                    keepalive: true
                 }).catch(console.error)
             }
         }
-    }, []) // Array de dependências vazio para executar apenas no mount/unmount
+    }, [])
 
     // Função para salvar progresso
     const handleSaveProgress = async () => {
@@ -303,7 +301,6 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             setDialogTempoCicloOpen(true)
         } else {
             console.log('⏩ Salvando diretamente sem modal (tempo < 1 minuto)')
-            // Se não há tempo suficiente, salvar diretamente
             await executarSalvarProgresso()
         }
     }
@@ -311,24 +308,28 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     const executarSalvarProgresso = async () => {
         if (!materialId) return
 
-        const page = currentPageRef.current
+        const videoTime = currentTimeRef.current
 
         setSavingProgress(true)
         try {
-            // Atualizar progresso no banco de dados
-            const paginasLidas = Array.from({ length: page }, (_, i) => i + 1)
-            await atualizarProgressoMaterial({
-                materialId,
-                paginasLidas
+            // Atualizar progresso no banco de dados (tempoAssistido)
+            await fetch(`/api/material/${materialId}/progress`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tempoAssistido: Math.floor(videoTime)
+                })
             })
 
-            // Salvar histórico de leitura apenas com o delta desde o último salvamento
+            // Salvar histórico de visualização apenas com o delta desde o último salvamento
             const currentElapsed = elapsedTimeRef.current
             const lastSaved = lastSavedElapsedSecondsRef.current
             const deltaSeconds = Math.max(0, currentElapsed - lastSaved)
 
             if (deltaSeconds > 0) {
-                await saveReadingHistory(page, deltaSeconds)
+                await saveWatchHistory(deltaSeconds, videoTime)
             }
 
             // Zerar e reiniciar o cronômetro
@@ -344,7 +345,7 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             // Atualizar material local
             setMaterial((prev: any) => ({
                 ...prev,
-                paginasLidas: page
+                tempoAssistido: Math.floor(videoTime)
             }))
 
             toast.success('Progresso salvo com sucesso!')
@@ -420,26 +421,6 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
                     </span>
                 )}
 
-                {/* Cronômetro - Design Discreto */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/50 transition-colors">
-                    <button
-                        onClick={toggleTimer}
-                        className="flex items-center gap-2 group"
-                        title={isTimerRunning ? 'Pausar cronômetro' : 'Retomar cronômetro'}
-                    >
-                        {isTimerRunning ? (
-                            <Pause className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                        ) : (
-                            <Play className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                        )}
-                        <span className={`text-sm font-mono tabular-nums ${
-                            isTimerRunning ? 'text-foreground' : 'text-muted-foreground'
-                        }`}>
-                            {formatTime(elapsedTime)}
-                        </span>
-                    </button>
-                </div>
-
                 {/* Botão Salvar Progresso - Design Discreto */}
                 <Button
                     onClick={handleSaveProgress}
@@ -472,7 +453,7 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
             setTitle("Dashboard")
             setFullWidth(false)
         }
-    }, [material, fromCache, tempUrl, elapsedTime, isTimerRunning, savingProgress, setCustomContent, setTitle, setBackButton, setFullWidth])
+    }, [material, fromCache, tempUrl, savingProgress, setCustomContent, setTitle, setBackButton, setFullWidth])
 
     if (loading) {
         return (
@@ -490,21 +471,21 @@ export default function SyncfusionViewerPage({ params }: PageProps) {
     }
 
     // Usar a URL do blob (que pode vir do cache ou do servidor)
-    const pdfUrl = pdfBlobUrl || material.arquivoPdfUrl || ''
+    const videoUrl = videoBlobUrl || material.arquivoVideoUrl || ''
 
     return (
         <>
             <div style={{ height: 'calc(100vh - 4rem)', width: '100%' }}>
-                {/* PDF Viewer em tela cheia */}
-                {pdfUrl ? (
-                    <SyncfusionPdfViewer
-                        pdfUrl={pdfUrl}
-                        paginaProgresso={material.paginasLidas}
-                        onPageChange={handlePageChange}
+                {/* Video Player em tela cheia */}
+                {videoUrl ? (
+                    <VideoPlayer
+                        videoUrl={videoUrl}
+                        tempoProgressoSegundos={material.tempoAssistido || 0}
+                        onTimeUpdate={handleVideoTimeUpdate}
                     />
                 ) : (
                     <div className="h-full w-full flex items-center justify-center">
-                        <p className="text-gray-500">Aguardando URL do PDF...</p>
+                        <p className="text-gray-500">Aguardando URL do vídeo...</p>
                     </div>
                 )}
             </div>

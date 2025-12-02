@@ -114,7 +114,7 @@ export async function POST(
     // Verifica se o material existe
     const materialExistente = await prisma.materialEstudo.findUnique({
       where: { id: materialId },
-      select: { id: true, nome: true, totalPaginas: true }
+      select: { id: true, nome: true, tipo: true, totalPaginas: true }
     })
 
     if (!materialExistente) {
@@ -125,12 +125,23 @@ export async function POST(
       )
     }
 
-    // Valida os dados
-    if (!Number.isInteger(paginaAtual) || paginaAtual < 1 || paginaAtual > materialExistente.totalPaginas) {
-      return NextResponse.json(
-        { error: 'Página atual inválida' },
-        { status: 400 }
-      )
+    // Valida os dados de acordo com o tipo de material
+    if (materialExistente.tipo === 'VIDEO') {
+      // Para vídeos, paginaAtual representa segundos do vídeo
+      if (!Number.isInteger(paginaAtual) || paginaAtual < 0) {
+        return NextResponse.json(
+          { error: 'Tempo do vídeo inválido' },
+          { status: 400 }
+        )
+      }
+    } else {
+      // Para PDFs, valida contra totalPaginas
+      if (!Number.isInteger(paginaAtual) || paginaAtual < 1 || paginaAtual > materialExistente.totalPaginas) {
+        return NextResponse.json(
+          { error: 'Página atual inválida' },
+          { status: 400 }
+        )
+      }
     }
 
     if (!Number.isInteger(tempoLeituraSegundos) || tempoLeituraSegundos < 0) {

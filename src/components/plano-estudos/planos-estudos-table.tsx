@@ -202,30 +202,42 @@ export function PlanosEstudoTable() {
                   </TableCell>
                   
                   <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-1 justify-end">
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600"
                         onClick={() => setPlanoSelecionado(plano.id)}
+                        title="Adicionar Ciclo"
                       >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Adicionar Ciclo
+                        <Plus className="h-4 w-4" />
                       </Button>
                       <Link href={`/plano-estudos/${plano.id}`}>
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:bg-green-50 hover:text-green-600"
+                          title="Visualizar"
+                        >
+                          <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Link href={`/plano-estudos/${plano.id}/editar`}>
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:bg-orange-50 hover:text-orange-600"
+                          title="Editar"
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
                         onClick={() => setPlanoParaExcluir(plano)}
+                        title="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

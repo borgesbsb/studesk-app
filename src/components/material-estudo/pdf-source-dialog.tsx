@@ -31,9 +31,9 @@ export function PdfSourceDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Escolha a fonte do PDF</DialogTitle>
+                    <DialogTitle>Escolha a fonte do material</DialogTitle>
                     <DialogDescription>
-                        {materialNome ? `Como deseja abrir "${materialNome}"?` : 'Como deseja abrir este material?'}
+                        {materialNome ? `Como deseja abrir "${materialNome}"?` : 'Como deseja adicionar este material?'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -50,7 +50,7 @@ export function PdfSourceDialog({
                             </div>
                             <div className="flex-1 text-left">
                                 <div className="font-semibold text-sm text-gray-900">Disco Local</div>
-                                <div className="text-xs text-gray-500">Abrir PDF armazenado no servidor</div>
+                                <div className="text-xs text-gray-500">Upload de PDF ou vídeo do seu computador</div>
                             </div>
                         </div>
                     </Button>

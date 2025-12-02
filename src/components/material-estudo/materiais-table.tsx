@@ -9,8 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Trash2, Eye } from "lucide-react"
+import { FileText, Trash2, Video, Play, Eye } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
@@ -18,7 +19,7 @@ import { deletarMaterialEstudo } from "@/interface/actions/material-estudo/delet
 import { atualizarProgressoLeitura } from "@/interface/actions/material-estudo/update"
 import { toast } from "sonner"
 import { MaterialEstudo } from "@/domain/entities/MaterialEstudo"
-import { PdfUploadDialog } from './pdf-upload-dialog'
+import { MediaUploadDialog } from './media-upload-dialog'
 
 interface MateriaisTableProps {
   disciplinaId: string
@@ -30,6 +31,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const [horasPorMaterialSegundos, setHorasPorMaterialSegundos] = useState<Record<string, number>>({})
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [pendingMaterial, setPendingMaterial] = useState<MaterialEstudo | null>(null)
+  const [activeTab, setActiveTab] = useState<'pdf' | 'video'>('pdf')
 
   useEffect(() => {
     carregarMateriais()
@@ -83,9 +85,13 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         const materiaisData = response.data.map((dm) => ({
           id: dm.material.id,
           nome: dm.material.nome,
+          tipo: dm.material.tipo || 'PDF', // Fallback para PDF se não houver tipo
           totalPaginas: dm.material.totalPaginas,
           paginasLidas: dm.material.paginasLidas,
+          duracaoSegundos: dm.material.duracaoSegundos,
+          tempoAssistido: dm.material.tempoAssistido,
           arquivoPdfUrl: dm.material.arquivoPdfUrl || '',
+          arquivoVideoUrl: dm.material.arquivoVideoUrl || null,
           createdAt: new Date(dm.material.createdAt).toISOString(),
           updatedAt: new Date(dm.material.updatedAt).toISOString()
         })) as MaterialEstudo[]
@@ -118,21 +124,35 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
 
 
   const handleOpenPdf = (material: MaterialEstudo) => {
-    // Redirecionar direto para o Syncfusion Viewer
-    window.location.href = `/material/${material.id}/syncfusion?disciplinaId=${disciplinaId}`
+    // Redirecionar para o visualizador correto baseado no tipo
+    if (material.tipo === 'VIDEO') {
+      window.location.href = `/material/${material.id}/video?disciplinaId=${disciplinaId}`
+    } else {
+      window.location.href = `/material/${material.id}/syncfusion?disciplinaId=${disciplinaId}`
+    }
   }
 
   const handleUploadPdf = (material: MaterialEstudo) => {
+    console.log('📤 Abrindo modal de upload para material:', {
+      id: material.id,
+      nome: material.nome,
+      tipo: material.tipo
+    })
     setPendingMaterial(material)
     setShowUploadDialog(true)
   }
 
 
-  const handleUploadComplete = (fileUrl: string) => {
+  const handleUploadComplete = (fileUrl: string, mediaType: 'PDF' | 'VIDEO') => {
     if (!pendingMaterial) return
 
-    // Redirecionar para Syncfusion com URL temporária e disciplinaId
-    window.location.href = `/material/${pendingMaterial.id}/syncfusion?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
+    if (mediaType === 'PDF') {
+      // Redirecionar para Syncfusion com URL temporária e disciplinaId
+      window.location.href = `/material/${pendingMaterial.id}/syncfusion?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
+    } else {
+      // Redirecionar para visualizador de vídeo com URL temporária e disciplinaId
+      window.location.href = `/material/${pendingMaterial.id}/video?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
+    }
 
     setPendingMaterial(null)
     setShowUploadDialog(false)
@@ -148,134 +168,140 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     )
   }
 
-  return (
-    <div className="space-y-4">
-      {materiais.length === 0 ? (
+  // Separar materiais por tipo
+  const materiaisPdf = materiais.filter(m => m.tipo === 'PDF')
+  const materiaisVideo = materiais.filter(m => m.tipo === 'VIDEO')
+
+  // Componente de tabela reutilizável
+  const renderTable = (materiais: MaterialEstudo[], tipo: 'PDF' | 'VIDEO') => {
+    if (materiais.length === 0) {
+      return (
         <div className="text-center text-muted-foreground py-12">
-          Nenhum material de estudo cadastrado
+          Nenhum {tipo === 'PDF' ? 'PDF' : 'vídeo'} cadastrado
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {materiais.map((material) => {
-            const progresso = (material.paginasLidas / material.totalPaginas) * 100
-            return (
-              <div
-                key={material.id}
-                className="group relative border border-gray-200 rounded-xl p-5 bg-white hover:border-blue-300 hover:shadow-lg transition-all duration-200"
-              >
-                {/* Header do Card */}
-                <div className="flex items-start justify-between mb-4">
-                  <div
-                    className="flex-1 min-w-0 cursor-pointer"
-                    onClick={() => handleOpenPdf(material)}
-                  >
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-1 group-hover:text-blue-600 transition-colors" title={material.nome}>
-                      {material.nome}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                      <FileText className="h-3 w-3" />
-                      <span>{material.paginasLidas}/{material.totalPaginas} páginas</span>
+      )
+    }
+
+    return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40%]">Nome</TableHead>
+              <TableHead className="w-[15%]">Progresso</TableHead>
+              <TableHead className="w-[15%]">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</TableHead>
+              <TableHead className="w-[15%]">Tempo Estudado</TableHead>
+              <TableHead className="w-[15%] text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {materiais.map((material) => {
+              const tempoEstudadoSegundos = horasPorMaterialSegundos[material.id] ?? 0
+              const progresso = tipo === 'VIDEO'
+                ? Math.min(100, (tempoEstudadoSegundos / (material.duracaoSegundos || 1)) * 100)
+                : (material.paginasLidas / material.totalPaginas) * 100
+
+              return (
+                <TableRow key={material.id} className="group hover:bg-muted/50">
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {tipo === 'VIDEO' ? (
+                        <Video className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                      ) : (
+                        <FileText className="h-4 w-4 text-red-600 flex-shrink-0" />
+                      )}
+                      <span className="truncate" title={material.nome}>
+                        {material.nome}
+                      </span>
                     </div>
-                  </div>
-
-                  {/* Botões de ação */}
-                  <div className="flex items-center gap-1 ml-2 relative z-10">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (confirm(`Deseja realmente excluir "${material.nome}"?`)) {
-                          handleDelete(material.id)
-                        }
-                      }}
-                      title="Excluir material"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Botão de Ação Principal */}
-                <div className="mb-4">
-                  <Button
-                    size="sm"
-                    onClick={() => handleOpenPdf(material)}
-                    title="Clique para abrir e estudar este material no visualizador"
-                    aria-label={`Abrir material ${material.nome}`}
-                    className="w-full text-sm h-10 !bg-blue-600 hover:!bg-blue-700 !text-white font-bold shadow-md hover:shadow-lg transition-all border-0"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Estudar
-                  </Button>
-                </div>
-
-                {/* Pizza de Progresso Gigante */}
-                <div
-                  className="flex flex-col items-center justify-center py-6 cursor-pointer"
-                  onClick={() => handleOpenPdf(material)}
-                >
-                  <div className="relative w-32 h-32">
-                    <svg className="transform -rotate-90 w-32 h-32">
-                      {/* Círculo de fundo */}
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="56"
-                        stroke="currentColor"
-                        strokeWidth="12"
-                        fill="none"
-                        className="text-gray-200"
-                      />
-                      {/* Círculo de progresso */}
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="56"
-                        stroke="currentColor"
-                        strokeWidth="12"
-                        fill="none"
-                        strokeDasharray={`${2 * Math.PI * 56}`}
-                        strokeDashoffset={`${2 * Math.PI * 56 * (1 - progresso / 100)}`}
-                        className="text-primary transition-all duration-500"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    {/* Porcentagem no centro */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-3xl font-bold text-gray-900">
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Progress value={progresso} className="h-2 flex-1" />
+                      <span className="text-sm font-medium text-muted-foreground min-w-[45px] text-right">
                         {Math.round(progresso)}%
                       </span>
                     </div>
-                  </div>
-                </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {tipo === 'VIDEO' ? (
+                      <span>
+                        {Math.floor((material.tempoAssistido || 0) / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
+                      </span>
+                    ) : (
+                      <span>
+                        {material.paginasLidas} / {material.totalPaginas}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {formatarTempo(tempoEstudadoSegundos)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenPdf(material)}
+                        className="h-8 px-2 hover:bg-blue-50 hover:text-blue-600"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Abrir
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (confirm(`Deseja realmente excluir "${material.nome}"?`)) {
+                            handleDelete(material.id)
+                          }
+                        }}
+                        className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
 
-                {/* Total de Horas Estudadas */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Total estudado</span>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {formatarTempo(horasPorMaterialSegundos[material.id] ?? 0)}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+  return (
+    <div className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'pdf' | 'video')} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="pdf" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            PDFs ({materiaisPdf.length})
+          </TabsTrigger>
+          <TabsTrigger value="video" className="flex items-center gap-2">
+            <Video className="h-4 w-4" />
+            Vídeos ({materiaisVideo.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Diálogo de upload de PDF */}
-      <PdfUploadDialog
+        <TabsContent value="pdf" className="mt-4">
+          {renderTable(materiaisPdf, 'PDF')}
+        </TabsContent>
+
+        <TabsContent value="video" className="mt-4">
+          {renderTable(materiaisVideo, 'VIDEO')}
+        </TabsContent>
+      </Tabs>
+
+      {/* Diálogo de upload de mídia (PDF ou Vídeo) */}
+      <MediaUploadDialog
         open={showUploadDialog}
         onOpenChange={setShowUploadDialog}
         onUploadComplete={handleUploadComplete}
         materialId={pendingMaterial?.id}
         materialNome={pendingMaterial?.nome}
+        mediaType={(pendingMaterial?.tipo === 'VIDEO' ? 'VIDEO' : 'PDF') as 'PDF' | 'VIDEO'}
       />
     </div>
   )

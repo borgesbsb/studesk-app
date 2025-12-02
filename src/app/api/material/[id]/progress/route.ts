@@ -1,54 +1,60 @@
-import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
-import { MaterialEstudoService } from '@/application/services/material-estudo.service'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(
   request: NextRequest,
-  { params }: any
-): Promise<NextResponse> {
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { paginasLidas } = await request.json()
-    const id = params.id
+    const { id } = await params
+    const body = await request.json()
 
-    console.log('📝 API - Atualizando progresso:', { id, paginasLidas })
+    const { paginasLidas, tempoAssistido } = body
 
-    // Primeiro busca o material para obter o total de páginas
-    const materialAtual = await prisma.materialEstudo.findUnique({
-      where: { id },
-      select: { 
-        id: true,
-        totalPaginas: true,
-        paginasLidas: true,
-        nome: true 
-      }
+    // Buscar o material para verificar o tipo
+    const material = await prisma.materialEstudo.findUnique({
+      where: { id }
     })
 
-    if (!materialAtual) {
-      console.log('❌ API - Material não encontrado:', id)
+    if (!material) {
       return NextResponse.json(
-        { error: 'Material não encontrado' },
+        { success: false, error: 'Material não encontrado' },
         { status: 404 }
       )
     }
 
-    console.log('📚 API - Material atual:', materialAtual)
+    // Atualizar o progresso baseado no tipo
+    const updateData: any = {}
 
-    // Atualiza o material com o novo progresso usando o service
-    const material = await MaterialEstudoService.atualizarProgressoLeitura(id, paginasLidas)
-    
-    console.log('✅ API - Material atualizado:', material)
+    if (material.tipo === 'VIDEO' && tempoAssistido !== undefined) {
+      updateData.tempoAssistido = tempoAssistido
+    } else if (material.tipo === 'PDF' && paginasLidas !== undefined) {
+      // Atualizar paginasLidas se for array
+      if (Array.isArray(paginasLidas)) {
+        updateData.paginasLidas = Math.max(...paginasLidas, 0)
+      } else {
+        updateData.paginasLidas = paginasLidas
+      }
+    }
 
-    return NextResponse.json({ 
-      success: true, 
-      material,
-      message: `Progresso atualizado para ${paginasLidas} páginas`
+    const updatedMaterial = await prisma.materialEstudo.update({
+      where: { id },
+      data: updateData
     })
+
+    return NextResponse.json({
+      success: true,
+      data: updatedMaterial
+    })
+
   } catch (error) {
-    console.error('❌ API - Erro ao atualizar progresso:', error)
-    console.error('❌ API - Stack trace:', error instanceof Error ? error.stack : 'No stack trace available')
+    console.error('Erro ao atualizar progresso:', error)
     return NextResponse.json(
-      { error: 'Erro ao atualizar progresso' },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao atualizar progresso'
+      },
       { status: 500 }
     )
   }
-} 
+}

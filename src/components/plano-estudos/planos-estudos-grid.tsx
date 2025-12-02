@@ -5,11 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getAllPlanosEstudo } from '@/interface/actions/plano-estudo/get-all'
-import { Calendar, Clock, Target, Trash2, Eye, Edit } from 'lucide-react'
+import { deletePlanoEstudo } from '@/interface/actions/plano-estudo/delete'
+import { Calendar, Clock, Target, Trash2, Eye, Edit, Plus, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { AdicionarCicloModal } from './adicionar-ciclo-modal'
+import { toast } from 'sonner'
 
 interface PlanoEstudo {
   id: string
@@ -38,21 +42,54 @@ interface PlanoEstudo {
 export function PlanosEstudoGrid() {
   const [planos, setPlanos] = useState<PlanoEstudo[]>([])
   const [loading, setLoading] = useState(true)
+  const [planoSelecionado, setPlanoSelecionado] = useState<string | null>(null)
+  const [planoParaExcluir, setPlanoParaExcluir] = useState<PlanoEstudo | null>(null)
+  const [excluindo, setExcluindo] = useState(false)
+
+  const carregarPlanos = async () => {
+    try {
+      const resultado = await getAllPlanosEstudo()
+      if (resultado.success && resultado.data) {
+        setPlanos(resultado.data as any)
+      } else {
+        setPlanos([])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar planos:', error)
+      setPlanos([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCicloAdicionado = () => {
+    carregarPlanos()
+    setPlanoSelecionado(null)
+  }
+
+  const handleExcluirPlano = async () => {
+    if (!planoParaExcluir) return
+
+    setExcluindo(true)
+    try {
+      const resultado = await deletePlanoEstudo(planoParaExcluir.id)
+
+      if (resultado.success) {
+        toast.success('Plano de estudo excluído com sucesso!')
+        carregarPlanos()
+        setPlanoParaExcluir(null)
+      } else {
+        toast.error(resultado.error || 'Erro ao excluir plano de estudo')
+      }
+    } catch (error) {
+      console.error('Erro ao excluir plano:', error)
+      toast.error('Erro inesperado ao excluir plano de estudo')
+    } finally {
+      setExcluindo(false)
+    }
+  }
 
   useEffect(() => {
-    const carregarPlanos = async () => {
-      try {
-        const resultado = await getAllPlanosEstudo()
-        if (resultado.success && resultado.data) {
-          setPlanos(resultado.data)
-        }
-      } catch (error) {
-        console.error('Erro ao carregar planos:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     carregarPlanos()
   }, [])
 
@@ -96,7 +133,10 @@ export function PlanosEstudoGrid() {
             Comece criando seu primeiro plano de estudos para organizar sua rotina.
           </p>
           <Link href="/plano-estudos/criar">
-            <Button>Criar Primeiro Plano</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Primeiro Plano
+            </Button>
           </Link>
         </CardContent>
       </Card>
@@ -104,82 +144,151 @@ export function PlanosEstudoGrid() {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {planos.map((plano) => {
-        const stats = calcularEstatisticas(plano)
-        
-        return (
-          <Card key={plano.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">{plano.nome}</CardTitle>
-                  <CardDescription>{plano.descricao}</CardDescription>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Badge variant={plano.ativo ? "default" : "secondary"}>
+    <>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {planos.map((plano) => {
+          const stats = calcularEstatisticas(plano)
+
+          return (
+            <Card
+              key={plano.id}
+              className="border border-gray-200 shadow-sm bg-white hover:shadow-lg transition-all duration-300 flex flex-col"
+            >
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between mb-2">
+                  <Badge variant={plano.ativo ? "default" : "secondary"} className="mb-2">
                     {plano.ativo ? "Ativo" : "Inativo"}
                   </Badge>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 hover:bg-blue-50 hover:text-blue-600"
+                      onClick={() => setPlanoSelecionado(plano.id)}
+                      title="Adicionar Ciclo"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <Link href={`/plano-estudos/${plano.id}`}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 hover:bg-green-50 hover:text-green-600"
+                        title="Visualizar"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Link href={`/plano-estudos/${plano.id}/editar`}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 hover:bg-orange-50 hover:text-orange-600"
+                        title="Editar"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 hover:bg-red-50 hover:text-red-600"
+                      onClick={() => setPlanoParaExcluir(plano)}
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              {/* Período */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span>
-                  {format(new Date(plano.dataInicio), "dd/MM/yyyy", { locale: ptBR })} - {" "}
-                  {format(new Date(plano.dataFim), "dd/MM/yyyy", { locale: ptBR })}
-                </span>
-              </div>
 
-              {/* Progresso */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1">
-                    <Target className="h-4 w-4" />
-                    Progresso
-                  </span>
-                  <span className="font-medium">{stats.progresso}%</span>
+                <CardTitle className="text-xl font-bold text-gray-900 mb-2">
+                  {plano.nome}
+                </CardTitle>
+
+                {plano.descricao && (
+                  <CardDescription className="text-sm text-gray-600 line-clamp-2">
+                    {plano.descricao}
+                  </CardDescription>
+                )}
+              </CardHeader>
+
+              <CardContent className="flex-1 flex flex-col justify-between">
+                <div className="space-y-4">
+                  {/* Período */}
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <span>
+                      {format(new Date(plano.dataInicio), "dd/MM/yy", { locale: ptBR })} - {" "}
+                      {format(new Date(plano.dataFim), "dd/MM/yy", { locale: ptBR })}
+                    </span>
+                  </div>
+
+                  {/* Semanas */}
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <BookOpen className="h-4 w-4 text-gray-400" />
+                    <span>{plano.semanas.length} semana{plano.semanas.length !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  {/* Horas */}
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Clock className="h-4 w-4 text-gray-400" />
+                    <span>
+                      {stats.totalHorasRealizadas}h / {stats.totalHorasPlanejadas}h
+                    </span>
+                  </div>
+
+                  {/* Progresso */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600 font-medium">Progresso</span>
+                      <span className="text-gray-900 font-bold">{stats.progresso}%</span>
+                    </div>
+                    <Progress value={stats.progresso} className="h-2" />
+                  </div>
                 </div>
-                <Progress value={stats.progresso} />
-              </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
 
-              {/* Horas */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {stats.totalHorasRealizadas}h / {stats.totalHorasPlanejadas}h
-                </span>
-              </div>
+      {/* Modal para adicionar ciclo */}
+      <AdicionarCicloModal
+        planoId={planoSelecionado}
+        isOpen={!!planoSelecionado}
+        onClose={() => setPlanoSelecionado(null)}
+        onSuccess={handleCicloAdicionado}
+      />
 
-              {/* Semanas */}
-              <div className="text-sm text-muted-foreground">
-                {plano.semanas.length} semana{plano.semanas.length !== 1 ? 's' : ''}
-              </div>
-
-              {/* Ações */}
-              <div className="flex gap-2 pt-2">
-                <Link href={`/plano-estudos/${plano.id}`} className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Eye className="h-4 w-4 mr-2" />
-                    Ver Detalhes
-                  </Button>
-                </Link>
-                <Link href={`/plano-estudos/${plano.id}/editar`}>
-                  <Button variant="outline" size="sm">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <Button variant="outline" size="sm">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )
-      })}
-    </div>
+      {/* Dialog de confirmação para exclusão */}
+      <Dialog open={!!planoParaExcluir} onOpenChange={() => setPlanoParaExcluir(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir o plano de estudos "{planoParaExcluir?.nome}"?
+              <br />
+              <strong>Esta ação não pode ser desfeita.</strong> Todos os ciclos, disciplinas e progresso associados serão perdidos permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPlanoParaExcluir(null)}
+              disabled={excluindo}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleExcluirPlano}
+              disabled={excluindo}
+            >
+              {excluindo ? 'Excluindo...' : 'Excluir Plano'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

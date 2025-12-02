@@ -13,6 +13,52 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Book, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react"
 
+// Componente de progresso circular
+function CircularProgress({ value, size = 48, strokeWidth = 4, className = "" }: {
+  value: number
+  size?: number
+  strokeWidth?: number
+  className?: string
+}) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (value / 100) * circumference
+
+  return (
+    <div className={`relative inline-flex items-center justify-center ${className}`}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        {/* Círculo de fundo */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          fill="none"
+          className="text-gray-200"
+        />
+        {/* Círculo de progresso */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="text-blue-600 transition-all duration-300"
+        />
+      </svg>
+      {/* Texto no centro */}
+      <span className="absolute text-xs font-semibold text-gray-700">
+        {Math.round(value)}%
+      </span>
+    </div>
+  )
+}
+
 interface DisciplinasTableProps {
   termoPesquisa?: string // Para filtrar disciplinas
 }
@@ -21,9 +67,13 @@ interface DisciplinasTableProps {
 interface MaterialEstudo {
   id: string
   nome: string
+  tipo: 'PDF' | 'VIDEO'
   totalPaginas: number
   paginasLidas: number
+  duracaoSegundos: number | null
+  tempoAssistido: number | null
   arquivoPdfUrl?: string | null
+  arquivoVideoUrl?: string | null
 }
 
 interface DisciplinaComMateriais {
@@ -37,6 +87,10 @@ interface DisciplinaComMateriais {
   progresso: number
   totalPaginas: number
   paginasLidas: number
+  progressoPdf: number
+  progressoVideo: number
+  totalDuracaoSegundos: number
+  totalTempoAssistido: number
 }
 
 export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
@@ -72,9 +126,29 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
               const materiaisResponse = await listarMateriaisDaDisciplina(disc.disciplinaId)
               const materiais = materiaisResponse.success ? materiaisResponse.data?.map(dm => dm.material) || [] : []
 
-              const totalPaginas = materiais.reduce((total, mat) => total + mat.totalPaginas, 0)
-              const paginasLidas = materiais.reduce((total, mat) => total + mat.paginasLidas, 0)
-              const progresso = totalPaginas > 0 ? (paginasLidas / totalPaginas) * 100 : 0
+              // Separar materiais por tipo
+              const materiaisPdf = materiais.filter(m => m.tipo === 'PDF')
+              const materiaisVideo = materiais.filter(m => m.tipo === 'VIDEO')
+
+              // Calcular progresso de PDFs
+              const totalPaginas = materiaisPdf.reduce((total, mat) => total + mat.totalPaginas, 0)
+              const paginasLidas = materiaisPdf.reduce((total, mat) => total + mat.paginasLidas, 0)
+              const progressoPdf = totalPaginas > 0 ? (paginasLidas / totalPaginas) * 100 : 0
+
+              // Calcular progresso de Vídeos
+              const totalDuracaoSegundos = materiaisVideo.reduce((total, mat) => total + (mat.duracaoSegundos || 0), 0)
+              const totalTempoAssistido = materiaisVideo.reduce((total, mat) => total + (mat.tempoAssistido || 0), 0)
+              const progressoVideo = totalDuracaoSegundos > 0 ? (totalTempoAssistido / totalDuracaoSegundos) * 100 : 0
+
+              // Progresso geral (média ponderada se houver ambos os tipos)
+              let progresso = 0
+              if (materiaisPdf.length > 0 && materiaisVideo.length > 0) {
+                progresso = (progressoPdf + progressoVideo) / 2
+              } else if (materiaisPdf.length > 0) {
+                progresso = progressoPdf
+              } else if (materiaisVideo.length > 0) {
+                progresso = progressoVideo
+              }
 
               return {
                 ...disc,
@@ -82,6 +156,10 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                 progresso,
                 totalPaginas,
                 paginasLidas,
+                progressoPdf,
+                progressoVideo,
+                totalDuracaoSegundos,
+                totalTempoAssistido,
               }
             })
           )
@@ -143,8 +221,9 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
             <TableRow>
               <TableHead>Disciplina</TableHead>
               <TableHead>Materiais</TableHead>
-              <TableHead>Páginas</TableHead>
-              <TableHead>Progresso</TableHead>
+              <TableHead>PDFs (Páginas)</TableHead>
+              <TableHead>Vídeos (Tempo)</TableHead>
+              <TableHead>Progresso Geral</TableHead>
               <TableHead className="text-center">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -153,6 +232,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
               <TableRow key={i}>
                 <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-12" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                 <TableCell>
                   <Skeleton className="h-2 w-full" />
@@ -177,8 +257,9 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           <TableRow>
             <TableHead>Disciplina</TableHead>
             <TableHead>Materiais</TableHead>
-            <TableHead>Páginas</TableHead>
-            <TableHead>Progresso</TableHead>
+            <TableHead>PDFs (Páginas)</TableHead>
+            <TableHead>Vídeos (Tempo)</TableHead>
+            <TableHead>Progresso Geral</TableHead>
             <TableHead className="text-center">Ações</TableHead>
           </TableRow>
         </TableHeader>
@@ -186,12 +267,48 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           {disciplinasPaginadas.map((disciplina) => {
             const materiaisCount = disciplina.materiais.length
             const progresso = disciplina.progresso
+
+            // Formatar tempo de vídeo
+            const formatarTempo = (segundos: number): string => {
+              const horas = Math.floor(segundos / 3600)
+              const minutos = Math.floor((segundos % 3600) / 60)
+              if (horas > 0) {
+                return `${horas}h ${minutos}m`
+              }
+              return `${minutos}m`
+            }
+
             return (
               <TableRow key={disciplina.id}>
                 <TableCell className="font-medium">{disciplina.disciplina.nome}</TableCell>
                 <TableCell>{materiaisCount}</TableCell>
                 <TableCell>
-                  {disciplina.paginasLidas} / {disciplina.totalPaginas}
+                  <div className="flex items-center gap-3">
+                    {disciplina.totalPaginas > 0 ? (
+                      <>
+                        <CircularProgress value={disciplina.progressoPdf} size={52} strokeWidth={5} />
+                        <div className="text-sm text-gray-600">
+                          {disciplina.paginasLidas} / {disciplina.totalPaginas}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    {disciplina.totalDuracaoSegundos > 0 ? (
+                      <>
+                        <CircularProgress value={disciplina.progressoVideo} size={52} strokeWidth={5} />
+                        <div className="text-sm text-gray-600">
+                          {formatarTempo(disciplina.totalTempoAssistido)} / {formatarTempo(disciplina.totalDuracaoSegundos)}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="min-w-[220px]">
                   <div className="flex items-center gap-2">
@@ -227,7 +344,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
 
           {disciplinasFiltradas.length === 0 && !loading && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-gray-500 py-10">
+              <TableCell colSpan={6} className="text-center text-gray-500 py-10">
                 {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina cadastrada'}
               </TableCell>
             </TableRow>

@@ -7,12 +7,19 @@ import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getAgendaMensal, type AgendaMensal, type DisciplinaAgenda } from "@/interface/actions/agenda/get-agenda-mensal"
 import { debugBanco } from "@/interface/actions/agenda/debug-banco"
+import { useHeader } from "@/contexts/header-context"
 
 export default function AgendaPage() {
+  const { setTitle } = useHeader()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [agendaData, setAgendaData] = useState<AgendaMensal | null>(null)
   const [loading, setLoading] = useState(true)
   const [todasDisciplinas, setTodasDisciplinas] = useState<DisciplinaAgenda[]>([])
+
+  // Definir título do header
+  useEffect(() => {
+    setTitle("Agenda")
+  }, [setTitle])
 
   // Carregar dados da agenda
   useEffect(() => {
@@ -109,18 +116,8 @@ export default function AgendaPage() {
         <div className="flex items-center gap-2">
           <Calendar className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Agenda</h1>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={async () => {
-              const result = await debugBanco()
-              console.log("Resultado debug:", result)
-            }}
-          >
-            Debug DB
-          </Button>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

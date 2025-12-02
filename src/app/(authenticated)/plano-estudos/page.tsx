@@ -1,29 +1,39 @@
-import { PlanosEstudoTable } from '@/components/plano-estudos/planos-estudos-table'
+"use client"
+
+import { PlanosEstudoGrid } from '@/components/plano-estudos/planos-estudos-grid'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
+import { useHeader } from "@/contexts/header-context"
+import { useEffect } from "react"
 
 export default function PlanosEstudoPage() {
+  const { setTitle } = useHeader()
+
+  useEffect(() => {
+    setTitle("Planos de Estudo")
+  }, [setTitle])
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header com botão */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gerenciador de Estudos</h1>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl font-bold text-gray-900">Meus Planos de Estudo</h2>
+          <p className="text-gray-500 text-sm mt-1">
             Visualize e gerencie todos os seus planos de estudo
           </p>
         </div>
         <Link href="/plano-estudos/criar">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button size="lg" className="shadow-sm">
+            <Plus className="h-5 w-5 mr-2" />
             Novo Plano
           </Button>
         </Link>
       </div>
 
-      {/* Lista de planos */}
-      <PlanosEstudoTable />
+      {/* Grid de planos */}
+      <PlanosEstudoGrid />
     </div>
   )
 }

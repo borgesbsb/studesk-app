@@ -1,9 +1,19 @@
+"use client"
+
 import { DataHoje } from "@/components/dashboard/data-hoje"
 import { MateriasHojeWrapper } from "@/components/dashboard/materias-hoje-wrapper"
 import { CalendarioSemanal } from "@/components/dashboard/calendario-semanal"
 import { DashboardProvider } from "@/contexts/dashboard-context"
+import { useHeader } from "@/contexts/header-context"
+import { useEffect } from "react"
 
 export default function DashboardPage() {
+  const { setTitle } = useHeader()
+
+  useEffect(() => {
+    setTitle("Hoje")
+  }, [setTitle])
+
   return (
     <DashboardProvider>
       <div className="p-4 h-screen flex flex-col gap-4 max-w-full">

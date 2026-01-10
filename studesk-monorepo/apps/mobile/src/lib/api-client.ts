@@ -142,8 +142,8 @@ class ApiClient {
   ): Promise<T> {
     const { token, ...fetchOptions } = options || {}
 
-    const headers: HeadersInit = {
-      ...fetchOptions.headers,
+    const headers: Record<string, string> = {
+      ...(fetchOptions.headers as Record<string, string> || {}),
     }
 
     if (token) {

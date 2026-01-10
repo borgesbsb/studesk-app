@@ -10,6 +10,13 @@
 !.yarn/releases
 !.yarn/versions
 
+# monorepo dependencies and builds
+studesk-monorepo/node_modules
+studesk-monorepo/**/node_modules
+studesk-monorepo/**/.next
+studesk-monorepo/**/.turbo
+studesk-monorepo/apps/mobile/.certificates
+
 # testing
 /coverage
 

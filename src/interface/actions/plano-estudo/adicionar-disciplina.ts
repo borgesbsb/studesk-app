@@ -22,7 +22,7 @@ export async function adicionarDisciplinaSemana(data: AdicionarDisciplinaData) {
       disciplinaId: data.disciplinaId,
       horasPlanejadas: data.horasPlanejadas || 1,
       questoesPlanejadas: data.questoesPlanejadas || 0,
-      diasEstudo: data.diasEstudo || '[]'
+      diasEstudo: data.diasEstudo || ''
     })
 
     console.log('✅ ACTION: Disciplina adicionada com sucesso:', resultado)

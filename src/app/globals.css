@@ -367,3 +367,401 @@
   animation: stat-card-hover 0.6s ease-in-out;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
+
+/* Estilos para o visualizador de Markdown - Design Profissional */
+.markdown-content {
+  /* Melhorar renderização de texto */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+
+  /* Melhor quebra de palavras */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+
+  /* Melhorar seleção de texto */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+.markdown-content * {
+  /* Garantir seleção granular em todos os elementos */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Prevenir seleção automática de blocos */
+.markdown-content p,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6,
+.markdown-content li,
+.markdown-content div {
+  -webkit-touch-callout: text;
+  -webkit-user-drag: none;
+  /* Prevenir expansão automática da seleção */
+  -webkit-user-modify: read-only;
+  -moz-user-modify: read-only;
+  user-modify: read-only;
+}
+
+.markdown-content p {
+  /* Garantir espaçamento consistente entre parágrafos */
+  display: block;
+  margin-block-start: 0.875em;
+  margin-block-end: 0.875em;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  /* Melhorar legibilidade de títulos */
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 1.75em;
+  margin-bottom: 0.65em;
+  line-height: 1.25;
+}
+
+.markdown-content h1 {
+  font-size: 1.875em;
+  font-weight: 700;
+}
+
+.markdown-content h2 {
+  font-size: 1.5em;
+}
+
+.markdown-content h3 {
+  font-size: 1.25em;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  /* Melhor espaçamento para listas */
+  padding-left: 1.75em;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.markdown-content li {
+  /* Espaçamento entre itens de lista */
+  margin-bottom: 0.5em;
+  line-height: 1.85;
+}
+
+.markdown-content blockquote {
+  /* Estilo para citações */
+  font-style: italic;
+  margin: 1.25em 0;
+  padding-left: 1.25em;
+  opacity: 0.9;
+}
+
+.markdown-content img {
+  /* Estilo para imagens */
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1.5em 0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.markdown-content code {
+  /* Estilo para código inline */
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.markdown-content pre {
+  /* Estilo para blocos de código */
+  max-width: 100%;
+  overflow-x: auto;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.markdown-content pre code {
+  /* Código dentro de blocos pre */
+  display: block;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* Melhor separação visual entre elementos */
+.markdown-content > * + * {
+  margin-top: 0.875em;
+}
+
+/* Estilos para slider de largura personalizada */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(59, 130, 246, 0.6);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+}
+
+input[type='range']::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(59, 130, 246, 0.6);
+}
+
+/* Tiptap Reader Styles */
+.tiptap-reader-container {
+  width: 100%;
+}
+
+.tiptap-reader {
+  outline: none !important;
+  border: none !important;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+.tiptap-reader * {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Tiptap Typography */
+.tiptap-reader h1 {
+  font-size: 1.875em;
+  font-weight: 700;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.tiptap-reader h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 1.75em;
+  margin-bottom: 0.65em;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.tiptap-reader h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.6em;
+  line-height: 1.4;
+}
+
+.tiptap-reader p {
+  text-align: left;
+  margin-top: 0.875em;
+  margin-bottom: 0.875em;
+  line-height: 1.85;
+}
+
+.tiptap-reader strong {
+  font-weight: 600;
+}
+
+.tiptap-reader code {
+  background-color: rgba(150, 150, 150, 0.1);
+  border-radius: 0.25em;
+  padding: 0.125em 0.375em;
+  font-size: 0.875em;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.tiptap-reader pre {
+  background-color: rgba(150, 150, 150, 0.1);
+  border-radius: 0.5em;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.tiptap-reader pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.tiptap-reader ul,
+.tiptap-reader ol {
+  padding-left: 1.5em;
+  margin: 0.875em 0;
+}
+
+.tiptap-reader li {
+  margin: 0.5em 0;
+}
+
+.tiptap-reader blockquote {
+  border-left: 3px solid rgba(150, 150, 150, 0.3);
+  padding-left: 1em;
+  margin: 1em 0;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+/* Tiptap Highlight (mark) */
+.tiptap-reader mark {
+  background-color: #fef08a;
+  color: inherit;
+  padding: 0.125em 0.25em;
+  border-radius: 0.25em;
+  transition: background-color 0.2s ease;
+}
+
+.tiptap-reader mark[data-color="yellow"] {
+  background-color: #fef08a;
+}
+
+.tiptap-reader mark[data-color="green"] {
+  background-color: #bbf7d0;
+}
+
+.tiptap-reader mark[data-color="blue"] {
+  background-color: #bfdbfe;
+}
+
+.tiptap-reader mark[data-color="red"] {
+  background-color: #fecaca;
+}
+
+.tiptap-reader mark[data-color="purple"] {
+  background-color: #e9d5ff;
+}
+
+.tiptap-reader mark[data-color="orange"] {
+  background-color: #fed7aa;
+}
+
+/* Tiptap Underline */
+.tiptap-reader u {
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 2px;
+  text-decoration-color: #3b82f6;
+}
+
+/* Tiptap Strike */
+.tiptap-reader s {
+  text-decoration: line-through;
+  text-decoration-thickness: 3px;
+}
+
+/* Custom Underline com atributos dinâmicos */
+.tiptap-reader u[data-underline-style] {
+  text-decoration-style: solid;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #3b82f6;
+  text-underline-offset: 2px;
+}
+
+.tiptap-reader u[data-underline-style="solid"] {
+  text-decoration-style: solid;
+}
+
+.tiptap-reader u[data-underline-style="dashed"] {
+  text-decoration-style: dashed;
+}
+
+.tiptap-reader u[data-underline-style="dotted"] {
+  text-decoration-style: dotted;
+}
+
+.tiptap-reader u[data-underline-style="wavy"] {
+  text-decoration-style: wavy;
+}
+
+/* Aplicar espessura via atributo */
+.tiptap-reader u[data-underline-thickness="1px"] {
+  text-decoration-thickness: 1px;
+}
+
+.tiptap-reader u[data-underline-thickness="2px"] {
+  text-decoration-thickness: 2px;
+}
+
+.tiptap-reader u[data-underline-thickness="3px"] {
+  text-decoration-thickness: 3px;
+}
+
+/* Aplicar cores via atributos */
+.tiptap-reader u[data-underline-color="#3b82f6"] {
+  text-decoration-color: #3b82f6;
+}
+
+.tiptap-reader u[data-underline-color="#ef4444"] {
+  text-decoration-color: #ef4444;
+}
+
+.tiptap-reader u[data-underline-color="#10b981"] {
+  text-decoration-color: #10b981;
+}
+
+.tiptap-reader u[data-underline-color="#f59e0b"] {
+  text-decoration-color: #f59e0b;
+}
+
+.tiptap-reader u[data-underline-color="#8b5cf6"] {
+  text-decoration-color: #8b5cf6;
+}
+
+.tiptap-reader u[data-underline-color="#ec4899"] {
+  text-decoration-color: #ec4899;
+}
+
+.tiptap-reader u[data-underline-color="#000000"] {
+  text-decoration-color: #000000;
+}
+
+.tiptap-reader u[data-underline-color="#6b7280"] {
+  text-decoration-color: #6b7280;
+}

@@ -8,10 +8,11 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-
   // Configuração para servir arquivos estáticos do PDF.js e WebViewer
   async headers() {
     return [
+      // CORS headers são tratados dinamicamente nas rotas individuais via handleCors()
+      // NÃO adicionar headers CORS aqui pois sobrescreve os headers dinâmicos
       {
         source: '/pdf.worker.min.js',
         headers: [
@@ -49,13 +50,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Headers para Syncfusion PDF Viewer
+      // MIME type correto para arquivos WASM (deve vir ANTES da regra geral)
       {
-        source: '/ej2-pdfviewer-lib/:path*',
+        source: '/ej2-pdfviewer-lib/(.*).wasm',
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=86400',
+            key: 'Content-Type',
+            value: 'application/wasm',
           },
           {
             key: 'Access-Control-Allow-Origin',
@@ -96,11 +97,6 @@ const nextConfig: NextConfig = {
       test: /\.node$/,
       use: "ignore-loader",
     });
-
-    // Desabilitar minificação para módulos Syncfusion em produção
-    if (!isServer && config.optimization) {
-      config.optimization.minimize = false;
-    }
 
     return config;
   },

@@ -80,14 +80,15 @@ export async function getAgendaMensal(ano: number, mes: number): Promise<AgendaM
       },
       select: {
         id: true,
-        nome: true
+        nome: true,
+        cor: true
       }
     })
 
-    // Criar mapeamento de cores por disciplina
+    // Criar mapeamento de cores por disciplina (usando a cor do banco)
     const mapeamentoCores: Record<string, string> = {}
     todasDisciplinas.forEach((disciplina, index) => {
-      mapeamentoCores[disciplina.id] = coresDisciplinas[index % coresDisciplinas.length]
+      mapeamentoCores[disciplina.id] = disciplina.cor || coresDisciplinas[index % coresDisciplinas.length]
     })
 
     // Processar os dados para criar a agenda mensal
@@ -98,53 +99,51 @@ export async function getAgendaMensal(ano: number, mes: number): Promise<AgendaM
       semana.disciplinas.forEach(disciplinaSemana => {
         const disciplina = disciplinaSemana.disciplina
         
-        // Determinar os dias da semana que esta disciplina será estudada
-        let diasEstudo: number[] = []
-        
+        // Determinar os dias do ciclo que esta disciplina será estudada
+        let diasDoCiclo: number[] = [] // Array de índices de dias (0, 1, 2, ...)
+
         if (disciplinaSemana.diasEstudo) {
-          // Se tem dias específicos definidos, converter do formato string para números
-          try {
-            // Primeiro tenta parsear como JSON (formato novo)
-            diasEstudo = JSON.parse(disciplinaSemana.diasEstudo)
-          } catch {
-            // Se não conseguir, assume que é string com dias separados por vírgula (formato antigo)
-            const diasString = disciplinaSemana.diasEstudo.split(',')
+          const diasString = disciplinaSemana.diasEstudo.split(',').filter(d => d.trim())
+
+          // Novo formato: dia1, dia2, dia3...
+          diasDoCiclo = diasString
+            .map(dia => {
+              const match = dia.match(/dia(\d+)/)
+              return match ? parseInt(match[1]) - 1 : null // dia1 = índice 0, dia2 = índice 1, etc
+            })
+            .filter(d => d !== null) as number[]
+
+          // Se não encontrou dias no formato novo, tentar formato antigo (seg, ter, qua)
+          if (diasDoCiclo.length === 0) {
             const mapaDias: Record<string, number> = {
               'dom': 0, 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6
             }
-            diasEstudo = diasString.map(dia => mapaDias[dia.trim().toLowerCase()]).filter(d => d !== undefined)
-            
-            // Se não conseguiu converter, usar padrão
-            if (diasEstudo.length === 0) {
-              diasEstudo = [1, 2, 3, 4, 5] // Segunda a sexta por padrão
-            }
-          }
-        } else {
-          // Distribuir pela semana baseado na carga horária
-          const horasTotal = disciplinaSemana.horasPlanejadas
-          if (horasTotal <= 2) {
-            diasEstudo = [1, 3] // 2 dias na semana
-          } else if (horasTotal <= 4) {
-            diasEstudo = [1, 3, 5] // 3 dias na semana
-          } else {
-            diasEstudo = [1, 2, 3, 4, 5] // Todos os dias úteis
+            diasDoCiclo = diasString
+              .map(dia => mapaDias[dia.trim().toLowerCase()])
+              .filter(d => d !== undefined)
           }
         }
 
-        // Adicionar a disciplina nos dias correspondentes do mês
-        let dataAtual = new Date(Math.max(semana.dataInicio.getTime(), dataInicio.getTime()))
-        const fimPeriodo = new Date(Math.min(semana.dataFim.getTime(), dataFim.getTime()))
-        
-        while (dataAtual <= fimPeriodo) {
-          const diaSemana = dataAtual.getDay() // 0 = domingo, 1 = segunda, etc.
-          const diaDoMes = dataAtual.getDate()
-          
-          // Verificar se este dia da semana está nos dias de estudo
-          if (diasEstudo.includes(diaSemana)) {
+        // Se não tem dias definidos, pular esta disciplina
+        if (diasDoCiclo.length === 0) {
+          return
+        }
+
+        // Mapear dias do ciclo para datas reais
+        const inicioCiclo = new Date(semana.dataInicio)
+
+        diasDoCiclo.forEach(indiceDia => {
+          // Calcular a data real baseada no início do ciclo + índice do dia
+          const dataReal = addDays(inicioCiclo, indiceDia)
+
+          // Verificar se a data está dentro do período do mês atual
+          if (dataReal >= dataInicio && dataReal <= dataFim) {
+            const diaDoMes = dataReal.getDate()
+
             if (!diasAgenda[diaDoMes]) {
               diasAgenda[diaDoMes] = []
             }
-            
+
             // Verificar se a disciplina já não está no dia (evitar duplicatas)
             const jaExiste = diasAgenda[diaDoMes].some(d => d.id === disciplina.id)
             if (!jaExiste) {
@@ -155,9 +154,7 @@ export async function getAgendaMensal(ano: number, mes: number): Promise<AgendaM
               })
             }
           }
-          
-          dataAtual = addDays(dataAtual, 1)
-        }
+        })
       })
     })
 

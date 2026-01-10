@@ -5,9 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Setup and Dependencies
-- `npm run copy-webviewer` - Copy WebViewer files to public directory (required before dev/build)
-- `npm run dev` - Start development server (includes WebViewer copy)
-- `npm run build` - Build for production (includes WebViewer copy and PDF worker setup)
+- `npm run dev` - Start development server
+- `npm run build` - Build for production (includes PDF worker setup)
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
 
@@ -27,8 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Framework**: Next.js 15.3.2 with App Router
 - **Database**: PostgreSQL with Prisma ORM
 - **UI**: React 19, Tailwind CSS, Radix UI components
-- **PDF Processing**: Multiple libraries (@pdftron/webviewer, pdfjs-dist, @react-pdf-viewer)
-- **AI Integration**: OpenAI API for question generation
+- **PDF Processing**: AI-powered text reader with OpenAI API
 - **Authentication**: NextAuth.js with Prisma adapter
 
 ### Core Domain Structure
@@ -61,9 +59,9 @@ Server actions organized by domain:
 ### Key Features
 
 #### PDF Processing System
-- Multiple PDF viewers: WebViewer, PDF.js, React PDF Viewer
+- AI-powered text reader with GPT-4o-mini for optimal formatting
 - Text extraction and caching via ChunkCache model
-- Annotation system with highlighting and notes
+- Text-based annotation system with startOffset/endOffset positioning
 - Reading progress tracking with HistoricoLeitura
 
 #### AI Question Generation
@@ -96,14 +94,15 @@ Important indexes on:
 #### PDF Storage
 - Upload endpoint: `/api/upload/`
 - Static serving: `/api/static/uploads/[...path]/`
-- WebViewer assets: `/public/lib/webviewer/`
-- PDF.js workers: `/public/pdf.worker.min.js`
+- AI-formatted text endpoint: `/api/pdf/[id]/mobile-text`
+- PDF reading route: `/material/[id]/ler`
 
 #### PDF Processing Pipeline
 1. Upload via `/api/upload/`
 2. Text extraction via `/api/pdf/extract-text/`
 3. Chunk processing and caching
-4. AI processing via `/api/questoes/gerar-com-ia/`
+4. AI text formatting via OpenAI API
+5. Text rendering with TextReader component at `/material/[id]/ler`
 
 ### Authentication Structure
 - Layout: `/src/app/(authenticated)/` - Protected routes
@@ -118,14 +117,14 @@ Important indexes on:
 ### Development Notes
 
 #### PDF Integration
-- WebViewer requires files to be copied to public directory before build
-- PDF.js worker must be available at `/pdf.worker.min.js`
-- Multiple PDF libraries used for different viewer requirements
+- OpenAI API key required in environment variable `OPENAI_API_KEY`
+- AI text formatting uses GPT-4o-mini model for cost efficiency
+- Text-based annotations use character offsets (startOffset/endOffset)
 
 #### Build Configuration
 - ESLint disabled during builds (`ignoreDuringBuilds: true`)
 - Type checking skipped in build (`SKIP_TYPE_CHECK=true`)
-- Webpack configured for PDF.js compatibility and Node.js modules
+- Webpack configured for Node.js modules and PDF processing
 
 #### Styling
 - Extensive Tailwind safelist for dynamic classes

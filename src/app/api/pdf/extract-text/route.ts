@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs/promises'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { sanitizeUnicode } from '@/utils/unicode-sanitizer'
 
 // Função alternativa usando pdf-parse como fallback
 async function extractTextWithPdfParse(buffer: Buffer): Promise<{
@@ -26,9 +27,9 @@ async function extractTextWithPdfParse(buffer: Buffer): Promise<{
     if (!data.text || data.text.trim().length === 0) {
       throw new Error('Nenhum texto foi extraído do PDF')
     }
-    
+
     return {
-      text: data.text,
+      text: sanitizeUnicode(data.text),
       pages: data.numpages
     }
     
@@ -71,15 +72,16 @@ async function extractTextWithPdfjs(buffer: Buffer): Promise<{
         console.log(`Processando página ${i}/${numPages}`)
         const page = await doc.getPage(i)
         const textContent = await page.getTextContent()
-        
+
         const pageText = textContent.items
           .filter((item: any) => item.str && typeof item.str === 'string')
           .map((item: any) => item.str.trim())
           .filter((str: string) => str.length > 0)
           .join(' ')
-        
+
         if (pageText.length > 0) {
-          fullText += pageText + '\n\n'
+          // Adicionar marcador de página
+          fullText += `\n\n[PAGE_${i}]\n\n` + pageText + '\n\n'
         }
       } catch (pageError) {
         console.warn(`Erro ao processar página ${i}:`, pageError)
@@ -92,9 +94,9 @@ async function extractTextWithPdfjs(buffer: Buffer): Promise<{
     if (fullText.length === 0) {
       throw new Error('Nenhum texto foi extraído do PDF')
     }
-    
+
     return {
-      text: fullText.trim(),
+      text: sanitizeUnicode(fullText.trim()),
       pages: numPages
     }
     
@@ -144,11 +146,11 @@ async function extractTextSimple(buffer: Buffer): Promise<{
     if (extractedText.trim().length === 0) {
       throw new Error('Não foi possível extrair texto do PDF com método simples')
     }
-    
+
     console.log(`Extração simples concluída: ${extractedText.length} caracteres, ~${estimatedPages} páginas`)
-    
+
     return {
-      text: extractedText.trim(),
+      text: sanitizeUnicode(extractedText.trim()),
       pages: estimatedPages
     }
     
@@ -293,10 +295,24 @@ export async function POST(request: NextRequest) {
       console.log('- Caracteres extraídos:', data.text.length)
       console.log('- Primeiros 300 chars:', data.text.substring(0, 300))
       console.log('- Últimos 200 chars:', data.text.slice(-200))
-      
-      text = data.text
+
+      // Adicionar marcadores de página usando quebras naturais
+      // Estimativa: dividir o texto em páginas aproximadas
+      const textWithPageMarkers = data.text
+        .split('\n\n')
+        .reduce((acc, paragraph, idx) => {
+          // A cada ~10 parágrafos, inserir marcador de página
+          const pageNum = Math.floor(idx / 10) + 1
+          if (idx % 10 === 0 && pageNum <= data.numpages) {
+            acc += `\n\n[PAGE_${pageNum}]\n\n`
+          }
+          acc += paragraph + '\n\n'
+          return acc
+        }, '')
+
+      text = sanitizeUnicode(textWithPageMarkers)
       pages = data.numpages
-      
+
       if (!text || text.trim().length === 0) {
         throw new Error('PDF-parse não extraiu texto')
       }
@@ -331,11 +347,14 @@ export async function POST(request: NextRequest) {
     console.log('Parágrafos organizados:', paragraphs.length)
     console.log('Amostra do primeiro parágrafo:', paragraphs[0]?.substring(0, 200))
 
+    // Sanitizar todos os textos antes de retornar
+    const sanitizedParagraphs = paragraphs.map(p => sanitizeUnicode(p))
+
     return NextResponse.json({
       success: true,
-      text: text,
-      cleanedText: cleanedText,
-      paragraphs: paragraphs,
+      text: text, // Já sanitizado acima
+      cleanedText: sanitizeUnicode(cleanedText),
+      paragraphs: sanitizedParagraphs,
       pages: pages,
       info: {
         producer: 'pdf-parse',

@@ -1,70 +1,87 @@
-# 💾 Sistema de Salvamento de Anotações
+# 💾 Sistema de Anotações em PDF
 
 ## ✨ Como Funciona
 
-O sistema agora salva suas anotações **diretamente no arquivo PDF**, seguindo o exemplo oficial do PDFTron WebViewer.
+O sistema salva suas anotações **diretamente no arquivo PDF** usando o Syncfusion PDF Viewer.
 
 ### 🎯 Passo a Passo
 
 1. **Abrir PDF**: Clique em "Abrir PDF" no material
-2. **Fazer Anotações**: Use as ferramentas do WebViewer:
+2. **Fazer Anotações**: Use as ferramentas do Syncfusion PDF Viewer:
    - ✏️ Destacar texto (highlight)
-   - 📝 Adicionar notas
-   - ✏️ Desenhar
-   - 📌 Adicionar marcações
-3. **Salvar**: Clique no botão 💾 que aparece no header do WebViewer
-4. **Pronto!** O PDF é atualizado com suas anotações incorporadas
+   - 📝 Adicionar notas adesivas
+   - ✏️ Desenhar formas e linhas
+   - 📌 Adicionar marcações e carimbos
+   - ✍️ Assinatura manuscrita
+3. **Salvar**: As anotações são salvas automaticamente no servidor
+4. **Pronto!** O PDF mantém suas anotações entre sessões
 
 ### 🔧 Implementação Técnica
 
-Baseado no exemplo oficial do PDFTron:
+Usando o Syncfusion PDF Viewer:
 
-```javascript
-// 1. Exportar anotações como XFDF
-const xfdfString = await annotationManager.exportAnnotations()
-
-// 2. Obter PDF com anotações incorporadas
-const data = await documentViewer.getDocument().getFileData({ xfdfString })
-
-// 3. Salvar novo PDF no servidor
-const formData = new FormData()
-formData.append('pdf', new Blob([data], { type: 'application/pdf' }))
+```typescript
+// Componente PdfViewerComponent com anotações habilitadas
+<PdfViewerComponent
+  id="container"
+  documentPath={pdfUrl}
+  enableAnnotation={true}
+  enableStickyNotesAnnotation={true}
+  enableTextMarkupAnnotation={true}
+  enableShapeAnnotation={true}
+  enableMeasureAnnotation={true}
+  enableStampAnnotations={true}
+  enableHandwrittenSignature={true}
+  enableFreeText={true}
+  enableInkAnnotation={true}
+>
+  <Inject services={[Annotation, ...]} />
+</PdfViewerComponent>
 ```
 
 ### 📋 Características
 
-✅ **Anotações Permanentes**: Incorporadas no arquivo PDF  
-✅ **Sem Dependências Externas**: Usa API nativa do WebViewer  
-✅ **Automático**: Atualiza o material automaticamente  
-✅ **Simples**: Baseado no exemplo oficial do PDFTron  
+✅ **Anotações Completas**: Suporta todos os tipos de anotações
+✅ **Persistência Automática**: Salvas no servidor
+✅ **Interface Intuitiva**: Barra de ferramentas completa
+✅ **Multi-formato**: Highlights, notas, desenhos, formas, assinaturas  
 
-### 🚀 API Endpoint
+### 🚀 Funcionalidades do Viewer
 
-**POST** `/api/material/[id]/save-annotations`
+- **Toolbar Completa**: Todas as ferramentas de anotação disponíveis
+- **Modos de Leitura**: Normal, Sépia, Noturno, Cinza, Verde
+- **Ajustes Visuais**: Controle de brilho e contraste
+- **Navegação**: Thumbnails, bookmarks, busca de texto
+- **Tela Cheia**: Modo de visualização imersivo
 
-- Recebe o PDF com anotações via FormData
-- Salva novo arquivo no diretório uploads
-- Atualiza referência no banco de dados
+### 🔍 Tipos de Anotações Suportadas
 
-### 🔍 Debug
-
-Acompanhe o processo no console:
-```
-🔄 Exportando anotações...
-📄 XFDF exportado: <dados>
-🔄 Obtendo dados do documento com anotações...
-✅ Dados do PDF obtidos com anotações incorporadas
-🚀 Enviando PDF para servidor...
-✅ PDF salvo com sucesso!
-```
+- **Markup de Texto**: Highlight, sublinhado, tachado
+- **Notas Adesivas**: Comentários e observações
+- **Formas**: Linhas, retângulos, círculos, polígonos
+- **Medição**: Ferramentas de medição de distância e área
+- **Carimbos**: Carimbos pré-definidos e personalizados
+- **Texto Livre**: Adicionar texto em qualquer lugar
+- **Desenho à Mão**: Anotações manuscritas e assinaturas
 
 ### 📱 Interface
 
-- **Botão de Salvar**: Aparece automaticamente no header do WebViewer
-- **Ícone**: 💾 (disquete)
-- **Localização**: Barra superior do viewer PDF
-- **Feedback**: Toast de confirmação quando salvo
+- **Toolbar Completa**: Ferramentas de anotação integradas
+- **Ajustes de Visualização**: Botão no canto superior direito
+- **Painel de Configurações**: Controles de brilho, contraste e modo de leitura
+- **Tela Cheia**: Botão dedicado na toolbar
+- **Responsivo**: Interface otimizada para diferentes tamanhos de tela
+
+### ⚙️ Configuração
+
+Para usar o PDF Viewer, configure a licença do Syncfusion:
+
+```env
+NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY="sua-chave-aqui"
+```
+
+Obtenha uma chave trial em: https://www.syncfusion.com/account/manage-trials/start-trials
 
 ---
 
-**Implementado com ❤️ seguindo as melhores práticas do PDFTron WebViewer** 
+**Implementado com Syncfusion PDF Viewer - versão 31.2.16** 

@@ -4,6 +4,33 @@ import path from 'path'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
+// CORS helper function
+function getCorsHeaders(request: NextRequest) {
+  const origin = request.headers.get('origin') || ''
+  const allowedOrigins = ['http://localhost:3031', 'http://localhost:3030']
+
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin
+    headers['Access-Control-Allow-Credentials'] = 'true'
+  }
+
+  return headers
+}
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: getCorsHeaders(request),
+  })
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -12,7 +39,10 @@ export async function GET(
     // Verificar autenticação
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return new NextResponse('Não autorizado', { status: 401 })
+      return new NextResponse('Não autorizado', {
+        status: 401,
+        headers: getCorsHeaders(request)
+      })
     }
 
     // Aguardar os parâmetros
@@ -23,7 +53,10 @@ export async function GET(
 
     // Verificar se o usuário está tentando acessar seus próprios arquivos
     if (fileOwnerId !== session.user.id) {
-      return new NextResponse('Acesso negado', { status: 403 })
+      return new NextResponse('Acesso negado', {
+        status: 403,
+        headers: getCorsHeaders(request)
+      })
     }
 
     // Construir o caminho do arquivo
@@ -33,7 +66,10 @@ export async function GET(
     try {
       await fs.access(filePath)
     } catch {
-      return new NextResponse('Arquivo não encontrado', { status: 404 })
+      return new NextResponse('Arquivo não encontrado', {
+        status: 404,
+        headers: getCorsHeaders(request)
+      })
     }
 
     // Ler o arquivo
@@ -70,13 +106,14 @@ export async function GET(
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',
         'Content-Length': fileBuffer.length.toString(),
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        ...getCorsHeaders(request),
       },
     })
   } catch (error) {
     console.error('Erro ao servir arquivo estático:', error)
-    return new NextResponse('Erro interno do servidor', { status: 500 })
+    return new NextResponse('Erro interno do servidor', {
+      status: 500,
+      headers: getCorsHeaders(request)
+    })
   }
 } 

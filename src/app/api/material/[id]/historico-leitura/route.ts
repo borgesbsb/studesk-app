@@ -2,6 +2,12 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { handleCors } from '@/lib/cors'
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: handleCors(request) })
+}
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +19,7 @@ export async function GET(
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Não autorizado' },
-        { status: 401 }
+        { status: 401, headers: handleCors(request) }
       )
     }
 
@@ -34,7 +40,7 @@ export async function GET(
     if (!material) {
       return NextResponse.json(
         { error: 'Material não encontrado' },
-        { status: 404 }
+        { status: 404, headers: handleCors(request) }
       )
     }
 
@@ -54,15 +60,15 @@ export async function GET(
 
     console.log('✅ API - Histórico encontrado:', { count: historico.length })
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       historico
-    })
+    }, { headers: handleCors(request) })
   } catch (error) {
     console.error('❌ API - Erro ao buscar histórico de leitura:', error)
     return NextResponse.json(
       { error: 'Erro ao buscar histórico de leitura' },
-      { status: 500 }
+      { status: 500, headers: handleCors(request) }
     )
   }
 }
@@ -77,7 +83,7 @@ export async function PUT(
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Não autorizado' },
-        { status: 401 }
+        { status: 401, headers: handleCors(request) }
       )
     }
 
@@ -104,7 +110,7 @@ export async function PUT(
     if (!material) {
       return NextResponse.json(
         { error: 'Material não encontrado' },
-        { status: 404 }
+        { status: 404, headers: handleCors(request) }
       )
     }
 
@@ -120,7 +126,7 @@ export async function PUT(
       console.log('❌ API - Sessão não encontrada:', { sessaoId, materialId })
       return NextResponse.json(
         { error: 'Sessão não encontrada' },
-        { status: 404 }
+        { status: 404, headers: handleCors(request) }
       )
     }
 
@@ -134,16 +140,16 @@ export async function PUT(
 
     console.log('✅ API - Assuntos da sessão atualizados:', sessaoAtualizada)
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       sessao: sessaoAtualizada,
       message: 'Assuntos atualizados com sucesso'
-    })
+    }, { headers: handleCors(request) })
   } catch (error) {
     console.error('❌ API - Erro ao atualizar assuntos da sessão:', error)
     return NextResponse.json(
       { error: 'Erro ao atualizar assuntos da sessão' },
-      { status: 500 }
+      { status: 500, headers: handleCors(request) }
     )
   }
 }
@@ -158,7 +164,7 @@ export async function POST(
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Não autorizado' },
-        { status: 401 }
+        { status: 401, headers: handleCors(request) }
       )
     }
 
@@ -187,7 +193,7 @@ export async function POST(
       console.log('❌ API - Material não encontrado:', materialId)
       return NextResponse.json(
         { error: 'Material não encontrado' },
-        { status: 404 }
+        { status: 404, headers: handleCors(request) }
       )
     }
 
@@ -197,7 +203,7 @@ export async function POST(
       if (!Number.isInteger(paginaAtual) || paginaAtual < 0) {
         return NextResponse.json(
           { error: 'Tempo do vídeo inválido' },
-          { status: 400 }
+          { status: 400, headers: handleCors(request) }
         )
       }
     } else {
@@ -205,7 +211,7 @@ export async function POST(
       if (!Number.isInteger(paginaAtual) || paginaAtual < 1 || paginaAtual > materialExistente.totalPaginas) {
         return NextResponse.json(
           { error: 'Página atual inválida' },
-          { status: 400 }
+          { status: 400, headers: handleCors(request) }
         )
       }
     }
@@ -213,7 +219,7 @@ export async function POST(
     if (!Number.isInteger(tempoLeituraSegundos) || tempoLeituraSegundos < 0) {
       return NextResponse.json(
         { error: 'Tempo de leitura inválido' },
-        { status: 400 }
+        { status: 400, headers: handleCors(request) }
       )
     }
 
@@ -228,22 +234,30 @@ export async function POST(
       }
     })
 
+    // Atualiza o progresso no MaterialEstudo (paginasLidas)
+    if (materialExistente.tipo === 'PDF') {
+      await prisma.materialEstudo.update({
+        where: { id: materialId },
+        data: { paginasLidas: paginaAtual }
+      })
+    }
+
     console.log('✅ API - Histórico de leitura salvo:', historicoLeitura)
 
-    const mensagem = assuntosEstudados 
+    const mensagem = assuntosEstudados
       ? `Sessão de estudo salva: página ${paginaAtual}, ${Math.floor(tempoLeituraSegundos / 60)}min ${tempoLeituraSegundos % 60}s, assuntos registrados`
       : `Histórico de leitura salvo: página ${paginaAtual}, ${Math.floor(tempoLeituraSegundos / 60)}min ${tempoLeituraSegundos % 60}s`
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       historicoLeitura,
       message: mensagem
-    })
+    }, { headers: handleCors(request) })
   } catch (error) {
     console.error('❌ API - Erro ao salvar histórico de leitura:', error)
     return NextResponse.json(
       { error: 'Erro ao salvar histórico de leitura' },
-      { status: 500 }
+      { status: 500, headers: handleCors(request) }
     )
   }
 } 
@@ -258,7 +272,7 @@ export async function DELETE(
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Não autorizado' },
-        { status: 401 }
+        { status: 401, headers: handleCors(request) }
       )
     }
 
@@ -275,7 +289,7 @@ export async function DELETE(
     if (!sessaoId) {
       return NextResponse.json(
         { error: 'ID da sessão é obrigatório' },
-        { status: 400 }
+        { status: 400, headers: handleCors(request) }
       )
     }
 
@@ -291,7 +305,7 @@ export async function DELETE(
     if (!material) {
       return NextResponse.json(
         { error: 'Material não encontrado' },
-        { status: 404 }
+        { status: 404, headers: handleCors(request) }
       )
     }
 
@@ -306,7 +320,7 @@ export async function DELETE(
     if (!sessaoExistente) {
       return NextResponse.json(
         { error: 'Mini sessão não encontrada' },
-        { status: 404 }
+        { status: 404, headers: handleCors(request) }
       )
     }
 
@@ -320,15 +334,15 @@ export async function DELETE(
       materialId
     })
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'Mini sessão excluída com sucesso'
-    })
+    }, { headers: handleCors(request) })
   } catch (error) {
     console.error('❌ API - Erro ao excluir mini sessão:', error)
     return NextResponse.json(
       { error: 'Erro ao excluir mini sessão' },
-      { status: 500 }
+      { status: 500, headers: handleCors(request) }
     )
   }
 } 

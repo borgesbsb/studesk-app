@@ -43,6 +43,18 @@ export interface UpdateProgressoData {
   diasEstudo?: string
 }
 
+export interface UpdateDisciplinaDiaData {
+  disciplinaDiaId?: string
+  disciplinaSemanaId: string
+  dia: string
+  horasPlanejadas?: number
+  horasRealizadas?: number
+  questoesPlanejadas?: number
+  questoesRealizadas?: number
+  observacoes?: string
+  concluida?: boolean
+}
+
 export class PlanoEstudoService {
   static async listarPlanos(userId: string) {
     try {
@@ -83,7 +95,12 @@ export class PlanoEstudoService {
           include: {
             disciplinas: {
               include: {
-                disciplina: true
+                disciplina: true,
+                dias: {
+                  orderBy: {
+                    dia: 'asc'
+                  }
+                }
               },
               orderBy: {
                 prioridade: 'asc'
@@ -518,6 +535,115 @@ export class PlanoEstudoService {
       })
     } catch (error) {
       const errorLog = logError(error, 'atualizarSemana')
+      throw new Error(formatPrismaError(error))
+    }
+  }
+
+  // ========== Funções para DisciplinaDia ==========
+
+  /**
+   * Atualiza ou cria uma entrada de DisciplinaDia
+   */
+  static async atualizarDisciplinaDia(userId: string, data: UpdateDisciplinaDiaData) {
+    try {
+      // Verifica se a disciplinaSemana pertence ao usuário
+      const disciplinaSemana = await prisma.disciplinaSemana.findUnique({
+        where: { id: data.disciplinaSemanaId },
+        include: {
+          semana: {
+            include: {
+              plano: true
+            }
+          }
+        }
+      })
+
+      if (!disciplinaSemana || disciplinaSemana.semana.plano.userId !== userId) {
+        throw new Error('Disciplina não encontrada ou sem permissão')
+      }
+
+      const updateData: any = {}
+      if (data.horasPlanejadas !== undefined) updateData.horasPlanejadas = data.horasPlanejadas
+      if (data.horasRealizadas !== undefined) updateData.horasRealizadas = data.horasRealizadas
+      if (data.questoesPlanejadas !== undefined) updateData.questoesPlanejadas = data.questoesPlanejadas
+      if (data.questoesRealizadas !== undefined) updateData.questoesRealizadas = data.questoesRealizadas
+      if (data.observacoes !== undefined) updateData.observacoes = data.observacoes
+      if (data.concluida !== undefined) updateData.concluida = data.concluida
+
+      // Upsert: criar se não existe, atualizar se existe
+      const disciplinaDia = await prisma.disciplinaDia.upsert({
+        where: {
+          disciplinaSemanaId_dia: {
+            disciplinaSemanaId: data.disciplinaSemanaId,
+            dia: data.dia
+          }
+        },
+        update: updateData,
+        create: {
+          disciplinaSemanaId: data.disciplinaSemanaId,
+          dia: data.dia,
+          horasPlanejadas: data.horasPlanejadas || 0,
+          horasRealizadas: data.horasRealizadas || 0,
+          questoesPlanejadas: data.questoesPlanejadas || 0,
+          questoesRealizadas: data.questoesRealizadas || 0,
+          observacoes: data.observacoes || null,
+          concluida: data.concluida || false
+        },
+        include: {
+          disciplinaSemana: {
+            include: {
+              disciplina: true
+            }
+          }
+        }
+      })
+
+      console.log('✅ DisciplinaDia atualizada:', disciplinaDia)
+      return disciplinaDia
+    } catch (error) {
+      console.error('❌ Erro ao atualizar DisciplinaDia:', error)
+      throw new Error(formatPrismaError(error))
+    }
+  }
+
+  /**
+   * Busca todas as entradas DisciplinaDia de uma disciplinaSemana
+   */
+  static async listarDisciplinasDia(disciplinaSemanaId: string) {
+    try {
+      return await prisma.disciplinaDia.findMany({
+        where: { disciplinaSemanaId },
+        orderBy: { dia: 'asc' }
+      })
+    } catch (error) {
+      throw new Error(formatPrismaError(error))
+    }
+  }
+
+  /**
+   * Cria entradas DisciplinaDia ao adicionar uma disciplina na semana
+   */
+  static async criarDisciplinasDiaPadrao(disciplinaSemanaId: string, diasEstudo: string) {
+    try {
+      const dias = diasEstudo.split(',').filter(d => d.trim())
+
+      const criadas = await Promise.all(
+        dias.map(dia =>
+          prisma.disciplinaDia.create({
+            data: {
+              disciplinaSemanaId,
+              dia: dia.trim(),
+              horasPlanejadas: 1, // Valor padrão inicial
+              questoesPlanejadas: 0
+            }
+          })
+        )
+      )
+
+      console.log(`✅ Criadas ${criadas.length} entradas DisciplinaDia`)
+      return criadas
+    } catch (error) {
+      console.error('❌ Erro ao criar DisciplinasDia:', error)
       throw new Error(formatPrismaError(error))
     }
   }

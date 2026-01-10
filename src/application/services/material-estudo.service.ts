@@ -7,7 +7,7 @@ export class MaterialEstudoService {
     try {
       const { disciplinaIds, ...materialData } = data
 
-      return await prisma.materialEstudo.create({
+      const material = await prisma.materialEstudo.create({
         data: {
           ...materialData,
           userId,
@@ -25,6 +25,23 @@ export class MaterialEstudoService {
           }
         }
       })
+
+      // Se for PDF, iniciar processamento em background automaticamente
+      if (material.tipo === 'PDF' && material.arquivoPdfUrl) {
+        console.log(`🚀 Material PDF criado (${material.id}), iniciando processamento em background...`)
+
+        // Chamar endpoint de processamento em background (não aguarda conclusão)
+        const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3030}`
+        fetch(`${baseUrl}/api/pdf/start-background-processing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ materialId: material.id }),
+        }).catch((error) => {
+          console.error('❌ Erro ao iniciar processamento em background:', error)
+        })
+      }
+
+      return material
     } catch (error) {
       const errorLog = logError(error, 'criarMaterialEstudo')
       throw new Error(formatPrismaError(error))
@@ -67,6 +84,32 @@ export class MaterialEstudoService {
       })
     } catch (error) {
       const errorLog = logError(error, 'buscarMaterialEstudoPorId')
+      throw new Error(formatPrismaError(error))
+    }
+  }
+
+  static async listarMateriaisPorDisciplina(userId: string, disciplinaId: string): Promise<MaterialEstudo[]> {
+    try {
+      return await prisma.materialEstudo.findMany({
+        where: {
+          userId,
+          disciplinas: {
+            some: {
+              disciplinaId
+            }
+          }
+        },
+        orderBy: { nome: "asc" },
+        include: {
+          disciplinas: {
+            include: {
+              disciplina: true
+            }
+          }
+        }
+      })
+    } catch (error) {
+      const errorLog = logError(error, 'listarMateriaisPorDisciplina')
       throw new Error(formatPrismaError(error))
     }
   }

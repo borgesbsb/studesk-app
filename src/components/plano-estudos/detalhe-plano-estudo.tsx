@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { getPlanoEstudoById } from '@/interface/actions/plano-estudo/get-by-id'
 import { updateProgressoEstudo } from '@/interface/actions/plano-estudo/update-progresso'
+import { updateDisciplinaDia } from '@/interface/actions/plano-estudo/update-disciplina-dia'
 import { deleteCiclo } from '@/interface/actions/plano-estudo/delete-ciclo'
 import { adicionarDisciplinaSemana } from '@/interface/actions/plano-estudo/adicionar-disciplina'
 import { deleteDisciplinaSemana } from '@/interface/actions/plano-estudo/delete-disciplina'
@@ -17,7 +18,7 @@ import { updateSemanaEstudo } from '@/interface/actions/plano-estudo/update-sema
 import { adicionarCicloAoPlano } from '@/interface/actions/plano-estudo/adicionar-ciclo'
 import { reordenarDisciplinas } from '@/interface/actions/plano-estudo/reordenar-disciplinas'
 import { listarDisciplinas } from '@/interface/actions/disciplina/list'
-import { Calendar, Clock, Target, Book, FileText, Video, Save, Trash2, Plus, ChevronDown, ChevronUp, GripVertical } from 'lucide-react'
+import { Calendar, Clock, Target, Book, FileText, Video, Save, Trash2, Plus, ChevronDown, ChevronUp, GripVertical, BookOpen, ListChecks, Timer } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -63,6 +64,20 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 
+interface DisciplinaDia {
+  id: string
+  disciplinaSemanaId: string
+  dia: string
+  horasPlanejadas: number
+  horasRealizadas: number
+  questoesPlanejadas: number
+  questoesRealizadas: number
+  observacoes: string | null
+  concluida: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
 interface DisciplinaSemana {
   id: string
   createdAt: Date
@@ -84,6 +99,7 @@ interface DisciplinaSemana {
   paginasLidas: number
   totalPaginas: number
   diasEstudo: string | null
+  dias?: DisciplinaDia[] // Array de dias com valores independentes
   disciplina: {
     id: string
     nome: string
@@ -92,6 +108,7 @@ interface DisciplinaSemana {
     peso: number
     descricao: string | null
     cargaHoraria: number
+    cor: string | null
   }
 }
 
@@ -123,6 +140,7 @@ interface DetalhePlanoEstudoProps {
 interface Disciplina {
   id: string
   nome: string
+  cor?: string | null
 }
 
 // Componente SortableDisciplinaRow
@@ -170,7 +188,7 @@ function SortableDisciplinaRow({
     obterIdDisciplinaAtual: (disciplinaSemana: DisciplinaSemana) => string
     parseDiasEstudo: (diasEstudo?: string | null) => string[]
     atualizarDiasEstudo: (disciplina: DisciplinaSemana, diasSelecionados: string[]) => void
-    excluirDisciplina: (disciplinaSemanaId: string, semanaId: string) => void
+    excluirDisciplina: (disciplinaSemanaId: string, semanaId: string, diaId?: string) => void
   }
 }) {
   const {
@@ -350,12 +368,19 @@ function SortableDisciplinaRow({
             autoFocus
           />
         ) : (
-          <span 
-            className="text-sm cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-            onDoubleClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'horasPlanejadas', disciplina.horasPlanejadas)}
-          >
-            {disciplina.horasPlanejadas}h
-          </span>
+          <div className="flex flex-col items-center gap-1">
+            <span
+              className="text-sm cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+              onDoubleClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'horasPlanejadas', disciplina.horasPlanejadas)}
+            >
+              {disciplina.horasPlanejadas}h
+            </span>
+            {disciplina.diasEstudo && (
+              <Badge variant="secondary" className="text-xs">
+                {calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)}h/dia
+              </Badge>
+            )}
+          </div>
         )}
       </TableCell>
 
@@ -459,6 +484,807 @@ function SortableDisciplinaRow({
   )
 }
 
+// ========== Funções Helper para Distribuição de Horas ==========
+
+/**
+ * Formatar horas em "Xh Ymin"
+ * @param horas - Valor em horas (decimal)
+ * @returns String formatada (ex: "1h 30min", "45min", "2h")
+ */
+function formatarTempo(horas: number): string {
+  const h = Math.floor(horas)
+  const min = Math.round((horas - h) * 60)
+
+  if (h === 0) {
+    return `${min}min`
+  } else if (min === 0) {
+    return `${h}h`
+  } else {
+    return `${h}h ${min}min`
+  }
+}
+
+/**
+ * Calcular dias do ciclo baseado nas datas de início e fim
+ * @param dataInicio - Data de início do ciclo
+ * @param dataFim - Data de fim do ciclo
+ * @returns Array de dias do ciclo com id, label e data
+ */
+function calcularDiasCiclo(dataInicio: Date | string, dataFim: Date | string): Array<{ id: string; label: string; data: Date }> {
+  const inicio = new Date(dataInicio)
+  const fim = new Date(dataFim)
+
+  // Calcular número de dias
+  const diffTime = Math.abs(fim.getTime() - inicio.getTime())
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 // +1 para incluir o último dia
+
+  const dias = []
+  for (let i = 0; i < diffDays; i++) {
+    const data = new Date(inicio)
+    data.setDate(inicio.getDate() + i)
+
+    dias.push({
+      id: `dia${i + 1}`,
+      label: `Dia ${i + 1}`,
+      data: data
+    })
+  }
+
+  return dias
+}
+
+/**
+ * Calcula quantas horas por dia uma disciplina deve ser estudada
+ * @param horasPlanejadas - Total de horas planejadas para a semana
+ * @param diasEstudo - String CSV com dias selecionados (ex: "seg,qua,sex")
+ * @returns Horas por dia (arredondado para 1 casa decimal)
+ */
+function calcularHorasPorDia(horasPlanejadas: number, diasEstudo: string | null): number {
+  if (!diasEstudo || horasPlanejadas === 0) return 0
+
+  const diasSelecionados = diasEstudo.split(',').filter(d => d.trim())
+  // Filtrar apenas dias do formato novo (dia1, dia2, etc), ignorar formato antigo (seg, ter, etc)
+  const diasNovos = diasSelecionados.filter(dia => !['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'].includes(dia))
+
+  if (diasNovos.length === 0) return 0
+
+  return Math.round((horasPlanejadas / diasNovos.length) * 10) / 10
+}
+
+/**
+ * Calcula a distribuição de horas por dia do ciclo para todas as disciplinas
+ * @param disciplinas - Array de disciplinas da semana
+ * @returns Objeto com total de horas por dia { dia1: 5, dia2: 3, ... }
+ */
+function calcularDistribuicaoPorDia(disciplinas: DisciplinaSemana[]): Record<string, number> {
+  const distribuicao: Record<string, number> = {}
+
+  disciplinas.forEach(disciplina => {
+    if (!disciplina.diasEstudo) return
+
+    const diasEstudo = disciplina.diasEstudo.trim()
+    // Ignorar formato antigo (seg, ter, etc)
+    const formatoAntigo = /^(seg|ter|qua|qui|sex|sab|dom)(,(seg|ter|qua|qui|sex|sab|dom))*$/.test(diasEstudo)
+    if (formatoAntigo) return
+
+    const diasSelecionados = disciplina.diasEstudo.split(',').filter(d => d.trim())
+
+    diasSelecionados.forEach(dia => {
+      if (!distribuicao[dia]) {
+        distribuicao[dia] = 0
+      }
+
+      // Verificar se existe DisciplinaDia específico para este dia
+      const disciplinaDia = disciplina.dias?.find(d => d.dia === dia)
+
+      if (disciplinaDia) {
+        // Usar valor específico do dia
+        distribuicao[dia] += disciplinaDia.horasPlanejadas
+      } else {
+        // Calcular proporcionalmente se não existe valor específico
+        const horasPorDia = calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+        distribuicao[dia] += horasPorDia
+      }
+    })
+  })
+
+  // Arredondar valores finais
+  Object.keys(distribuicao).forEach(dia => {
+    distribuicao[dia] = Math.round(distribuicao[dia] * 10) / 10
+  })
+
+  return distribuicao
+}
+
+/**
+ * Calcula a média de horas por dia útil do ciclo
+ * @param totalHoras - Total de horas planejadas
+ * @param disciplinas - Array de disciplinas para verificar dias de estudo
+ * @returns Média de horas por dia
+ */
+function calcularMediaHorasPorDia(totalHoras: number, disciplinas: DisciplinaSemana[]): number {
+  const distribuicao = calcularDistribuicaoPorDia(disciplinas)
+  const diasComEstudo = Object.values(distribuicao).filter(h => h > 0).length
+
+  if (diasComEstudo === 0) return 0
+
+  return Math.round((totalHoras / diasComEstudo) * 10) / 10
+}
+
+/**
+ * Agrupa disciplinas por dia da semana com suas respectivas horas
+ * @param disciplinas - Array de disciplinas da semana
+ * @returns Objeto com disciplinas agrupadas por dia
+ */
+function agruparDisciplinasPorDia(disciplinas: DisciplinaSemana[]): Record<string, Array<{ nome: string; horas: number; disciplinaId: string }>> {
+  const agrupamento: Record<string, Array<{ nome: string; horas: number; disciplinaId: string }>> = {
+    seg: [],
+    ter: [],
+    qua: [],
+    qui: [],
+    sex: [],
+    sab: [],
+    dom: []
+  }
+
+  disciplinas.forEach(disciplina => {
+    if (!disciplina.diasEstudo) return
+
+    const diasSelecionados = disciplina.diasEstudo.split(',').filter(d => d.trim())
+
+    diasSelecionados.forEach(dia => {
+      if (agrupamento[dia] !== undefined) {
+        // Verificar se existe DisciplinaDia específico para este dia
+        const disciplinaDia = disciplina.dias?.find(d => d.dia === dia)
+
+        const horasPorDia = disciplinaDia
+          ? disciplinaDia.horasPlanejadas
+          : calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+
+        agrupamento[dia].push({
+          nome: disciplina.disciplina?.nome || 'Sem nome',
+          horas: horasPorDia,
+          disciplinaId: disciplina.disciplinaId
+        })
+      }
+    })
+  })
+
+  return agrupamento
+}
+
+// ========== Componente de Card de Disciplina Interativo ==========
+
+interface DisciplinaCardItemProps {
+  disciplina: DisciplinaSemana
+  diaId: string
+  onDisciplinaActions: any
+  salvandoId: string | null
+  onEditarClick: (disciplina: DisciplinaSemana, dia: string) => void
+}
+
+function DisciplinaCardItem({
+  disciplina,
+  diaId,
+  onDisciplinaActions,
+  salvandoId,
+  onEditarClick
+}: DisciplinaCardItemProps) {
+  // Buscar dados específicos deste dia se existir
+  const disciplinaDia = disciplina.dias?.find(d => d.dia === diaId)
+
+  // Se existe DisciplinaDia, usar seus valores, senão calcular proporcionalmente
+  const horasPorDia = disciplinaDia
+    ? disciplinaDia.horasPlanejadas
+    : calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+
+  const questoesPorDia = disciplinaDia
+    ? disciplinaDia.questoesPlanejadas
+    : disciplina.questoesPlanejadas
+
+  const corDisciplina = disciplina.disciplina?.cor || '#3b82f6'
+
+  // Formatar tempo usando a função helper
+  const tempoFormatado = formatarTempo(horasPorDia)
+
+  return (
+    <div
+      className="group relative rounded-lg border-2 hover:border-primary/40 transition-all cursor-pointer overflow-hidden shadow-sm hover:shadow-md"
+      style={{
+        borderColor: `${corDisciplina}40`,
+        backgroundColor: 'white'
+      }}
+      onClick={() => onEditarClick(disciplina, diaId)}
+    >
+      {/* Barra colorida superior */}
+      <div
+        className="h-1.5 w-full"
+        style={{ backgroundColor: corDisciplina }}
+      />
+
+      <div className="p-2">
+        {/* Nome e botão excluir */}
+        <div className="flex items-start justify-between gap-1 mb-2">
+          <h5
+            className="font-semibold text-[9px] flex-1 leading-tight line-clamp-2"
+            style={{ color: corDisciplina }}
+            title={disciplina.disciplina?.nome}
+          >
+            {disciplina.disciplina?.nome || 'Sem nome'}
+          </h5>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 rounded-md"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDisciplinaActions.excluirDisciplina(disciplina.id, disciplina.semanaId, diaId)
+            }}
+            disabled={salvandoId === disciplina.id}
+            title="Remover deste dia"
+          >
+            <Trash2 className="h-3 w-3 text-destructive" />
+          </Button>
+        </div>
+
+        {/* Informações em grid */}
+        <div className="space-y-1.5">
+          {/* Horas */}
+          <div className="flex items-center gap-1.5 bg-blue-50 rounded-md px-2 py-1">
+            <div className="bg-blue-500 rounded-full p-0.5">
+              <Timer className="h-2.5 w-2.5 text-white" />
+            </div>
+            <span className="text-[10px] font-semibold text-blue-700">{tempoFormatado}</span>
+            <span className="text-[9px] text-blue-600 ml-auto">tempo</span>
+          </div>
+
+          {/* Questões */}
+          <div className="flex items-center gap-1.5 bg-purple-50 rounded-md px-2 py-1">
+            <div className="bg-purple-500 rounded-full p-0.5">
+              <ListChecks className="h-2.5 w-2.5 text-white" />
+            </div>
+            <span className="text-[10px] font-semibold text-purple-700">{questoesPorDia}</span>
+            <span className="text-[9px] text-purple-600 ml-auto">questões</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Indicador de salvamento */}
+      {salvandoId === disciplina.id && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-lg">
+            <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-[10px] font-medium text-foreground">Salvando...</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ========== Modal de Edição de Disciplina por Dia ==========
+
+interface ModalEditarDisciplinaDiaProps {
+  disciplina: DisciplinaSemana | null
+  dia: string | null // "dia1", "dia2", etc
+  aberto: boolean
+  onFechar: () => void
+  onSalvar: (disciplina: DisciplinaSemana, dia: string, dados: {
+    horasPlanejadas: number
+    questoesPlanejadas: number
+    observacoes: string
+  }) => Promise<void>
+}
+
+function ModalEditarDisciplina({
+  disciplina,
+  dia,
+  aberto,
+  onFechar,
+  onSalvar
+}: ModalEditarDisciplinaDiaProps) {
+  const [horasPlanejadas, setHorasPlanejadas] = useState(0)
+  const [questoesPlanejadas, setQuestoesPlanejadas] = useState(0)
+  const [observacoes, setObservacoes] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  useEffect(() => {
+    if (disciplina && dia) {
+      // Buscar dados específicos deste dia se existir
+      const disciplinaDia = disciplina.dias?.find(d => d.dia === dia)
+
+      if (disciplinaDia) {
+        // Se já existe entrada para este dia, usar os valores dela
+        console.log('📝 Modal carregando DisciplinaDia existente:', {
+          disciplinaNome: disciplina.disciplina?.nome,
+          dia: dia,
+          horasPlanejadas: disciplinaDia.horasPlanejadas,
+          questoesPlanejadas: disciplinaDia.questoesPlanejadas
+        })
+
+        setHorasPlanejadas(Number(disciplinaDia.horasPlanejadas))
+        setQuestoesPlanejadas(Number(disciplinaDia.questoesPlanejadas))
+        setObservacoes(String(disciplinaDia.observacoes || ''))
+      } else {
+        // Se não existe, calcular valor padrão (distribuição uniforme)
+        const horasPorDia = calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+        const diasSelecionados = disciplina.diasEstudo?.split(',').filter(d => d.trim()) || []
+        const questoesPorDia = Math.floor(disciplina.questoesPlanejadas / (diasSelecionados.length || 1))
+
+        console.log('📝 Modal criando nova DisciplinaDia:', {
+          disciplinaNome: disciplina.disciplina?.nome,
+          dia: dia,
+          horasPorDia: horasPorDia,
+          questoesPorDia: questoesPorDia
+        })
+
+        setHorasPlanejadas(Number(horasPorDia))
+        setQuestoesPlanejadas(Number(questoesPorDia))
+        setObservacoes('')
+      }
+    }
+  }, [disciplina, dia])
+
+  const handleSalvar = async () => {
+    if (!disciplina || !dia) return
+
+    setSalvando(true)
+    try {
+      console.log('💾 Salvando DisciplinaDia:', {
+        disciplinaNome: disciplina.disciplina?.nome,
+        dia: dia,
+        horasPlanejadas: horasPlanejadas,
+        questoesPlanejadas: questoesPlanejadas,
+        observacoes: observacoes
+      })
+
+      // Agora salva apenas para o dia específico
+      await onSalvar(disciplina, dia, {
+        horasPlanejadas: Number(horasPlanejadas),
+        questoesPlanejadas: Number(questoesPlanejadas),
+        observacoes: String(observacoes)
+      })
+      onFechar()
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  if (!disciplina) return null
+
+  return (
+    <Dialog open={aberto} onOpenChange={onFechar}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar Disciplina</DialogTitle>
+          <DialogDescription>
+            {disciplina.disciplina?.nome}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Tempo de Leitura */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold flex items-center gap-2 italic">
+              <span className="text-lg">📖</span>
+              Tempo de Leitura (por dia)
+            </label>
+
+            {/* Stepper de Horas */}
+            <div className="flex items-center justify-center gap-3 py-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-full"
+                onClick={() => {
+                  // Decrementa 1 minuto (1/60 de hora)
+                  const novoValor = Math.max(0, horasPlanejadas - 1/60)
+                  setHorasPlanejadas(Math.round(novoValor * 60) / 60) // Arredonda para minutos
+                }}
+              >
+                <span className="text-lg font-bold">−</span>
+              </Button>
+
+              <div className="flex items-center justify-center min-w-[120px]">
+                <span className="text-3xl font-bold text-primary">
+                  {formatarTempo(horasPlanejadas)}
+                </span>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-full"
+                onClick={() => {
+                  // Incrementa 1 minuto (1/60 de hora)
+                  const novoValor = horasPlanejadas + 1/60
+                  setHorasPlanejadas(Math.round(novoValor * 60) / 60) // Arredonda para minutos
+                }}
+              >
+                <span className="text-lg font-bold">+</span>
+              </Button>
+            </div>
+
+            {/* Barra de Intensidade */}
+            <div className="space-y-1">
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full transition-all duration-300 rounded-full"
+                  style={{
+                    width: `${Math.min((horasPlanejadas / 4) * 100, 100)}%`,
+                    backgroundColor: horasPlanejadas <= 1 ? '#10b981' : horasPlanejadas <= 2 ? '#3b82f6' : '#f59e0b'
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground px-1">
+                <span>Leve</span>
+                <span>Moderado</span>
+                <span>Intenso</span>
+              </div>
+            </div>
+
+            {/* Atalhos */}
+            <div className="flex flex-wrap gap-2">
+              {[0.5, 1, 1.5, 2, 3].map((valor) => (
+                <Button
+                  key={valor}
+                  type="button"
+                  variant={horasPlanejadas === valor ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setHorasPlanejadas(valor)}
+                >
+                  {formatarTempo(valor)}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Questões */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold flex items-center gap-2 italic">
+              <span className="text-lg">❓</span>
+              Questões para Praticar
+            </label>
+
+            {/* Stepper de Questões */}
+            <div className="flex items-center justify-center gap-3 py-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-full"
+                onClick={() => setQuestoesPlanejadas(Math.max(0, questoesPlanejadas - 1))}
+              >
+                <span className="text-lg font-bold">−</span>
+              </Button>
+
+              <div className="flex items-center justify-center min-w-[120px]">
+                <span className="text-3xl font-bold text-purple-600">
+                  {questoesPlanejadas}
+                </span>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-full"
+                onClick={() => setQuestoesPlanejadas(questoesPlanejadas + 1)}
+              >
+                <span className="text-lg font-bold">+</span>
+              </Button>
+            </div>
+
+            {/* Indicador Visual de Questões */}
+            <div className="space-y-1">
+              <div className="flex gap-0.5">
+                {[...Array(20)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 h-2 rounded-sm transition-all duration-200"
+                    style={{
+                      backgroundColor: i < Math.min(questoesPlanejadas / 5, 20) ? '#9333ea' : '#e5e7eb'
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground px-1">
+                <span>Poucas (5-10)</span>
+                <span>Ideal (15-25)</span>
+                <span>Muitas (50+)</span>
+              </div>
+            </div>
+
+            {/* Atalhos */}
+            <div className="flex flex-wrap gap-2">
+              {[10, 20, 30, 50].map((valor) => (
+                <Button
+                  key={valor}
+                  type="button"
+                  variant={questoesPlanejadas === valor ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setQuestoesPlanejadas(valor)}
+                >
+                  {valor}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Estimativa Total */}
+          {disciplina && (
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex flex-col gap-1 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">⏳</span>
+                  <span className="font-medium text-blue-900">Estimativa por dia:</span>
+                  <span className="font-bold text-blue-700">
+                    {formatarTempo(horasPlanejadas)} leitura
+                    {questoesPlanejadas > 0 && ` + ${Math.round(questoesPlanejadas * 1.5)}min questões`}
+                    {' = '}
+                    ~{formatarTempo(horasPlanejadas + (questoesPlanejadas * 1.5 / 60))}
+                  </span>
+                </div>
+                {(() => {
+                  const diasSelecionados = disciplina.diasEstudo?.split(',').filter(d => d.trim()) || []
+                  const numDias = diasSelecionados.length || 1
+                  const tempoTotalSemana = horasPlanejadas * numDias
+                  return numDias > 1 && (
+                    <div className="flex items-center gap-2 text-xs text-blue-600 pl-7">
+                      <span>Total na semana ({numDias} dias):</span>
+                      <span className="font-semibold">
+                        ~{formatarTempo(tempoTotalSemana + (questoesPlanejadas * numDias * 1.5 / 60))}
+                      </span>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Assuntos/Observações */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold flex items-center gap-2">
+              <span className="text-lg">📋</span>
+              Assuntos/Observações
+            </label>
+            <Textarea
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              placeholder="Digite os assuntos ou observações..."
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onFechar} disabled={salvando}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSalvar} disabled={salvando}>
+            {salvando ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ========== Componente de Visualização Semanal Interativa ==========
+
+interface VisualizacaoSemanalProps {
+  disciplinas: DisciplinaSemana[]
+  semana: SemanaEstudoDetalhe
+  onDisciplinaActions: any
+  salvandoId: string | null
+  onAdicionarDisciplina: (diaId: string) => void
+}
+
+function VisualizacaoSemanal({
+  disciplinas,
+  semana,
+  onDisciplinaActions,
+  salvandoId,
+  onAdicionarDisciplina
+}: VisualizacaoSemanalProps) {
+  const [disciplinaEditando, setDisciplinaEditando] = useState<DisciplinaSemana | null>(null)
+  const [diaEditando, setDiaEditando] = useState<string | null>(null)
+  const [modalAberto, setModalAberto] = useState(false)
+
+  // Calcular distribuição de horas por dia do ciclo dinamicamente
+  const calcularDistribuicaoDinamica = (diasDoCiclo: Array<{ id: string; label: string; data: Date }>) => {
+    const distribuicao: Record<string, number> = {}
+
+    // Inicializar com zeros
+    diasDoCiclo.forEach(dia => {
+      distribuicao[dia.id] = 0
+    })
+
+    // Somar horas de cada disciplina por dia
+    disciplinas.forEach(disciplina => {
+      if (!disciplina.diasEstudo) return
+
+      const diasSelecionados = disciplina.diasEstudo.split(',').filter(d => d.trim())
+
+      diasSelecionados.forEach(dia => {
+        if (distribuicao[dia] !== undefined) {
+          // Verificar se existe DisciplinaDia específico para este dia
+          const disciplinaDia = disciplina.dias?.find(d => d.dia === dia)
+
+          if (disciplinaDia) {
+            // Usar valor específico do dia
+            distribuicao[dia] += disciplinaDia.horasPlanejadas
+          } else {
+            // Calcular proporcionalmente se não existe valor específico
+            const horasPorDia = calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+            distribuicao[dia] += horasPorDia
+          }
+        }
+      })
+    })
+
+    // Arredondar valores
+    Object.keys(distribuicao).forEach(dia => {
+      distribuicao[dia] = Math.round(distribuicao[dia] * 10) / 10
+    })
+
+    return distribuicao
+  }
+
+  console.log('🔍 DEBUG VisualizacaoSemanal:', {
+    totalDisciplinas: disciplinas.length,
+    disciplinas: disciplinas.map(d => ({
+      nome: d.disciplina?.nome,
+      diasEstudo: d.diasEstudo,
+      id: d.id
+    }))
+  })
+
+  const abrirModalEdicao = (disciplina: DisciplinaSemana, dia: string) => {
+    setDisciplinaEditando(disciplina)
+    setDiaEditando(dia)
+    setModalAberto(true)
+  }
+
+  const fecharModal = () => {
+    setModalAberto(false)
+    setDisciplinaEditando(null)
+    setDiaEditando(null)
+  }
+
+  const salvarEdicaoDisciplina = async (
+    disciplina: DisciplinaSemana,
+    dia: string,
+    dados: { horasPlanejadas: number; questoesPlanejadas: number; observacoes: string }
+  ) => {
+    try {
+      console.log('💾 Salvando edição de DisciplinaDia:', {
+        disciplinaId: disciplina.id,
+        dia: dia,
+        dados: dados
+      })
+
+      // Usar a action updateDisciplinaDia para salvar dados específicos do dia
+      const resultado = await updateDisciplinaDia({
+        disciplinaSemanaId: disciplina.id,
+        dia: dia,
+        horasPlanejadas: dados.horasPlanejadas,
+        questoesPlanejadas: dados.questoesPlanejadas,
+        observacoes: dados.observacoes
+      })
+
+      if (resultado.success) {
+        console.log('✅ DisciplinaDia salva com sucesso')
+        // Recarregar o plano para atualizar os dados
+        window.location.reload()
+      } else {
+        console.error('❌ Erro ao salvar DisciplinaDia:', resultado.error)
+      }
+    } catch (error) {
+      console.error('❌ Erro inesperado ao salvar:', error)
+    }
+  }
+
+  // Calcular dias do ciclo baseado nas datas
+  const diasDoCiclo = calcularDiasCiclo(semana.dataInicio, semana.dataFim)
+  const distribuicao = calcularDistribuicaoDinamica(diasDoCiclo)
+
+  return (
+    <>
+      <ModalEditarDisciplina
+        disciplina={disciplinaEditando}
+        dia={diaEditando}
+        aberto={modalAberto}
+        onFechar={fecharModal}
+        onSalvar={salvarEdicaoDisciplina}
+      />
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-semibold text-foreground">Distribuição Semanal por Disciplina</h4>
+          <p className="text-xs text-muted-foreground">Clique para editar</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {diasDoCiclo.map(dia => {
+            const disciplinasDoDia = disciplinas.filter(d => {
+              const dias = d.diasEstudo?.split(',').filter(x => x.trim()) || []
+              console.log(`📅 Verificando disciplina ${d.disciplina?.nome}:`, {
+                diasEstudo: d.diasEstudo,
+                diasArray: dias,
+                diaAtual: dia.id,
+                includes: dias.includes(dia.id)
+              })
+              return dias.includes(dia.id)
+            })
+            const totalHoras = distribuicao[dia.id]
+            const temEstudo = totalHoras > 0
+
+            return (
+              <Card key={dia.id} className={`${temEstudo ? 'border-primary/30' : 'border-muted'}`}>
+                <CardHeader className="pb-2 pt-3 px-4 space-y-0">
+                  <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span>{dia.label}</span>
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {format(dia.data, 'dd/MM', { locale: ptBR })}
+                      </span>
+                    </div>
+                    <Badge variant={temEstudo ? "default" : "outline"} className="text-xs">
+                      {totalHoras > 0 ? `${totalHoras}h` : '0h'}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-2">
+                  {/* Grid de disciplinas do dia */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+                    {disciplinasDoDia.length > 0 ? (
+                      disciplinasDoDia.map((disc) => (
+                        <DisciplinaCardItem
+                          key={disc.id}
+                          disciplina={disc}
+                          diaId={dia.id}
+                          onDisciplinaActions={onDisciplinaActions}
+                          salvandoId={salvandoId}
+                          onEditarClick={abrirModalEdicao}
+                        />
+                      ))
+                    ) : (
+                      <div className="col-span-full">
+                        <p className="text-[10px] text-muted-foreground italic text-center py-2">
+                          Sem estudos
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Botão para adicionar disciplina */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-6 text-[10px]"
+                    onClick={() => onAdicionarDisciplina(dia.id)}
+                  >
+                    <Plus className="h-2.5 w-2.5 mr-1" />
+                    Adicionar
+                  </Button>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ========== Componente Principal ==========
+
 export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
   const [plano, setPlano] = useState<PlanoEstudoDetalhe | null>(null)
   const [loading, setLoading] = useState(true)
@@ -484,12 +1310,14 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
   const [semanasColapsadas, setSemanasColapsadas] = useState<Record<string, boolean>>({})
   
   // Estados para modal de seleção de ciclo origem
+  const [modalEscolhaTipoCicloAberto, setModalEscolhaTipoCicloAberto] = useState(false)
   const [modalSelecionarCicloAberto, setModalSelecionarCicloAberto] = useState(false)
   const [cicloOrigemSelecionado, setCicloOrigemSelecionado] = useState<string | null>(null)
   
   // Estados para modal de seleção de disciplina
   const [modalAdicionarDisciplinaAberto, setModalAdicionarDisciplinaAberto] = useState(false)
   const [semanaParaAdicionar, setSemanaParaAdicionar] = useState<SemanaEstudoDetalhe | null>(null)
+  const [diaParaAdicionar, setDiaParaAdicionar] = useState<string | null>(null)
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<string | null>(null)
 
   // Configuração dos sensores de drag and drop
@@ -520,12 +1348,27 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     try {
       const resultado = await getPlanoEstudoById(planoId)
       if (resultado.success && resultado.data) {
-        console.log('📋 Plano carregado do servidor:', resultado.data) // Debug
-        
+        console.log('📋 Plano carregado do servidor:', {
+          totalSemanas: resultado.data.semanas.length,
+          disciplinasPorSemana: resultado.data.semanas.map(s => ({
+            semanaId: s.id,
+            totalDisciplinas: s.disciplinas.length,
+            disciplinas: s.disciplinas.map(d => d.disciplina?.nome)
+          }))
+        })
+
         // Se houver plano anterior, preservar disciplinas que foram alteradas localmente
         if (plano) {
+          console.log('📋 Plano ANTERIOR (antes de atualizar):', {
+            totalSemanas: plano.semanas.length,
+            disciplinasPorSemana: plano.semanas.map(s => ({
+              semanaId: s.id,
+              totalDisciplinas: s.disciplinas.length
+            }))
+          })
+
           const planoAtualizado = { ...resultado.data }
-          
+
           // Para cada disciplina que foi alterada localmente, manter a alteração
           planoAtualizado.semanas = planoAtualizado.semanas.map(semana => ({
             ...semana,
@@ -533,7 +1376,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
               // Buscar a disciplina correspondente no plano local
               const semanaLocal = plano.semanas.find(s => s.id === semana.id)
               const disciplinaLocal = semanaLocal?.disciplinas.find(d => d.id === disciplinaServidor.id)
-              
+
               // Se a disciplina foi alterada localmente (tem disciplinaId), preservar
               if (disciplinaLocal?.disciplinaId && disciplinaLocal.disciplina?.nome) {
                 // Verificar se a disciplina local é diferente da do servidor
@@ -542,14 +1385,25 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                   return disciplinaLocal
                 }
               }
-              
+
               return disciplinaServidor
             })
           }))
-          
+
+          console.log('📋 Plano ATUALIZADO (depois de processar):', {
+            totalSemanas: planoAtualizado.semanas.length,
+            disciplinasPorSemana: planoAtualizado.semanas.map(s => ({
+              semanaId: s.id,
+              totalDisciplinas: s.disciplinas.length,
+              disciplinas: s.disciplinas.map(d => d.disciplina?.nome)
+            }))
+          })
+
           setPlano(planoAtualizado)
+          console.log('✅ Estado setPlano() chamado com plano atualizado')
         } else {
           setPlano(resultado.data)
+          console.log('✅ Estado setPlano() chamado com dados do servidor (primeira vez)')
         }
       }
     } catch (error) {
@@ -561,12 +1415,20 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
   const carregarDisciplinas = async () => {
     try {
+      console.log('🔄 Carregando disciplinas...')
       const resultado = await listarDisciplinas()
+      console.log('📚 Resultado ao carregar disciplinas:', {
+        success: resultado.success,
+        quantidade: resultado.data?.length || 0,
+        disciplinas: resultado.data?.map(d => d.nome) || []
+      })
       if (resultado.success && resultado.data) {
         setDisciplinas(resultado.data)
+      } else {
+        console.error('❌ Falha ao carregar disciplinas:', resultado.error)
       }
     } catch (error) {
-      console.error('Erro ao carregar disciplinas:', error)
+      console.error('❌ Erro ao carregar disciplinas:', error)
     }
   }
 
@@ -942,11 +1804,80 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
+  const salvarEdicaoCompleta = async (
+    disciplina: DisciplinaSemana,
+    dados: { horasPlanejadas: number; questoesPlanejadas: number; observacoes: string }
+  ) => {
+    try {
+      console.log('💾 Salvando edição completa:', {
+        disciplinaId: disciplina.id,
+        disciplinaNome: disciplina.disciplina?.nome,
+        dadosAntigos: {
+          horasPlanejadas: disciplina.horasPlanejadas,
+          questoesPlanejadas: disciplina.questoesPlanejadas
+        },
+        dadosNovos: dados,
+        tiposDados: {
+          horasPlanejadas: typeof dados.horasPlanejadas,
+          questoesPlanejadas: typeof dados.questoesPlanejadas,
+          observacoes: typeof dados.observacoes
+        }
+      })
+
+      setSalvandoId(disciplina.id)
+      setSaving()
+
+      const dadosParaEnviar = {
+        disciplinaSemanaId: disciplina.id,
+        horasPlanejadas: Number(dados.horasPlanejadas),
+        questoesPlanejadas: Number(dados.questoesPlanejadas),
+        observacoes: String(dados.observacoes)
+      }
+
+      console.log('📤 Dados que serão enviados para updateProgressoEstudo:', dadosParaEnviar)
+
+      const resultado = await updateProgressoEstudo(dadosParaEnviar)
+
+      if (resultado.success) {
+        setSuccess()
+
+        // Atualizar plano localmente
+        if (plano) {
+          const novoPlano = { ...plano }
+          novoPlano.semanas = novoPlano.semanas.map(semana => ({
+            ...semana,
+            disciplinas: semana.disciplinas.map(disc => {
+              if (disc.id === disciplina.id) {
+                return {
+                  ...disc,
+                  horasPlanejadas: dados.horasPlanejadas,
+                  questoesPlanejadas: dados.questoesPlanejadas,
+                  observacoes: dados.observacoes
+                }
+              }
+              return disc
+            })
+          }))
+
+          setPlano(novoPlano)
+          console.log('✅ Plano atualizado localmente com sucesso!')
+        }
+      } else {
+        setError(resultado.error || 'Erro ao atualizar disciplina')
+      }
+    } catch (error) {
+      console.error('Erro ao salvar edição completa:', error)
+      setError('Erro inesperado ao salvar')
+    } finally {
+      setSalvandoId(null)
+    }
+  }
+
   const atualizarValorEditado = (disciplinaId: string, campo: string, valor: any) => {
     const timestamp = new Date().toISOString().substr(14, 9)
     console.log(`⏰ ${timestamp} 📝 ATUALIZANDO VALOR EDITADO:`, { disciplinaId, campo, valor })
     console.log(`⏰ ${timestamp} 📝 ESTADO ANTERIOR:`, valoresEditados[disciplinaId])
-    
+
     setValoresEditados(prev => {
       const novo = {
         ...prev,
@@ -1050,15 +1981,13 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
-  const diasSemana = [
-    { id: 'seg', label: 'Seg' },
-    { id: 'ter', label: 'Ter' },
-    { id: 'qua', label: 'Qua' },
-    { id: 'qui', label: 'Qui' },
-    { id: 'sex', label: 'Sex' },
-    { id: 'sab', label: 'Sáb' },
-    { id: 'dom', label: 'Dom' },
-  ]
+  // Função helper para obter dias do ciclo de uma semana específica
+  const obterDiasCiclo = (semana: SemanaEstudoDetalhe) => {
+    return calcularDiasCiclo(semana.dataInicio, semana.dataFim)
+  }
+
+  // Usar primeira semana como referência para dias (ou criar dinamicamente quando necessário)
+  const diasSemana = plano?.semanas[0] ? obterDiasCiclo(plano.semanas[0]) : []
 
   const parseDiasEstudo = (diasEstudo?: string | null): string[] => {
     console.log('🔍 parseDiasEstudo chamado com:', diasEstudo)
@@ -1121,54 +2050,135 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
-  const abrirModalAdicionarDisciplina = (semana: SemanaEstudoDetalhe) => {
+  const abrirModalAdicionarDisciplina = (semana: SemanaEstudoDetalhe, diaId?: string) => {
+    // Obter dias específicos deste ciclo
+    const diasDesteCiclo = obterDiasCiclo(semana)
+
+    console.log('➕ Abrir modal adicionar disciplina:', {
+      semana: semana.numeroSemana,
+      diaId,
+      totalDisciplinas: disciplinas.length,
+      disciplinasNomes: disciplinas.map(d => d.nome),
+      diasDoCiclo: diasDesteCiclo.length
+    })
+
     if (!disciplinas.length) {
-      setError('Nenhuma disciplina disponível')
+      console.error('❌ Nenhuma disciplina disponível!')
+      setError('Nenhuma disciplina disponível. Por favor, cadastre disciplinas primeiro.')
       return
     }
-    
-    // Encontrar disciplinas que ainda não estão no ciclo
-    const disciplinasNoCiclo = semana.disciplinas.map(d => d.disciplinaId)
-    const disciplinasDisponiveis = disciplinas.filter(d => !disciplinasNoCiclo.includes(d.id))
-    
-    if (!disciplinasDisponiveis.length) {
-      setError('Todas as disciplinas já foram adicionadas a este ciclo')
-      return
+
+    // Se foi clicado em um dia específico, mostrar apenas disciplinas que NÃO estão nesse dia
+    if (diaId) {
+      // Disciplinas que já estão nesse dia específico
+      const disciplinasNoDia = semana.disciplinas.filter(d =>
+        d.diasEstudo?.split(',').includes(diaId)
+      ).map(d => d.disciplinaId)
+
+      // Mostrar todas as disciplinas que não estão nesse dia específico
+      const disciplinasDisponiveis = disciplinas.filter(d => !disciplinasNoDia.includes(d.id))
+
+      console.log('📋 Disciplinas disponíveis para o dia:', {
+        diaId,
+        diaLabel: diasDesteCiclo.find(d => d.id === diaId)?.label,
+        disciplinasNoDia: disciplinasNoDia.length,
+        disciplinasDisponiveis: disciplinasDisponiveis.length,
+        nomes: disciplinasDisponiveis.map(d => d.nome)
+      })
+
+      if (!disciplinasDisponiveis.length) {
+        const diaLabel = diasDesteCiclo.find(d => d.id === diaId)?.label || 'este dia'
+        setError(`Todas as disciplinas já foram adicionadas a ${diaLabel}`)
+        return
+      }
+
+      setSemanaParaAdicionar(semana)
+      setDiaParaAdicionar(diaId)
+      setDisciplinaSelecionada(disciplinasDisponiveis[0].id)
+      setModalAdicionarDisciplinaAberto(true)
+    } else {
+      // Se não foi clicado em dia específico, usar lógica antiga (ciclo completo)
+      const disciplinasNoCiclo = semana.disciplinas.map(d => d.disciplinaId)
+      const disciplinasDisponiveis = disciplinas.filter(d => !disciplinasNoCiclo.includes(d.id))
+
+      console.log('📋 Disciplinas disponíveis para o ciclo:', {
+        disciplinasNoCiclo: disciplinasNoCiclo.length,
+        disciplinasDisponiveis: disciplinasDisponiveis.length,
+        nomes: disciplinasDisponiveis.map(d => d.nome)
+      })
+
+      if (!disciplinasDisponiveis.length) {
+        setError('Todas as disciplinas já foram adicionadas a este ciclo')
+        return
+      }
+
+      setSemanaParaAdicionar(semana)
+      setDiaParaAdicionar(null)
+      setDisciplinaSelecionada(disciplinasDisponiveis[0].id)
+      setModalAdicionarDisciplinaAberto(true)
     }
-    
-    // Definir primeira disciplina disponível como padrão
-    setSemanaParaAdicionar(semana)
-    setDisciplinaSelecionada(disciplinasDisponiveis[0].id)
-    setModalAdicionarDisciplinaAberto(true)
   }
 
   const confirmarAdicionarDisciplina = async () => {
     if (!semanaParaAdicionar || !disciplinaSelecionada) return
-    
+
     setModalAdicionarDisciplinaAberto(false)
     setSaving()
-    
+
     try {
       const disciplina = disciplinas.find(d => d.id === disciplinaSelecionada)
       console.log('➕ Adicionando disciplina selecionada:', disciplina?.nome)
-      
-      // Chamar a nova action para adicionar disciplina
-      const resultado = await adicionarDisciplinaSemana({
-        semanaId: semanaParaAdicionar.id,
-        disciplinaId: disciplinaSelecionada,
-        horasPlanejadas: 1,
-        questoesPlanejadas: 0,
-        diasEstudo: '[]'
-      })
-      
-      if (resultado.success) {
-        setSuccess(`Disciplina "${disciplina?.nome}" adicionada ao ciclo!`)
-        // Recarregar o plano para obter a nova disciplina
-        await carregarPlano()
-        // Limpar valores editados para mostrar dados reais do banco
-        setValoresEditados({})
+
+      // Verificar se a disciplina já existe no ciclo
+      const disciplinaExistente = semanaParaAdicionar.disciplinas.find(
+        d => d.disciplinaId === disciplinaSelecionada
+      )
+
+      if (disciplinaExistente && diaParaAdicionar) {
+        // Se a disciplina já existe e estamos adicionando em um dia específico,
+        // adicionar o dia aos diasEstudo existentes
+        console.log('📅 Disciplina já existe, adicionando dia aos diasEstudo')
+
+        const diasAtuais = disciplinaExistente.diasEstudo?.split(',').filter(d => d) || []
+        const novosDias = [...new Set([...diasAtuais, diaParaAdicionar])].sort()
+        const diasCsv = novosDias.join(',')
+
+        const resultado = await updateProgressoEstudo({
+          disciplinaSemanaId: disciplinaExistente.id,
+          diasEstudo: diasCsv
+        })
+
+        if (resultado.success) {
+          setSuccess(`"${disciplina?.nome}" adicionada ao dia!`)
+          await carregarPlano()
+          setValoresEditados({})
+        } else {
+          setError(resultado.error || 'Erro ao adicionar dia à disciplina')
+        }
       } else {
-        setError(resultado.error || 'Erro ao adicionar disciplina')
+        // Se a disciplina não existe no ciclo, criar nova entrada
+        console.log('➕ Criando nova entrada de disciplina no ciclo')
+
+        const diasEstudo = diaParaAdicionar ? diaParaAdicionar : ''
+        console.log('📅 Dias de estudo para nova disciplina:', diasEstudo)
+
+        const resultado = await adicionarDisciplinaSemana({
+          semanaId: semanaParaAdicionar.id,
+          disciplinaId: disciplinaSelecionada,
+          horasPlanejadas: 1,
+          questoesPlanejadas: 0,
+          diasEstudo
+        })
+
+        console.log('✅ Resultado da adição:', resultado)
+
+        if (resultado.success) {
+          setSuccess(`Disciplina "${disciplina?.nome}" adicionada ao ciclo!`)
+          await carregarPlano()
+          setValoresEditados({})
+        } else {
+          setError(resultado.error || 'Erro ao adicionar disciplina')
+        }
       }
     } catch (error) {
       console.error('Erro ao adicionar disciplina:', error)
@@ -1179,24 +2189,91 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
-  const excluirDisciplina = async (disciplinaSemanaId: string, semanaId: string) => {
+  const excluirDisciplina = async (disciplinaSemanaId: string, semanaId: string, diaId?: string) => {
+    console.log('🗑️ INÍCIO DA EXCLUSÃO:', { disciplinaSemanaId, semanaId, diaId })
+
     setSaving()
-    
+
     try {
-      console.log('🔄 Excluindo disciplina:', disciplinaSemanaId, 'da semana:', semanaId)
-      
-      const resultado = await deleteDisciplinaSemana(disciplinaSemanaId)
-      
-      if (resultado.success) {
-        setSuccess()
-        // Recarregar o plano para refletir a exclusão
-        await carregarPlano()
+      // Se diaId for fornecido, remover apenas daquele dia específico
+      if (diaId) {
+        console.log('🔄 Removendo disciplina do dia:', { disciplinaSemanaId, diaId })
+
+        // Buscar a disciplina atual no plano
+        const semana = plano?.semanas.find(s => s.id === semanaId)
+        const disciplina = semana?.disciplinas.find(d => d.id === disciplinaSemanaId)
+
+        console.log('📊 Estado ANTES da exclusão:', {
+          totalDisciplinasNaSemana: semana?.disciplinas.length,
+          disciplinaEncontrada: !!disciplina,
+          nomeDisciplina: disciplina?.disciplina?.nome
+        })
+
+        if (!disciplina) {
+          setError('Disciplina não encontrada')
+          return
+        }
+
+        // Obter dias atuais e remover o dia específico
+        const diasAtuais = disciplina.diasEstudo?.split(',').filter(d => d.trim()) || []
+        const novosDias = diasAtuais.filter(d => d !== diaId)
+
+        console.log('📅 Dias atuais:', diasAtuais, '→ Novos dias:', novosDias)
+
+        // Se não sobrar nenhum dia, deletar completamente
+        if (novosDias.length === 0) {
+          console.log('⚠️ Último dia removido, deletando disciplina completamente')
+          const resultado = await deleteDisciplinaSemana(disciplinaSemanaId)
+
+          if (resultado.success) {
+            setSuccess('Disciplina removida completamente')
+            console.log('✅ Disciplina deletada do banco, chamando carregarPlano()...')
+            await carregarPlano()
+            console.log('✅ carregarPlano() concluído após exclusão completa')
+          } else {
+            setError(resultado.error || 'Erro ao excluir disciplina')
+          }
+        } else {
+          // Atualizar apenas os dias de estudo
+          console.log('📝 Atualizando dias de estudo:', { de: diasAtuais, para: novosDias })
+          const resultado = await updateProgressoEstudo({
+            disciplinaSemanaId: disciplinaSemanaId,
+            diasEstudo: novosDias.join(',')
+          })
+
+          if (resultado.success) {
+            // Buscar a semana para obter os dias corretos
+            const semanaAtual = plano?.semanas.find(s => s.id === semanaId)
+            const diasDoCiclo = semanaAtual ? obterDiasCiclo(semanaAtual) : []
+            const diaLabel = diasDoCiclo.find(d => d.id === diaId)?.label || 'dia'
+            setSuccess(`Disciplina removida de ${diaLabel}`)
+            console.log('✅ Dias de estudo atualizados, chamando carregarPlano()...')
+            await carregarPlano()
+            console.log('✅ carregarPlano() concluído após atualização de dias')
+          } else {
+            setError(resultado.error || 'Erro ao atualizar dias de estudo')
+          }
+        }
       } else {
-        setError(resultado.error || 'Erro ao excluir disciplina')
+        // Comportamento padrão: deletar completamente
+        console.log('🔄 Excluindo disciplina completamente (sem diaId):', disciplinaSemanaId)
+
+        const resultado = await deleteDisciplinaSemana(disciplinaSemanaId)
+
+        if (resultado.success) {
+          setSuccess('Disciplina excluída')
+          console.log('✅ Disciplina deletada do banco, chamando carregarPlano()...')
+          await carregarPlano()
+          console.log('✅ carregarPlano() concluído após exclusão completa')
+        } else {
+          setError(resultado.error || 'Erro ao excluir disciplina')
+        }
       }
     } catch (error) {
       console.error('Erro ao excluir disciplina:', error)
       setError('Erro inesperado ao excluir disciplina')
+    } finally {
+      console.log('🏁 FIM DA EXCLUSÃO')
     }
   }
 
@@ -1330,64 +2407,97 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
   const adicionarNovoCiclo = async (cicloOrigemId?: string) => {
     if (!plano) return
-    
+
     setSaving()
-    
+
     try {
       // Calcular próximo número de semana
-      const proximoNumero = Math.max(...plano.semanas.map(s => s.numeroSemana)) + 1
-      
-      // Determinar ciclo origem (selecionado ou último)
-      const cicloOrigem = cicloOrigemId 
+      const proximoNumero = plano.semanas.length > 0
+        ? Math.max(...plano.semanas.map(s => s.numeroSemana)) + 1
+        : 1
+
+      // Determinar se estamos criando ciclo vazio ou copiando
+      const cicloOrigem = cicloOrigemId
         ? plano.semanas.find(s => s.id === cicloOrigemId)
-        : plano.semanas[plano.semanas.length - 1]
-        
-      if (!cicloOrigem) {
+        : null
+
+      // Se cicloOrigemId foi passado mas não encontrado, é um erro
+      if (cicloOrigemId && !cicloOrigem) {
         setError('Ciclo origem não encontrado')
         return
       }
-      
-      // Calcular datas baseadas no último ciclo (sempre último para datas)
-      const ultimoCiclo = plano.semanas[plano.semanas.length - 1]
-      console.log('📅 Último ciclo (para datas):', { dataFim: ultimoCiclo.dataFim, formato: typeof ultimoCiclo.dataFim })
-      console.log('📋 Ciclo origem (para disciplinas):', { numero: cicloOrigem.numeroSemana, disciplinas: cicloOrigem.disciplinas.length })
-      
-      // Obter data fim do último ciclo como string
-      const ultimaDataFim = ultimoCiclo.dataFim instanceof Date 
-        ? ultimoCiclo.dataFim.toISOString().split('T')[0]
-        : ultimoCiclo.dataFim.split('T')[0]
-      
-      // Calcular próxima data início (dia seguinte ao fim do último ciclo)
-      const [ano, mes, dia] = ultimaDataFim.split('-').map(Number)
-      const proximaDataInicio = new Date(ano, mes - 1, dia + 1, 12, 0, 0)
-      const proximaDataFim = new Date(ano, mes - 1, dia + 7, 12, 0, 0) // +7 dias
-      
-      const dataInicioStr = proximaDataInicio.toISOString().split('T')[0]
-      const dataFimStr = proximaDataFim.toISOString().split('T')[0]
-      
+
+      // Calcular datas
+      let dataInicioStr: string
+      let dataFimStr: string
+
+      if (plano.semanas.length > 0) {
+        // Se há ciclos existentes, usar data após o último
+        const ultimoCiclo = plano.semanas[plano.semanas.length - 1]
+        console.log('📅 Último ciclo (para datas):', { dataFim: ultimoCiclo.dataFim, formato: typeof ultimoCiclo.dataFim })
+
+        // Obter data fim do último ciclo como string
+        const ultimaDataFim = ultimoCiclo.dataFim instanceof Date
+          ? ultimoCiclo.dataFim.toISOString().split('T')[0]
+          : ultimoCiclo.dataFim.split('T')[0]
+
+        // Calcular próxima data início (dia seguinte ao fim do último ciclo)
+        const [ano, mes, dia] = ultimaDataFim.split('-').map(Number)
+        const proximaDataInicio = new Date(ano, mes - 1, dia + 1, 12, 0, 0)
+        const proximaDataFim = new Date(ano, mes - 1, dia + 7, 12, 0, 0) // +7 dias
+
+        dataInicioStr = proximaDataInicio.toISOString().split('T')[0]
+        dataFimStr = proximaDataFim.toISOString().split('T')[0]
+      } else {
+        // Se é o primeiro ciclo, usar semana atual
+        const hoje = new Date()
+        const diaSemana = hoje.getDay() // 0 = domingo, 1 = segunda
+
+        const dataInicio = new Date(hoje)
+        // Se hoje é segunda (1), usar hoje. Senão, próxima segunda
+        if (diaSemana === 1) {
+          // Hoje é segunda, usar hoje mesmo
+        } else if (diaSemana === 0) {
+          // Hoje é domingo, próxima segunda é amanhã (+1)
+          dataInicio.setDate(hoje.getDate() + 1)
+        } else {
+          // Qualquer outro dia, calcular próxima segunda
+          const diasParaSegunda = 8 - diaSemana
+          dataInicio.setDate(hoje.getDate() + diasParaSegunda)
+        }
+
+        const dataFim = new Date(dataInicio)
+        dataFim.setDate(dataInicio.getDate() + 6) // 7 dias depois
+
+        dataInicioStr = dataInicio.toISOString().split('T')[0]
+        dataFimStr = dataFim.toISOString().split('T')[0]
+      }
+
       console.log('🔄 Criando novo ciclo:', {
         planoId: plano.id,
         numeroSemana: proximoNumero,
-        ultimaDataFim,
         dataInicio: dataInicioStr,
         dataFim: dataFimStr,
-        cicloOrigemNumero: cicloOrigem.numeroSemana
+        cicloOrigem: cicloOrigem ? `Ciclo ${cicloOrigem.numeroSemana}` : 'Vazio',
+        disciplinas: cicloOrigem ? cicloOrigem.disciplinas.length : 0
       })
-      
-      // Copiar disciplinas do ciclo origem com seu planejamento
-      const disciplinasCopiadas = cicloOrigem.disciplinas.map(disciplina => ({
-        disciplinaId: disciplina.disciplinaId,
-        disciplinaNome: disciplina.disciplina.nome,
-        horasPlanejadas: disciplina.horasPlanejadas,
-        questoesPlanejadas: disciplina.questoesPlanejadas,
-        tipoVeiculo: disciplina.tipoVeiculo || 'pdf',
-        materialNome: disciplina.materialNome || '',
-        diasEstudo: disciplina.diasEstudo ? disciplina.diasEstudo.split(',').filter(d => d.trim()) : [],
-        tempoVideoPlanejado: disciplina.tempoVideoPlanejado,
-        parametro: disciplina.observacoes || ''
-      }))
-      
-      console.log('📋 Copiando disciplinas do ciclo origem:', disciplinasCopiadas)
+
+      // Copiar disciplinas do ciclo origem (se houver) ou criar vazio
+      const disciplinasCopiadas = cicloOrigem
+        ? cicloOrigem.disciplinas.map(disciplina => ({
+            disciplinaId: disciplina.disciplinaId,
+            disciplinaNome: disciplina.disciplina.nome,
+            horasPlanejadas: disciplina.horasPlanejadas,
+            questoesPlanejadas: disciplina.questoesPlanejadas,
+            tipoVeiculo: disciplina.tipoVeiculo || 'pdf',
+            materialNome: disciplina.materialNome || '',
+            diasEstudo: disciplina.diasEstudo ? disciplina.diasEstudo.split(',').filter(d => d.trim()) : [],
+            tempoVideoPlanejado: disciplina.tempoVideoPlanejado,
+            parametro: disciplina.observacoes || ''
+          }))
+        : [] // Array vazio para ciclo sem disciplinas
+
+      console.log('📋 Disciplinas do novo ciclo:', disciplinasCopiadas.length > 0 ? disciplinasCopiadas : 'Ciclo vazio')
       
       const resultado = await adicionarCicloAoPlano(
         plano.id,
@@ -1417,16 +2527,26 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
   }
 
+  const abrirModalEscolhaTipoCiclo = () => {
+    setModalEscolhaTipoCicloAberto(true)
+  }
+
   const abrirModalSelecionarCiclo = () => {
     if (!plano || plano.semanas.length === 0) {
       setError('Nenhum ciclo disponível para copiar')
       return
     }
-    
+
     // Definir último ciclo como padrão selecionado
     const ultimoCiclo = plano.semanas[plano.semanas.length - 1]
     setCicloOrigemSelecionado(ultimoCiclo.id)
+    setModalEscolhaTipoCicloAberto(false)
     setModalSelecionarCicloAberto(true)
+  }
+
+  const criarCicloVazio = () => {
+    setModalEscolhaTipoCicloAberto(false)
+    adicionarNovoCiclo(undefined)
   }
   
   const confirmarCriacaoCiclo = async () => {
@@ -1565,14 +2685,18 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
           <DialogHeader>
             <DialogTitle>Adicionar Disciplina</DialogTitle>
             <DialogDescription>
-              Selecione uma disciplina para adicionar ao ciclo.
+              {diaParaAdicionar && semanaParaAdicionar
+                ? `Selecione uma disciplina para adicionar ao ${obterDiasCiclo(semanaParaAdicionar).find(d => d.id === diaParaAdicionar)?.label || 'dia'}.`
+                : 'Selecione uma disciplina para adicionar ao ciclo.'
+              }
             </DialogDescription>
           </DialogHeader>
-          
+
           {semanaParaAdicionar && (
             <div className="p-3 bg-blue-50 rounded-lg flex-shrink-0">
               <div className="text-sm font-medium text-blue-900">
                 Ciclo {semanaParaAdicionar.numeroSemana}
+                {diaParaAdicionar && ` - ${obterDiasCiclo(semanaParaAdicionar).find(d => d.id === diaParaAdicionar)?.label}`}
               </div>
               <div className="text-xs text-blue-600">
                 {format(new Date(semanaParaAdicionar.dataInicio), 'dd/MM', { locale: ptBR })} - {format(new Date(semanaParaAdicionar.dataFim), 'dd/MM', { locale: ptBR })}
@@ -1581,9 +2705,19 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
           )}
           
           <div className="flex-1 overflow-y-auto space-y-2 py-2">
-            {semanaParaAdicionar && disciplinas.filter(d => 
-              !semanaParaAdicionar.disciplinas.map(ds => ds.disciplinaId).includes(d.id)
-            ).map((disciplina) => (
+            {semanaParaAdicionar && (() => {
+              // Se tem dia específico, filtrar disciplinas que não estão naquele dia
+              if (diaParaAdicionar) {
+                const disciplinasNoDia = semanaParaAdicionar.disciplinas
+                  .filter(d => d.diasEstudo?.split(',').includes(diaParaAdicionar))
+                  .map(d => d.disciplinaId)
+                return disciplinas.filter(d => !disciplinasNoDia.includes(d.id))
+              }
+              // Se não, filtrar disciplinas que não estão no ciclo
+              return disciplinas.filter(d =>
+                !semanaParaAdicionar.disciplinas.map(ds => ds.disciplinaId).includes(d.id)
+              )
+            })().map((disciplina) => (
               <div key={disciplina.id} className="flex items-center space-x-2">
                 <input
                   type="radio"
@@ -1628,6 +2762,76 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Modal de escolha do tipo de ciclo */}
+      <Dialog open={modalEscolhaTipoCicloAberto} onOpenChange={setModalEscolhaTipoCicloAberto}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Novo Ciclo</DialogTitle>
+            <DialogDescription>
+              Escolha como deseja criar o novo ciclo de estudos
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div
+              onClick={criarCicloVazio}
+              className="flex items-start space-x-4 p-4 border-2 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 transition-all"
+            >
+              <div className="flex-shrink-0 mt-1">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Plus className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-base mb-1">Criar Ciclo Vazio</h4>
+                <p className="text-sm text-muted-foreground">
+                  Inicie um novo ciclo do zero e adicione disciplinas manualmente
+                </p>
+              </div>
+            </div>
+
+            <div
+              onClick={() => {
+                if (plano && plano.semanas.length > 0) {
+                  abrirModalSelecionarCiclo()
+                }
+              }}
+              className={`flex items-start space-x-4 p-4 border-2 rounded-lg transition-all ${
+                !plano || plano.semanas.length === 0
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-green-500 hover:bg-green-50/50'
+              }`}
+            >
+              <div className="flex-shrink-0 mt-1">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <Target className="h-5 w-5 text-green-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-base mb-1">Copiar de Ciclo Anterior</h4>
+                <p className="text-sm text-muted-foreground">
+                  Crie um novo ciclo copiando as configurações de um ciclo existente
+                </p>
+                {(!plano || plano.semanas.length === 0) && (
+                  <p className="text-xs text-red-500 mt-2">
+                    Nenhum ciclo disponível para copiar
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setModalEscolhaTipoCicloAberto(false)}
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal para selecionar ciclo origem */}
       <Dialog open={modalSelecionarCicloAberto} onOpenChange={setModalSelecionarCicloAberto}>
         <DialogContent className="sm:max-w-[500px]">
@@ -1751,10 +2955,105 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
       {/* Semanas em tabela */}
       <div className="space-y-6">
         {plano.semanas.map((semana) => {
-          // Calcular total de horas planejadas dinamicamente
-          const totalHorasPlanejadas = semana.disciplinas.reduce((acc, d) => acc + d.horasPlanejadas, 0)
-          const progressoSemana = totalHorasPlanejadas > 0 
-            ? (semana.horasRealizadas / totalHorasPlanejadas) * 100 
+          // Filtrar APENAS disciplinas que TÊM dias alocados no NOVO formato (dia1, dia2, etc)
+          const disciplinasComDias = semana.disciplinas.filter(d => {
+            const diasEstudo = d.diasEstudo?.trim()
+            // Ignorar formato antigo (seg, ter, qua, qui, sex, sab, dom)
+            const formatoAntigo = diasEstudo && /^(seg|ter|qua|qui|sex|sab|dom)(,(seg|ter|qua|qui|sex|sab|dom))*$/.test(diasEstudo)
+            // Aceitar apenas formato novo (dia1, dia2, etc) e não vazio
+            const temDias = diasEstudo && diasEstudo !== '' && diasEstudo !== '[]' && !formatoAntigo
+            console.log(`  - ${d.disciplina?.nome}: diasEstudo="${diasEstudo}" → ${formatoAntigo ? 'FORMATO ANTIGO (IGNORAR)' : temDias ? 'INCLUIR' : 'EXCLUIR'}`)
+            return temDias
+          })
+
+          console.log('📊 Estatísticas do Ciclo:', {
+            cicloNumero: semana.numeroSemana,
+            totalDisciplinasNoBanco: semana.disciplinas.length,
+            disciplinasComDiasAlocados: disciplinasComDias.length,
+            disciplinasSemDias: semana.disciplinas.length - disciplinasComDias.length,
+            disciplinasDetalhes: semana.disciplinas.map(d => ({
+              nome: d.disciplina?.nome,
+              diasEstudo: d.diasEstudo,
+              incluida: disciplinasComDias.includes(d)
+            }))
+          })
+
+          // Calcular total de horas planejadas REAL usando DisciplinaDia quando disponível
+          const horasPorDia: Record<string, number> = {}
+          const questoesPorDia: Record<string, number> = {}
+
+          disciplinasComDias.forEach(d => {
+            if (d.diasEstudo) {
+              const dias = d.diasEstudo.split(',').filter(x => x.trim())
+              // Filtrar apenas dias do formato NOVO (dia1, dia2, etc), ignorar formato antigo (seg, ter, etc)
+              const diasNovos = dias.filter(dia => !['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'].includes(dia))
+
+              diasNovos.forEach(dia => {
+                // Inicializar se não existe
+                if (!horasPorDia[dia]) horasPorDia[dia] = 0
+                if (!questoesPorDia[dia]) questoesPorDia[dia] = 0
+
+                // Verificar se existe DisciplinaDia específico para este dia
+                const disciplinaDia = d.dias?.find(dd => dd.dia === dia)
+
+                if (disciplinaDia) {
+                  // Usar valores específicos do DisciplinaDia
+                  horasPorDia[dia] += disciplinaDia.horasPlanejadas
+                  questoesPorDia[dia] += disciplinaDia.questoesPlanejadas
+                } else {
+                  // Calcular proporcionalmente se não existe valor específico
+                  const horasPorDiaDisciplina = calcularHorasPorDia(d.horasPlanejadas, diasNovos.join(','))
+                  const questoesPorDiaDisciplina = Math.floor(d.questoesPlanejadas / diasNovos.length)
+
+                  horasPorDia[dia] += horasPorDiaDisciplina
+                  questoesPorDia[dia] += questoesPorDiaDisciplina
+                }
+              })
+            }
+          })
+
+          const numDiasComEstudo = Object.keys(horasPorDia).length
+          const totalHorasReais = Object.values(horasPorDia).reduce((acc, h) => acc + h, 0)
+          const totalQuestoesReais = Object.values(questoesPorDia).reduce((acc, q) => acc + q, 0)
+
+          // Calcular média: total de horas reais ÷ número de dias com estudo
+          const mediaHorasPorDia = numDiasComEstudo > 0 ? totalHorasReais / numDiasComEstudo : 0
+
+          // Para compatibilidade com o código antigo
+          const totalHorasPlanejadas = totalHorasReais
+
+          console.log('💰 Estatísticas do Ciclo (com DisciplinaDia):', {
+            totalHorasPlanejadas,
+            totalHorasReais,
+            numDiasComEstudo,
+            mediaHorasPorDia,
+            totalQuestoesReais,
+            horasPorDiaDetalhado: horasPorDia,
+            questoesPorDiaDetalhado: questoesPorDia,
+            detalhes: disciplinasComDias.map(d => {
+              const dias = d.diasEstudo ? d.diasEstudo.split(',').filter(x => x.trim()) : []
+              const diasNovos = dias.filter(dia => !['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'].includes(dia))
+
+              return {
+                nome: d.disciplina?.nome,
+                diasEstudo: d.diasEstudo,
+                diasNovos: diasNovos,
+                horasPlanejadasNoBanco: d.horasPlanejadas,
+                questoesPlanejadasNoBanco: d.questoesPlanejadas,
+                diasDetalhados: diasNovos.map(dia => {
+                  const disciplinaDia = d.dias?.find(dd => dd.dia === dia)
+                  return {
+                    dia: dia,
+                    temDisciplinaDia: !!disciplinaDia,
+                    horasPlanejadas: disciplinaDia?.horasPlanejadas || calcularHorasPorDia(d.horasPlanejadas, diasNovos.join(',')),
+                    questoesPlanejadas: disciplinaDia?.questoesPlanejadas || Math.floor(d.questoesPlanejadas / diasNovos.length)
+                  }
+                })
+              }
+            })
+          })
+          const progressoSemana = totalHorasPlanejadas > 0
+            ? (semana.horasRealizadas / totalHorasPlanejadas) * 100
             : 0
           
           // Calcular progresso temporal
@@ -1911,7 +3210,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
               {!estaColapsado && (
                 <CardContent>
                   {/* Cards de informações do ciclo */}
-                  <div className="grid grid-cols-4 gap-4 w-full mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 w-full mb-6">
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -1919,9 +3218,9 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{semana.disciplinas.length}</div>
+                        <div className="text-2xl font-bold">{disciplinasComDias.length}</div>
                         <p className="text-xs text-muted-foreground">
-                          neste ciclo de estudos
+                          alocadas no ciclo
                         </p>
                       </CardContent>
                     </Card>
@@ -1932,9 +3231,24 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{totalHorasPlanejadas}h</div>
+                        <div className="text-2xl font-bold">{formatarTempo(totalHorasPlanejadas)}</div>
                         <p className="text-xs text-muted-foreground">
                           planejadas para o ciclo
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Média Horas/Dia
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {formatarTempo(mediaHorasPorDia)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          por dia de estudo
                         </p>
                       </CardContent>
                     </Card>
@@ -1945,7 +3259,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{semana.disciplinas.reduce((acc, d) => acc + d.questoesPlanejadas, 0)}</div>
+                        <div className="text-2xl font-bold">{totalQuestoesReais}</div>
                         <p className="text-xs text-muted-foreground">
                           para serem resolvidas
                         </p>
@@ -1958,102 +3272,27 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{Math.ceil((new Date(semana.dataFim).getTime() - new Date(semana.dataInicio).getTime()) / (1000 * 60 * 60 * 24))}</div>
+                        <div className="text-2xl font-bold">{numDiasComEstudo}</div>
                         <p className="text-xs text-muted-foreground">
-                          duração do ciclo
+                          dias com disciplinas
                         </p>
                       </CardContent>
                     </Card>
                   </div>
-                
-                <div className="overflow-x-auto rounded-md border">
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={(event) => handleDragEnd(event, semana.id)}
-                >
-                  <Table>
-                    <TableHeader className="bg-gray-50">
-                      <TableRow>
-                        <TableHead className="w-8"></TableHead>
-                        <TableHead className="min-w-[180px]">Disciplina</TableHead>
-                        <TableHead className="min-w-[250px]">Assuntos</TableHead>
-                        <TableHead className="min-w-[180px] text-center">Horas planejadas</TableHead>
-                        <TableHead className="text-center">Questões planejadas</TableHead>
-                        <TableHead className="text-center">Dias da semana</TableHead>
-                        <TableHead className="w-12">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <SortableContext 
-                        items={semana.disciplinas.map(d => d.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {semana.disciplinas.map((disciplina, index) => {
-                          const IconeVeiculo = obterIconeVeiculo(disciplina.tipoVeiculo || undefined)
-                          const valorQuestoesAtual =
-                            questoesEditadas[disciplina.id] !== undefined
-                              ? questoesEditadas[disciplina.id]
-                              : disciplina.questoesRealizadas
-                          const progressoQuestoes = disciplina.questoesPlanejadas > 0
-                            ? (valorQuestoesAtual / disciplina.questoesPlanejadas) * 100
-                            : 0
 
-                          const estaEditando = camposEditando[disciplina.id]
-                          const valoresEditadosDisciplina = valoresEditados[disciplina.id] || {}
-
-                          return (
-                            <SortableDisciplinaRow
-                              key={disciplina.id}
-                              disciplina={disciplina}
-                              index={index}
-                              semana={semana}
-                              IconeVeiculo={IconeVeiculo}
-                              valorQuestoesAtual={valorQuestoesAtual}
-                              progressoQuestoes={progressoQuestoes}
-                              estaEditando={estaEditando}
-                              valoresEditadosDisciplina={valoresEditadosDisciplina}
-                              camposEditando={camposEditando}
-                              valoresEditados={valoresEditados}
-                              questoesEditadas={questoesEditadas}
-                              salvandoId={salvandoId}
-                              disciplinas={disciplinas}
-                              plano={plano}
-                              diasSemana={diasSemana}
-                              onDisciplinaActions={{
-                                iniciarEdicao,
-                                atualizarValorEditado,
-                                salvarEdicao,
-                                salvarEdicaoComValor,
-                                cancelarEdicao,
-                                temEdicoesPendentes,
-                                obterNomeDisciplina,
-                                obterIdDisciplinaAtual,
-                                parseDiasEstudo,
-                                atualizarDiasEstudo,
-                                excluirDisciplina
-                              }}
-                            />
-                          )
-                        })}
-                      </SortableContext>
-                    </TableBody>
-                  </Table>
-                </DndContext>
-                </div>
-                
-                {/* Botão para adicionar nova disciplina */}
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => abrirModalAdicionarDisciplina(semana)}
-                    className="flex items-center gap-2 text-sm"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Adicionar disciplina
-                  </Button>
-                </div>
+                  {/* Visualização Semanal de Distribuição de Horas */}
+                  <div className="mb-6">
+                    <VisualizacaoSemanal
+                      disciplinas={semana.disciplinas}
+                      semana={semana}
+                      onDisciplinaActions={{
+                        excluirDisciplina,
+                        salvarEdicaoCompleta
+                      }}
+                      salvandoId={salvandoId}
+                      onAdicionarDisciplina={(diaId) => abrirModalAdicionarDisciplina(semana, diaId)}
+                    />
+                  </div>
                 </CardContent>
               )}
             </Card>
@@ -2065,7 +3304,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
           <Button
             variant="outline"
             size="lg"
-            onClick={abrirModalSelecionarCiclo}
+            onClick={abrirModalEscolhaTipoCiclo}
             className="flex items-center gap-2"
           >
             <Plus className="h-5 w-5" />

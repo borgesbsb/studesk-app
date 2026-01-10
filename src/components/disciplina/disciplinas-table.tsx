@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Book, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react"
+import { Book, Trash2, ChevronLeft, ChevronRight, AlertTriangle, Pencil } from "lucide-react"
+import { EditarDisciplinaModal } from "./editar-disciplina-modal"
 
 // Componente de progresso circular
 function CircularProgress({ value, size = 48, strokeWidth = 4, className = "" }: {
@@ -103,6 +104,8 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
   const [paginaAtual, setPaginaAtual] = useState(1)
   const [disciplinaParaExcluir, setDisciplinaParaExcluir] = useState<DisciplinaComMateriais | null>(null)
   const [excluindoDisciplinaId, setExcluindoDisciplinaId] = useState<string | null>(null)
+  const [disciplinaParaEditar, setDisciplinaParaEditar] = useState<any | null>(null)
+  const [modalEditarAberto, setModalEditarAberto] = useState(false)
   const itensPorPagina = 10
 
   useEffect(() => {
@@ -117,7 +120,9 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
             disciplinaId: disciplina.id,
             disciplina: {
               id: disciplina.id,
-              nome: disciplina.nome
+              nome: disciplina.nome,
+              descricao: disciplina.descricao,
+              cor: disciplina.cor
             }
           }))
         }
@@ -222,6 +227,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Disciplina</TableHead>
+              <TableHead>Cor</TableHead>
               <TableHead>Materiais</TableHead>
               <TableHead>PDFs (Páginas)</TableHead>
               <TableHead>Vídeos (Tempo)</TableHead>
@@ -233,6 +239,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
             {[1, 2, 3].map((i) => (
               <TableRow key={i}>
                 <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                <TableCell><Skeleton className="h-6 w-6 rounded-full" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-12" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-24" /></TableCell>
@@ -251,13 +258,134 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
     )
   }
 
+  // Formatar tempo de vídeo
+  const formatarTempo = (segundos: number): string => {
+    const horas = Math.floor(segundos / 3600)
+    const minutos = Math.floor((segundos % 3600) / 60)
+    if (horas > 0) {
+      return `${horas}h ${minutos}m`
+    }
+    return `${minutos}m`
+  }
+
   return (
     <div className="w-full">
-      <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+      {/* Mobile: Cards */}
+      <div className="md:hidden space-y-3">
+        {disciplinasPaginadas.map((disciplina) => {
+          const materiaisCount = disciplina.materiais.length
+          const progresso = disciplina.progresso
+
+          return (
+            <div key={disciplina.id} className="border border-gray-300 rounded-lg bg-white shadow-sm p-4">
+              {/* Header do Card */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 flex items-center gap-3">
+                  <div
+                    className="w-8 h-8 rounded-full border-2 border-gray-300 flex-shrink-0"
+                    style={{ backgroundColor: disciplina.disciplina.cor || '#94a3b8' }}
+                    title={disciplina.disciplina.cor || 'Sem cor definida'}
+                  />
+                  <div>
+                    <h3 className="font-semibold text-base">{disciplina.disciplina.nome}</h3>
+                    <p className="text-sm text-gray-500">{materiaisCount} {materiaisCount === 1 ? 'material' : 'materiais'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progresso Geral */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                  <span>Progresso Geral</span>
+                  <span className="font-medium">{Math.round(progresso)}%</span>
+                </div>
+                <Progress value={progresso} className="h-2" />
+              </div>
+
+              {/* Estatísticas em Grid */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {/* PDFs */}
+                <div className="border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-2">PDFs</p>
+                  {disciplina.totalPaginas > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <CircularProgress value={disciplina.progressoPdf} size={40} strokeWidth={4} />
+                      <div className="text-xs text-gray-600">
+                        <div>{disciplina.paginasLidas}</div>
+                        <div className="text-gray-400">/ {disciplina.totalPaginas}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+
+                {/* Vídeos */}
+                <div className="border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-2">Vídeos</p>
+                  {disciplina.totalDuracaoSegundos > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <CircularProgress value={disciplina.progressoVideo} size={40} strokeWidth={4} />
+                      <div className="text-xs text-gray-600">
+                        <div>{formatarTempo(disciplina.totalTempoAssistido)}</div>
+                        <div className="text-gray-400">/ {formatarTempo(disciplina.totalDuracaoSegundos)}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/${hash}/disciplina/${disciplina.disciplinaId}/materiais`)}
+                  className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50"
+                >
+                  <Book className="h-4 w-4 mr-2" />
+                  Materiais
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDisciplinaParaEditar(disciplina.disciplina)
+                    setModalEditarAberto(true)
+                  }}
+                  className="border-green-200 text-green-600 hover:bg-green-50"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDisciplinaParaExcluir(disciplina)}
+                  className="border-red-200 text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )
+        })}
+
+        {disciplinasFiltradas.length === 0 && !loading && (
+          <div className="text-center text-gray-500 py-10 border border-gray-300 rounded-lg bg-white">
+            {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina cadastrada'}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: Tabela */}
+      <div className="hidden md:block border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
         <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Disciplina</TableHead>
+            <TableHead>Cor</TableHead>
             <TableHead>Materiais</TableHead>
             <TableHead>PDFs (Páginas)</TableHead>
             <TableHead>Vídeos (Tempo)</TableHead>
@@ -270,19 +398,18 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
             const materiaisCount = disciplina.materiais.length
             const progresso = disciplina.progresso
 
-            // Formatar tempo de vídeo
-            const formatarTempo = (segundos: number): string => {
-              const horas = Math.floor(segundos / 3600)
-              const minutos = Math.floor((segundos % 3600) / 60)
-              if (horas > 0) {
-                return `${horas}h ${minutos}m`
-              }
-              return `${minutos}m`
-            }
-
             return (
               <TableRow key={disciplina.id}>
                 <TableCell className="font-medium">{disciplina.disciplina.nome}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-6 h-6 rounded-full border-2 border-gray-300"
+                      style={{ backgroundColor: disciplina.disciplina.cor || '#94a3b8' }}
+                      title={disciplina.disciplina.cor || 'Sem cor definida'}
+                    />
+                  </div>
+                </TableCell>
                 <TableCell>{materiaisCount}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -332,6 +459,18 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => {
+                        setDisciplinaParaEditar(disciplina.disciplina)
+                        setModalEditarAberto(true)
+                      }}
+                      className="border-green-200 text-green-600 hover:bg-green-50 hover:border-green-300"
+                      title="Editar Disciplina"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => setDisciplinaParaExcluir(disciplina)}
                       className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
                       title="Excluir Disciplina"
@@ -346,7 +485,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
 
           {disciplinasFiltradas.length === 0 && !loading && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-gray-500 py-10">
+              <TableCell colSpan={7} className="text-center text-gray-500 py-10">
                 {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina cadastrada'}
               </TableCell>
             </TableRow>
@@ -430,6 +569,16 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Edição */}
+      <EditarDisciplinaModal
+        disciplina={disciplinaParaEditar}
+        open={modalEditarAberto}
+        onOpenChange={setModalEditarAberto}
+        onSuccess={() => {
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }

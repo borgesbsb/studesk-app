@@ -18,9 +18,10 @@ function isValidHashFormat(hash: string): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Permitir acesso a arquivos estáticos da pasta public (incluindo pdf.worker.min.js)
+  // Permitir acesso a arquivos estáticos da pasta public (incluindo pdf.worker.min.js e WASM)
   if (
-    pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|eot|json|xml|pdf)$/)
+    pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|eot|json|xml|pdf|wasm)$/) ||
+    pathname.startsWith('/ej2-pdfviewer-lib/')
   ) {
     return NextResponse.next()
   }

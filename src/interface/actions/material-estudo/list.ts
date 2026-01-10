@@ -27,4 +27,17 @@ export async function buscarMaterialEstudoPorId(id: string) {
       error: error instanceof Error ? error.message : 'Erro ao buscar material de estudo'
     }
   }
-} 
+}
+
+export async function listarMateriaisPorDisciplina(disciplinaId: string) {
+  try {
+    const { userId } = await requireAuth()
+    const materiais = await MaterialEstudoService.listarMateriaisPorDisciplina(userId, disciplinaId)
+    return { success: true, data: materiais }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro ao listar materiais da disciplina'
+    }
+  }
+}

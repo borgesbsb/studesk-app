@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Trash2, Video, Play, Eye } from "lucide-react"
+import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
@@ -26,11 +26,21 @@ interface MateriaisTableProps {
   disciplinaId: string
 }
 
+interface ProcessingStatus {
+  hasProcessedPages: boolean
+  processedPages: number
+  totalPages: number
+  progress: number
+  status: 'pending' | 'processing' | 'partial' | 'complete' | 'error'
+}
+
 export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const { data: session } = useSession()
   const [materiais, setMateriais] = useState<MaterialEstudo[]>([])
   const [loading, setLoading] = useState(true)
   const [horasPorMaterialSegundos, setHorasPorMaterialSegundos] = useState<Record<string, number>>({})
+  const [materiaisComTextoProcessado, setMateriaisComTextoProcessado] = useState<Record<string, boolean>>({})
+  const [statusProcessamento, setStatusProcessamento] = useState<Record<string, ProcessingStatus>>({})
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [pendingMaterial, setPendingMaterial] = useState<MaterialEstudo | null>(null)
   const [activeTab, setActiveTab] = useState<'pdf' | 'video'>('pdf')
@@ -39,6 +49,16 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
 
   useEffect(() => {
     carregarMateriais()
+  }, [disciplinaId])
+
+  // Recarregar quando a janela ganhar foco (usuário voltar do PDF)
+  useEffect(() => {
+    const handleFocus = () => {
+      carregarMateriais()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [disciplinaId])
 
   // Após carregar materiais, buscar horas estudadas TOTAIS (todas as sessões, organizadas ou não)
@@ -69,6 +89,57 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       carregarHorasPorMaterial()
     } else {
       setHorasPorMaterialSegundos({})
+    }
+  }, [materiais])
+
+  // Verificar quais materiais PDF têm texto processado
+  useEffect(() => {
+    const verificarTextoProcessado = async () => {
+      try {
+        const entries = await Promise.all(
+          materiais
+            .filter(mat => mat.tipo === 'PDF')
+            .map(async (mat) => {
+              try {
+                const res = await fetch(`/api/pdf/${mat.id}/check-processed`)
+                const data = await res.json()
+                return {
+                  id: mat.id,
+                  hasProcessedPages: data.hasProcessedPages || false,
+                  status: data
+                }
+              } catch (e) {
+                console.error(`Erro ao verificar texto processado do material ${mat.id}:`, e)
+                return {
+                  id: mat.id,
+                  hasProcessedPages: false,
+                  status: {
+                    hasProcessedPages: false,
+                    processedPages: 0,
+                    totalPages: 0,
+                    progress: 0,
+                    status: 'pending' as const
+                  }
+                }
+              }
+            })
+        )
+
+        setMateriaisComTextoProcessado(
+          Object.fromEntries(entries.map(e => [e.id, e.hasProcessedPages]))
+        )
+        setStatusProcessamento(
+          Object.fromEntries(entries.map(e => [e.id, e.status]))
+        )
+      } catch (e) {
+        console.error('Erro ao verificar textos processados:', e)
+      }
+    }
+    if (materiais.length > 0) {
+      verificarTextoProcessado()
+    } else {
+      setMateriaisComTextoProcessado({})
+      setStatusProcessamento({})
     }
   }, [materiais])
 
@@ -137,8 +208,53 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     if (material.tipo === 'VIDEO') {
       window.location.href = `/${userHash}/material/${material.id}/video?disciplinaId=${disciplinaId}`
     } else {
-      window.location.href = `/${userHash}/material/${material.id}/syncfusion?disciplinaId=${disciplinaId}`
+      window.location.href = `/${userHash}/material/${material.id}/ler?disciplinaId=${disciplinaId}`
     }
+  }
+
+  const handleOpenTexto = async (material: MaterialEstudo) => {
+    if (!userHash) {
+      toast.error('Sessão não encontrada')
+      return
+    }
+
+    // Verificar se há páginas processadas antes de abrir
+    try {
+      const response = await fetch(`/api/pdf/${material.id}/check-processed`)
+      const data = await response.json()
+
+      if (!data.hasProcessedPages) {
+        // Nenhuma página processada ainda
+        if (data.status === 'pending') {
+          toast.info('Processamento ainda não foi iniciado. Aguarde alguns instantes.')
+        } else if (data.status === 'processing') {
+          toast.info(`Processamento em andamento: ${data.processedPages} de ${data.totalPages} páginas prontas. Tente novamente em instantes.`)
+        } else if (data.status === 'error') {
+          toast.error(`Erro no processamento: ${data.processingError || 'Erro desconhecido'}`)
+        } else {
+          toast.warning('Nenhuma página disponível ainda. Tente novamente em alguns instantes.')
+        }
+        return
+      }
+
+      // Há páginas processadas, pode abrir
+      if (data.status === 'processing' || data.status === 'partial') {
+        toast.success(`${data.processedPages} de ${data.totalPages} páginas prontas. Abrindo leitor...`)
+      }
+
+      window.location.href = `/${userHash}/material/${material.id}/ler?mode=text&disciplinaId=${disciplinaId}`
+    } catch (error) {
+      console.error('Erro ao verificar páginas processadas:', error)
+      toast.error('Erro ao verificar status do processamento')
+    }
+  }
+
+  const handleOpenPdfOriginal = (material: MaterialEstudo) => {
+    if (!userHash) {
+      toast.error('Sessão não encontrada')
+      return
+    }
+    window.location.href = `/${userHash}/material/${material.id}/ler?mode=pdf&disciplinaId=${disciplinaId}`
   }
 
   const handleUploadPdf = (material: MaterialEstudo) => {
@@ -161,8 +277,8 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     }
 
     if (mediaType === 'PDF') {
-      // Redirecionar para Syncfusion com URL temporária e disciplinaId
-      window.location.href = `/${userHash}/material/${pendingMaterial.id}/syncfusion?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
+      // Redirecionar para leitor de PDF com URL temporária e disciplinaId
+      window.location.href = `/${userHash}/material/${pendingMaterial.id}/ler?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
     } else {
       // Redirecionar para visualizador de vídeo com URL temporária e disciplinaId
       window.location.href = `/${userHash}/material/${pendingMaterial.id}/video?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
@@ -186,7 +302,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const materiaisPdf = materiais.filter(m => m.tipo === 'PDF')
   const materiaisVideo = materiais.filter(m => m.tipo === 'VIDEO')
 
-  // Componente de tabela reutilizável
+  // Componente de tabela e cards reutilizável
   const renderTable = (materiais: MaterialEstudo[], tipo: 'PDF' | 'VIDEO') => {
     if (materiais.length === 0) {
       return (
@@ -197,15 +313,141 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     }
 
     return (
-      <div className="rounded-md border">
+      <>
+        {/* Mobile: Cards */}
+        <div className="md:hidden space-y-3">
+          {materiais.map((material) => {
+            const tempoEstudadoSegundos = horasPorMaterialSegundos[material.id] ?? 0
+            const progresso = tipo === 'VIDEO'
+              ? Math.min(100, (tempoEstudadoSegundos / (material.duracaoSegundos || 1)) * 100)
+              : (material.paginasLidas / material.totalPaginas) * 100
+            const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
+
+            return (
+              <div key={material.id} className="border rounded-lg p-4 bg-white">
+                {/* Header do Card */}
+                <div className="flex items-start gap-2 mb-3">
+                  {tipo === 'VIDEO' ? (
+                    <Video className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <FileText className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <h3 className="font-medium text-sm flex-1">{material.nome}</h3>
+                </div>
+
+                {/* Progresso */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                    <span>Progresso</span>
+                    <span className="font-medium">{Math.round(progresso)}%</span>
+                  </div>
+                  <Progress value={progresso} className="h-2" />
+                </div>
+
+                {/* Estatísticas */}
+                <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+                  <div className="bg-gray-50 rounded p-2">
+                    <p className="text-xs text-gray-500 mb-1">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</p>
+                    <p className="font-medium">
+                      {tipo === 'VIDEO' ? (
+                        <span>
+                          {Math.floor((material.tempoAssistido || 0) / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
+                        </span>
+                      ) : (
+                        <span>
+                          {material.paginasLidas} / {material.totalPaginas}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <p className="text-xs text-gray-500 mb-1">Tempo Estudado</p>
+                    <p className="font-medium">{formatarTempo(tempoEstudadoSegundos)}</p>
+                  </div>
+                </div>
+
+                {/* Status de Processamento IA (apenas para PDF) */}
+                {tipo === 'PDF' && processingStatus && (
+                  <div className="mb-3 bg-blue-50 border border-blue-200 rounded p-2">
+                    <p className="text-xs text-blue-700 font-medium mb-1">Formatação com IA</p>
+                    <p className="text-xs text-blue-600">
+                      {processingStatus.status === 'complete'
+                        ? `✅ Concluído - ${processingStatus.totalPages} páginas formatadas (100%)`
+                        : processingStatus.status === 'processing' || processingStatus.status === 'partial'
+                        ? `⏳ Processando - ${processingStatus.processedPages}/${processingStatus.totalPages} páginas (${processingStatus.progress}%)`
+                        : processingStatus.status === 'error'
+                        ? `❌ Erro no processamento`
+                        : `⏸️ Aguardando início do processamento`
+                      }
+                    </p>
+                  </div>
+                )}
+
+                {/* Ações */}
+                <div className="flex gap-2">
+                  {tipo === 'PDF' ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenTexto(material)}
+                        disabled={!materiaisComTextoProcessado[material.id]}
+                        className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
+                      >
+                        <BookOpen className="h-4 w-4 mr-1" />
+                        Texto
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenPdfOriginal(material)}
+                        className="flex-1 border-purple-200 text-purple-600 hover:bg-purple-50"
+                      >
+                        <FileImage className="h-4 w-4 mr-1" />
+                        PDF
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenPdf(material)}
+                      className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Abrir
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm(`Deseja realmente excluir "${material.nome}"?`)) {
+                        handleDelete(material.id)
+                      }
+                    }}
+                    className="border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Desktop: Tabela */}
+        <div className="hidden md:block rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40%]">Nome</TableHead>
-              <TableHead className="w-[15%]">Progresso</TableHead>
-              <TableHead className="w-[15%]">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</TableHead>
-              <TableHead className="w-[15%]">Tempo Estudado</TableHead>
-              <TableHead className="w-[15%] text-right">Ações</TableHead>
+              <TableHead className="w-[30%]">Nome</TableHead>
+              <TableHead className="w-[12%]">Progresso</TableHead>
+              <TableHead className="w-[12%]">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</TableHead>
+              <TableHead className="w-[12%]">Tempo Estudado</TableHead>
+              {tipo === 'PDF' && <TableHead className="w-[14%]">Formatação IA</TableHead>}
+              <TableHead className="w-[20%] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -214,6 +456,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
               const progresso = tipo === 'VIDEO'
                 ? Math.min(100, (tempoEstudadoSegundos / (material.duracaoSegundos || 1)) * 100)
                 : (material.paginasLidas / material.totalPaginas) * 100
+              const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
 
               return (
                 <TableRow key={material.id} className="group hover:bg-muted/50">
@@ -251,17 +494,64 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                   <TableCell className="text-sm font-medium">
                     {formatarTempo(tempoEstudadoSegundos)}
                   </TableCell>
+                  {tipo === 'PDF' && (
+                    <TableCell className="text-xs">
+                      {processingStatus ? (
+                        <span className={`${
+                          processingStatus.status === 'complete' ? 'text-green-600' :
+                          processingStatus.status === 'processing' || processingStatus.status === 'partial' ? 'text-blue-600' :
+                          processingStatus.status === 'error' ? 'text-red-600' : 'text-gray-500'
+                        }`}>
+                          {processingStatus.status === 'complete'
+                            ? `✅ ${processingStatus.totalPages} pág. (100%)`
+                            : processingStatus.status === 'processing' || processingStatus.status === 'partial'
+                            ? `⏳ ${processingStatus.processedPages}/${processingStatus.totalPages} (${processingStatus.progress}%)`
+                            : processingStatus.status === 'error'
+                            ? `❌ Erro`
+                            : `⏸️ Aguardando`
+                          }
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenPdf(material)}
-                        className="h-8 px-2 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Abrir
-                      </Button>
+                      {tipo === 'PDF' ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenTexto(material)}
+                            disabled={!materiaisComTextoProcessado[material.id]}
+                            className="h-8 px-2 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
+                          >
+                            <BookOpen className="h-4 w-4 mr-1" />
+                            Texto
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenPdfOriginal(material)}
+                            className="h-8 px-2 hover:bg-purple-50 hover:text-purple-600"
+                          >
+                            <FileImage className="h-4 w-4 mr-1" />
+                            PDF
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenPdf(material)}
+                          className="h-8 px-2 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Abrir
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -281,7 +571,8 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
             })}
           </TableBody>
         </Table>
-      </div>
+        </div>
+      </>
     )
   }
 

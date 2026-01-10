@@ -11,7 +11,7 @@ export default async function UserHashLayout({
   params,
 }: {
   children: ReactNode
-  params: { userHash: string }
+  params: Promise<{ userHash: string }>
 }) {
   const session = await getServerSession(authOptions)
 
@@ -20,8 +20,11 @@ export default async function UserHashLayout({
     redirect('/login')
   }
 
+  // Aguardar params antes de usar (Next.js 15+)
+  const { userHash } = await params
+
   // Validar se hash existe e pertence ao usuário logado
-  const user = await getUserByHash(params.userHash)
+  const user = await getUserByHash(userHash)
 
   if (!user || user.id !== session.user.id) {
     // Hash inválido ou tentativa de acessar dados de outro usuário
@@ -29,7 +32,7 @@ export default async function UserHashLayout({
   }
 
   return (
-    <UserHashProvider hash={params.userHash} userId={user.id}>
+    <UserHashProvider hash={userHash} userId={user.id}>
       <AppLayout>{children}</AppLayout>
     </UserHashProvider>
   )

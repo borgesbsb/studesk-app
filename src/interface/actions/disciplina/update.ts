@@ -8,6 +8,7 @@ export interface UpdateDisciplinaData {
   descricao?: string
   cargaHoraria?: number
   peso?: number
+  cor?: string
 }
 
 export async function atualizarDisciplina(id: string, data: UpdateDisciplinaData) {

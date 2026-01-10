@@ -7,7 +7,7 @@ Plataforma web para gerenciamento de estudos focada em estudantes de concursos p
 ## Funcionalidades Principais
 
 ### 📄 Materiais de Estudo
-- Upload e visualização de PDFs (PDFTron WebViewer)
+- Upload e visualização de PDFs (Syncfusion PDF Viewer)
 - Sistema de anotações e highlights
 - Tracking automático de progresso (página atual)
 - Histórico de sessões de leitura com tempo
@@ -39,7 +39,7 @@ Plataforma web para gerenciamento de estudos focada em estudantes de concursos p
 - **Framework**: Next.js 15.3.2 (App Router, React 19)
 - **Database**: PostgreSQL + Prisma ORM
 - **UI**: Tailwind CSS + Radix UI
-- **PDF**: PDFTron WebViewer + PDF.js
+- **PDF**: Syncfusion PDF Viewer
 - **Auth**: NextAuth.js
 
 ## Estrutura de Dados
@@ -62,7 +62,6 @@ MaterialEstudo
 ```bash
 # Setup inicial
 npm install
-npm run copy-webviewer
 npx prisma generate
 npx prisma db push
 
@@ -83,6 +82,7 @@ npx prisma studio
 DATABASE_URL="postgresql://..."
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="..."
+NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY="..."
 ```
 
 ## Estrutura do Projeto
@@ -105,7 +105,7 @@ NEXTAUTH_SECRET="..."
   schema.prisma
 /public
   /uploads             # PDFs enviados
-  /lib/webviewer      # PDFTron assets
+  /wasm               # Syncfusion WASM files
 /docs                  # Documentação
 ```
 
@@ -115,8 +115,8 @@ NEXTAUTH_SECRET="..."
 1. User faz upload via form
 2. Arquivo salvo em `public/uploads/`
 3. Registro criado no banco (`MaterialEstudo`)
-4. Navega para `/material/[id]`
-5. WebViewer carrega PDF
+4. Navega para `/material/[id]/syncfusion`
+5. Syncfusion PDF Viewer carrega PDF
 6. Progresso trackado automaticamente
 
 ### Criar Plano

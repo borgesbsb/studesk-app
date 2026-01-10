@@ -216,24 +216,39 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                         : "";
 
                       return (
-                        <TableRow key={materia.id} className={rowClasses}>
+                        <TableRow
+                          key={materia.id}
+                          className={rowClasses}
+                          style={materia.disciplinaCor && !materia.concluida ? {
+                            backgroundColor: `${materia.disciplinaCor}15` // 15 = ~8% opacity em hex
+                          } : undefined}
+                        >
                           {/* Disciplina */}
                           <TableCell>
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                {materia.concluida && (
-                                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                                )}
-                                <span className="font-semibold text-sm">
-                                  {materia.disciplinaNome}
-                                </span>
+                            <div className="flex items-center gap-2">
+                              {/* Barra colorida lateral */}
+                              {materia.disciplinaCor && (
+                                <div
+                                  className="w-1 h-12 rounded-full"
+                                  style={{ backgroundColor: materia.disciplinaCor }}
+                                />
+                              )}
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  {materia.concluida && (
+                                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                  )}
+                                  <span className="font-semibold text-sm">
+                                    {materia.disciplinaNome}
+                                  </span>
+                                </div>
+                                <Badge
+                                  variant={materia.prioridade === 1 ? "destructive" : materia.prioridade === 2 ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {materia.prioridade === 1 ? "Alta" : materia.prioridade === 2 ? "Média" : "Baixa"}
+                                </Badge>
                               </div>
-                              <Badge
-                                variant={materia.prioridade === 1 ? "destructive" : materia.prioridade === 2 ? "default" : "secondary"}
-                                className="text-xs"
-                              >
-                                {materia.prioridade === 1 ? "Alta" : materia.prioridade === 2 ? "Média" : "Baixa"}
-                              </Badge>
                             </div>
                           </TableCell>
 
@@ -248,10 +263,38 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
 
                           {/* Tempo com Pizza */}
                           <TableCell className="text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-2xl">{getPizzaEmoji(progressoTempo)}</span>
-                                <span className="text-sm font-medium">{Math.round(progressoTempo)}%</span>
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="relative w-16 h-16">
+                                <svg className="w-16 h-16 transform -rotate-90">
+                                  {/* Círculo de fundo */}
+                                  <circle
+                                    cx="32"
+                                    cy="32"
+                                    r="28"
+                                    stroke="currentColor"
+                                    strokeWidth="6"
+                                    fill="none"
+                                    className="text-gray-200 dark:text-gray-700"
+                                  />
+                                  {/* Círculo de progresso */}
+                                  <circle
+                                    cx="32"
+                                    cy="32"
+                                    r="28"
+                                    stroke="currentColor"
+                                    strokeWidth="6"
+                                    fill="none"
+                                    className="text-primary transition-all duration-500"
+                                    strokeLinecap="round"
+                                    style={{
+                                      strokeDasharray: 2 * Math.PI * 28,
+                                      strokeDashoffset: 2 * Math.PI * 28 * (1 - progressoTempo / 100)
+                                    }}
+                                  />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-xs font-bold">{Math.round(progressoTempo)}%</span>
+                                </div>
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {formatarTempo(materia.tempoRealEstudo)} / {formatarTempo(materia.horasPlanejadas)}
@@ -262,10 +305,38 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                           {/* Questões com Pizza */}
                           <TableCell className="text-center">
                             {materia.questoesPlanejadas > 0 ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-2xl">{getPizzaEmoji(progressoQuestoes)}</span>
-                                  <span className="text-sm font-medium">{Math.round(progressoQuestoes)}%</span>
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="relative w-16 h-16">
+                                  <svg className="w-16 h-16 transform -rotate-90">
+                                    {/* Círculo de fundo */}
+                                    <circle
+                                      cx="32"
+                                      cy="32"
+                                      r="28"
+                                      stroke="currentColor"
+                                      strokeWidth="6"
+                                      fill="none"
+                                      className="text-gray-200 dark:text-gray-700"
+                                    />
+                                    {/* Círculo de progresso */}
+                                    <circle
+                                      cx="32"
+                                      cy="32"
+                                      r="28"
+                                      stroke="currentColor"
+                                      strokeWidth="6"
+                                      fill="none"
+                                      className="text-primary transition-all duration-500"
+                                      strokeLinecap="round"
+                                      style={{
+                                        strokeDasharray: 2 * Math.PI * 28,
+                                        strokeDashoffset: 2 * Math.PI * 28 * (1 - progressoQuestoes / 100)
+                                      }}
+                                    />
+                                  </svg>
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-xs font-bold">{Math.round(progressoQuestoes)}%</span>
+                                  </div>
                                 </div>
                                 <div className="text-xs text-muted-foreground">
                                   {materia.questoesRealizadas} / {materia.questoesPlanejadas}

@@ -44,11 +44,6 @@ export function AdicionarCicloModal({ planoId, isOpen, onClose, onSuccess }: Adi
 
   const handleConfirmarCiclo = async (disciplinas: DisciplinaPlanejada[]) => {
     if (!planoId) return
-    
-    if (!disciplinas || disciplinas.length === 0) {
-      toast.error('Nenhuma disciplina selecionada!')
-      return
-    }
 
     try {
       console.log('🚀 Modal: iniciando handleConfirmarCiclo', { planoId, proximaSemana, disciplinas })

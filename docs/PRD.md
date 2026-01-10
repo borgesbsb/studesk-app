@@ -4,7 +4,7 @@
 
 Plataforma web de gerenciamento de estudos para estudantes de concursos. Upload de PDFs, criação de planos de estudo, tracking de progresso.
 
-**Tech Stack**: Next.js 15 + PostgreSQL + Prisma + PDFTron WebViewer
+**Tech Stack**: Next.js 15 + PostgreSQL + Prisma + Syncfusion PDF Viewer
 
 ## Estado Atual
 
@@ -12,7 +12,7 @@ Plataforma web de gerenciamento de estudos para estudantes de concursos. Upload 
 
 1. **Materiais de Estudo (PDFs)**
    - Upload local (public/uploads)
-   - Visualização com PDFTron WebViewer
+   - Visualização com Syncfusion PDF Viewer
    - Sistema de anotações
    - Tracking de progresso (página atual)
    - Histórico de sessões de leitura
@@ -114,7 +114,6 @@ MaterialEstudo
 ```bash
 # Dev
 npm run dev                 # Inicia dev server
-npm run copy-webviewer     # Copia assets PDFTron
 
 # Database
 npx prisma generate        # Gera Prisma Client
@@ -131,11 +130,12 @@ npm run build              # Build produção
 DATABASE_URL="postgresql://..."
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="..."
+NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY="..."
 ```
 
 ## Troubleshooting Comum
 
-- **WebViewer não carrega**: Rodar `npm run copy-webviewer`
+- **Syncfusion trial expirado**: Obter nova chave em https://www.syncfusion.com/account/manage-trials/start-trials
 - **Erro Prisma**: Rodar `npx prisma generate`
 - **PDF não aparece**: Verificar se existe em `public/uploads/`
 

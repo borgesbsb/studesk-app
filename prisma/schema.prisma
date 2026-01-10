@@ -22,6 +22,11 @@ model User {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  // Google Drive Integration
+  googleDriveAccessToken  String?   @db.Text
+  googleDriveRefreshToken String?   @db.Text
+  googleDriveTokenExpiry  DateTime?
+
   // Relações
   accounts         Account[]
   sessions         Session[]
@@ -81,6 +86,7 @@ model Disciplina {
   descricao     String?
   cargaHoraria  Int                  @default(0)
   peso          Float                @default(1.0)
+  cor           String?              @default("#3b82f6")
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -102,12 +108,14 @@ model MaterialEstudo {
   tempoAssistido    Int?                 @default(0) // Tempo assistido em segundos (para vídeos)
   arquivoPdfUrl     String?              // Opcional - PDFs armazenados no IndexedDB
   arquivoVideoUrl   String?              // Opcional - Vídeos armazenados no IndexedDB
+  fonteOrigem       String?              // Fonte de origem (ex: "Google Drive (fileId)")
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   anotacoes         Anotacao[]
   disciplinas       DisciplinaMaterial[]
   historicoLeitura  HistoricoLeitura[]
+  mobileText        PdfMobileText?       // Texto formatado para mobile
 
   @@index([userId])
   @@index([tipo])
@@ -152,6 +160,10 @@ model Anotacao {
   altura     Float?
   cor        String?        @default("#ffff00")
   tipo       String         @default("highlight")
+  // Campos para anotações em texto formatado (mobile reader)
+  startOffset Int?          // Posição inicial no texto (char index)
+  endOffset   Int?          // Posição final no texto (char index)
+  metadata    Json?         // Metadados adicionais (ex: paths para freehand, configs de underline)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   material   MaterialEstudo @relation(fields: [materialId], references: [id], onDelete: Cascade)
@@ -160,6 +172,35 @@ model Anotacao {
   @@index([pagina])
   @@index([tipo])
   @@index([createdAt])
+}
+
+// Texto formatado para leitura mobile (e-reader style)
+model PdfMobileText {
+  id                String         @id @default(cuid())
+  materialId        String         @unique // Um material = um texto formatado
+  formattedText     String         @db.Text // Texto em markdown formatado pela IA
+  rawText           String         @db.Text // Texto bruto extraído do PDF (backup)
+  processedAt       DateTime       @default(now())
+  aiModel           String?        @default("gpt-4o-mini") // Modelo usado para formatação
+  tokensUsed        Int?           // Tokens consumidos na formatação
+
+  // Campos para processamento incremental
+  totalPages        Int            @default(0) // Total de páginas no PDF
+  processedPages    Int            @default(0) // Número de páginas processadas
+  processingStatus  String         @default("pending") // pending, processing, partial, complete, error
+  lastProcessedPage Int            @default(0) // Última página processada
+  processingError   String?        // Mensagem de erro se houver
+
+  // Padrões de cabeçalho/rodapé detectados pela IA
+  headerFooterPatterns String?     @db.Text // JSON com padrões regex detectados pela IA
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  material          MaterialEstudo @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([materialId])
+  @@index([processedAt])
+  @@index([processingStatus])
 }
 
 model PlanoEstudo {
@@ -202,31 +243,51 @@ model SemanaEstudo {
 }
 
 model DisciplinaSemana {
-  id                  String       @id @default(cuid())
+  id                  String          @id @default(cuid())
   semanaId            String
   disciplinaId        String
   horasPlanejadas     Int
-  horasRealizadas     Int          @default(0)
-  prioridade          Int          @default(1)
+  horasRealizadas     Int             @default(0)
+  prioridade          Int             @default(1)
   observacoes         String?
-  concluida           Boolean      @default(false)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  concluida           Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
   materialNome        String?
   materialUrl         String?
-  paginasLidas        Int          @default(0)
-  questoesPlanejadas  Int          @default(0)
-  questoesRealizadas  Int          @default(0)
-  tempoVideoPlanejado Int          @default(0)
-  tempoVideoRealizado Int          @default(0)
+  paginasLidas        Int             @default(0)
+  questoesPlanejadas  Int             @default(0)
+  questoesRealizadas  Int             @default(0)
+  tempoVideoPlanejado Int             @default(0)
+  tempoVideoRealizado Int             @default(0)
   tipoVeiculo         String?
-  totalPaginas        Int          @default(0)
+  totalPaginas        Int             @default(0)
   diasEstudo          String?
-  disciplina          Disciplina   @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
-  semana              SemanaEstudo @relation(fields: [semanaId], references: [id], onDelete: Cascade)
+  disciplina          Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  semana              SemanaEstudo    @relation(fields: [semanaId], references: [id], onDelete: Cascade)
+  dias                DisciplinaDia[] // Relação com DisciplinaDia
 
   @@unique([semanaId, disciplinaId])
   @@index([semanaId])
   @@index([disciplinaId])
   @@index([prioridade])
+}
+
+model DisciplinaDia {
+  id                  String           @id @default(cuid())
+  disciplinaSemanaId  String
+  dia                 String           // "dia1", "dia2", "dia3", "dia4", "dia5", "dia6", "dia7"
+  horasPlanejadas     Float            @default(0) // Horas específicas para este dia
+  horasRealizadas     Float            @default(0) // Horas realizadas neste dia
+  questoesPlanejadas  Int              @default(0) // Questões planejadas para este dia
+  questoesRealizadas  Int              @default(0) // Questões realizadas neste dia
+  observacoes         String?          // Observações específicas do dia
+  concluida           Boolean          @default(false) // Se o estudo deste dia foi concluído
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  disciplinaSemana    DisciplinaSemana @relation(fields: [disciplinaSemanaId], references: [id], onDelete: Cascade)
+
+  @@unique([disciplinaSemanaId, dia])
+  @@index([disciplinaSemanaId])
+  @@index([dia])
 }

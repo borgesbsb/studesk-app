@@ -7,25 +7,52 @@ import { Sidebar } from "./Sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SaveStatusProvider } from "@/contexts/save-status-context"
 import { HeaderProvider, useHeader } from "@/contexts/header-context"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { SidebarContent } from "./SidebarContent"
+import { useUserHash } from "@/contexts/user-hash-context"
 
 function AppLayoutContent({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(true)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { fullWidth } = useHeader()
+  const { hash } = useUserHash()
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen md:min-h-screen flex overflow-hidden md:overflow-visible">
+      {/* Desktop: Sidebar fixa */}
       <Sidebar isOpen={isOpen} setIsOpen={setIsOpen} />
 
+      {/* Mobile: Drawer */}
+      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+        <SheetContent side="left" className="p-0 w-72">
+          <SidebarContent
+            userHash={hash}
+            isOpen={true}
+            isMobile={true}
+            onLinkClick={() => setIsMobileMenuOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+
       <div className={cn(
-        "flex-1",
+        "flex-1 flex flex-col",
         "transition-all duration-300",
-        isOpen ? "ml-72" : "ml-20"
+        "h-screen md:min-h-screen",
+        // Desktop: aplica margin-left
+        // Mobile: sem margin (sidebar está escondida)
+        isOpen ? "md:ml-72" : "md:ml-20"
       )}>
-        <Header isOpen={isOpen} setIsOpen={setIsOpen} />
+        <Header
+          isOpen={isOpen}
+          setIsOpen={setIsOpen}
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+        />
 
         <main className={cn(
           "bg-background/95",
-          fullWidth ? "h-[calc(100vh-4rem)] relative" : "min-h-[calc(100vh-4rem)] p-6"
+          "flex-1 overflow-y-auto",
+          "p-0"
         )}>
           {children}
         </main>

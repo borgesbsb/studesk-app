@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { compare } from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // Adapter removido - não é compatível com CredentialsProvider
+  // adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -67,7 +68,24 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 dias
+    maxAge: 24 * 60 * 60, // 24 horas
+    updateAge: 24 * 60 * 60, // Atualiza a sessão a cada 24 horas
+  },
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 horas
+  },
+  cookies: {
+    sessionToken: {
+      name: 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        // Apenas usar secure: true em HTTPS real (não em localhost)
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
+        maxAge: 24 * 60 * 60, // 24 horas em segundos
+      }
+    }
   },
   secret: process.env.NEXTAUTH_SECRET,
 }

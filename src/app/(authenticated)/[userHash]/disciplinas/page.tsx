@@ -93,9 +93,10 @@ export default function DisciplinasPage() {
   }, [])
 
   return (
-    <div className="space-y-6">
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+      <div className="space-y-6 pb-6 md:pb-0">
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total de Disciplinas */}
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow">
           <CardContent className="p-6">
@@ -192,19 +193,19 @@ export default function DisciplinasPage() {
         </CardHeader>
         <CardContent className="p-6">
           {/* Barra de pesquisa e botão adicionar */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-0 mb-6">
             <AdicionarDisciplinaModal
               onSuccess={() => {
                 window.location.reload()
               }}
             />
-            <div className="relative">
+            <div className="relative w-full md:w-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Pesquisar disciplinas..."
                 value={termoPesquisa}
                 onChange={(e) => setTermoPesquisa(e.target.value)}
-                className="pl-10 w-80 h-10 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm transition-all duration-200"
+                className="pl-10 w-full md:w-80 h-10 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm transition-all duration-200"
               />
             </div>
           </div>
@@ -212,6 +213,7 @@ export default function DisciplinasPage() {
           <DisciplinasTable termoPesquisa={termoPesquisa} />
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

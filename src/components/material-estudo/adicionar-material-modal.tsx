@@ -16,6 +16,7 @@ import { useState, useRef } from "react"
 import { toast } from "sonner"
 import { criarMaterialEstudo } from "@/interface/actions/material-estudo/create"
 import { PdfSourceDialog } from "./pdf-source-dialog"
+import { GoogleDrivePicker } from "./google-drive-picker"
 import { pdfCacheService } from "@/services/pdf-cache.service"
 import { videoCacheService } from "@/services/video-cache.service"
 import * as pdfjsLib from 'pdfjs-dist'
@@ -34,6 +35,7 @@ interface AdicionarMaterialModalProps {
 export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: AdicionarMaterialModalProps) {
   const [open, setOpen] = useState(false)
   const [showSourceDialog, setShowSourceDialog] = useState(false)
+  const [showDrivePicker, setShowDrivePicker] = useState(false)
   const [selectedSource, setSelectedSource] = useState<'local' | 'drive' | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingFile, setLoadingFile] = useState(false)
@@ -63,14 +65,18 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
     setShowSourceDialog(false)
 
     if (source === 'drive') {
-      toast.info('Integração com Google Drive em desenvolvimento', {
-        description: 'Esta funcionalidade estará disponível em breve!'
-      })
-      setOpen(false)
+      // Abrir picker do Google Drive
+      setShowDrivePicker(true)
     } else {
       // Abre o modal principal para upload local
       setOpen(true)
     }
+  }
+
+  const handleDriveFileImported = () => {
+    // Callback quando arquivo do Drive foi importado com sucesso
+    setShowDrivePicker(false)
+    onSuccess?.()
   }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,6 +227,14 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
         open={showSourceDialog}
         onOpenChange={setShowSourceDialog}
         onSelectSource={handleSourceSelect}
+      />
+
+      {/* Google Drive Picker */}
+      <GoogleDrivePicker
+        open={showDrivePicker}
+        onOpenChange={setShowDrivePicker}
+        onFileImported={handleDriveFileImported}
+        disciplinaId={disciplinaId}
       />
 
       {/* Dialog principal de upload */}

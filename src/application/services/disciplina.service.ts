@@ -6,6 +6,8 @@ import { Prisma } from "@prisma/client"
 type CreateDisciplinaInput = {
   nome: string
   descricao?: string | null
+  cargaHoraria?: number
+  peso?: number
   cor?: string | null
 }
 

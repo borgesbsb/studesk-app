@@ -12,9 +12,6 @@ npm install
 npx prisma generate
 npx prisma db push
 
-# Copiar arquivos do WebViewer
-npm run copy-webviewer
-
 # Iniciar servidor de desenvolvimento
 npm run dev
 ```
@@ -37,7 +34,7 @@ Documentação completa em [`/docs`](./docs/README.md):
 - **Framework**: Next.js 15.3.2 (App Router)
 - **Database**: PostgreSQL + Prisma ORM
 - **UI**: React 19, Tailwind CSS, Radix UI
-- **PDF**: PDFTron WebViewer, PDF.js
+- **PDF**: Syncfusion PDF Viewer
 - **Auth**: NextAuth.js
 
 ## ✨ Principais Funcionalidades
@@ -63,7 +60,6 @@ npx prisma studio        # Interface visual do banco
 
 # Utilitários
 npm run lint             # Executar ESLint
-npm run copy-webviewer   # Copiar arquivos do WebViewer
 ```
 
 ## ⚙️ Configuração
@@ -74,6 +70,7 @@ Crie um arquivo `.env` na raiz do projeto:
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/studesk"
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="seu-secret-aqui"
+NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY="sua-chave-syncfusion-aqui"
 ```
 
 ## 🏗️ Estrutura do Projeto

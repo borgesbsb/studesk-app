@@ -13,9 +13,12 @@ Documentação completa da plataforma StudesDk para gerenciamento de estudos.
 ```bash
 # Setup
 npm install
-npm run copy-webviewer
 npx prisma generate
 npx prisma db push
+
+# Configurar variável de ambiente
+# Adicione ao .env.local:
+# NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY="sua-chave"
 
 # Rodar
 npm run dev
@@ -118,12 +121,12 @@ Plataforma web para **estudantes de concursos** organizarem:
 - Planos e cronogramas
 - Progresso de aprendizado
 
-**Stack**: Next.js 15 + PostgreSQL + Prisma + PDFTron WebViewer
+**Stack**: Next.js 15 + PostgreSQL + Prisma + Syncfusion PDF Viewer
 
 ## ✅ Status Atual
 
-- ✅ Upload e visualização de PDFs
-- ✅ Sistema de anotações
+- ✅ Upload e visualização de PDFs (Syncfusion)
+- ✅ Sistema de anotações completo
 - ✅ Planos de estudo (4 modos)
 - ✅ Dashboard com tracking
 - ✅ Autenticação
@@ -135,7 +138,7 @@ Plataforma web para **estudantes de concursos** organizarem:
 2. API Routes para CRUD (usar Server Actions)
 3. Upload em cloud (usar local storage)
 4. Features de teams/grupos
-5. Integração com IA sem discutir
+5. Usar PDFTron ou outras bibliotecas PDF (usar Syncfusion)
 
 ## 📊 Métricas de Documentação
 

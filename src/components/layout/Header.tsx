@@ -10,9 +10,11 @@ import { useHeader } from "@/contexts/header-context"
 interface HeaderProps {
   isOpen: boolean
   setIsOpen: (value: boolean) => void
+  isMobileMenuOpen?: boolean
+  setIsMobileMenuOpen?: (value: boolean) => void
 }
 
-export function Header({ isOpen, setIsOpen }: HeaderProps) {
+export function Header({ isOpen, setIsOpen, isMobileMenuOpen, setIsMobileMenuOpen }: HeaderProps) {
   const { status, message } = useSaveStatus()
   const { customContent, title, backButton } = useHeader()
 
@@ -20,16 +22,30 @@ export function Header({ isOpen, setIsOpen }: HeaderProps) {
     <header className="h-16 bg-background shadow-sm flex items-center px-6 sticky top-0 z-10 border-b">
       {/* Lado esquerdo: Menu e Botão Voltar */}
       <div className="flex items-center">
+        {/* Mobile: Botão hamburguer (sempre visível) */}
+        {setIsMobileMenuOpen && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="md:hidden mr-4 hover:bg-accent rounded-full"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
+
+        {/* Desktop: Botão para abrir sidebar quando fechada */}
         {!isOpen && (
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsOpen(true)}
-            className="mr-4 hover:bg-accent rounded-full"
+            className="hidden md:flex mr-4 hover:bg-accent rounded-full"
           >
             <Menu className="h-5 w-5" />
           </Button>
         )}
+
         {backButton}
       </div>
 

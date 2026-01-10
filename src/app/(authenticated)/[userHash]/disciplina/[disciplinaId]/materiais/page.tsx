@@ -48,11 +48,13 @@ const MateriaisPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header Card */}
+    <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+      <div className="space-y-6 pb-6 md:pb-0">
+        {/* Header Card */}
       <Card className="border border-gray-200 shadow-sm bg-white">
         <CardHeader className="pb-5 border-b border-gray-100">
-          <div className="flex items-center gap-4">
+          {/* Desktop: flex-row | Mobile: flex-col */}
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4">
             <Button
               variant="ghost"
               size="icon"
@@ -61,19 +63,19 @@ const MateriaisPage = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            
+
             {loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-7 w-64 bg-gray-200" />
-                <Skeleton className="h-4 w-40 bg-gray-200" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-7 w-full md:w-64 bg-gray-200" />
+                <Skeleton className="h-4 w-full md:w-40 bg-gray-200" />
               </div>
             ) : (
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="p-2 bg-gray-100 rounded-lg">
+              <div className="flex-1 w-full md:w-auto">
+                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 mb-1">
+                  <div className="p-2 bg-gray-100 rounded-lg w-fit">
                     <GraduationCap className="h-5 w-5 text-gray-600" />
                   </div>
-                  <h1 className="text-2xl font-semibold text-gray-900">
+                  <h1 className="text-xl md:text-2xl font-semibold text-gray-900">
                     {disciplina?.nome || "Disciplina não encontrada"}
                   </h1>
                 </div>
@@ -83,14 +85,15 @@ const MateriaisPage = () => {
                 </p>
               </div>
             )}
-            
-            <div className="flex items-center gap-3">
-              <AdicionarMaterialModal 
+
+            {/* Mobile: botão full width | Desktop: auto */}
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <AdicionarMaterialModal
                 disciplinaId={disciplinaId}
                 onSuccess={() => {
                   window.location.reload()
                 }}
-                className="bg-gray-900 hover:bg-gray-800 text-white border-0 shadow-sm hover:shadow-md transition-all duration-200"
+                className="bg-gray-900 hover:bg-gray-800 text-white border-0 shadow-sm hover:shadow-md transition-all duration-200 w-full md:w-auto"
               />
             </div>
           </div>
@@ -118,6 +121,7 @@ const MateriaisPage = () => {
           <MateriaisTable disciplinaId={disciplinaId} />
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

@@ -2,19 +2,22 @@
 
 ## Setup e Build
 
-### WebViewer não carrega / Arquivos não encontrados
+### Syncfusion PDF Viewer não carrega
 
 **Sintomas**:
-- Erro 404 ao carregar PDF
-- WebViewer não inicializa
-- "Failed to load WebViewer files"
+- Erro "License key not registered"
+- Viewer não inicializa
+- Mensagem de trial expirado
 
-**Causa**: Assets do PDFTron não foram copiados para `/public/lib/webviewer`
+**Causa**: Licença do Syncfusion não configurada ou expirada
 
 **Solução**:
-```bash
-npm run copy-webviewer
+1. Obter nova chave em https://www.syncfusion.com/account/manage-trials/start-trials
+2. Adicionar ao `.env.local`:
+```env
+NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY="sua-chave-aqui"
 ```
+3. Reiniciar o servidor de desenvolvimento
 
 ### Erro Prisma após mudança no schema
 
@@ -33,9 +36,9 @@ npx prisma db push
 **Sintomas**: Erro durante `npm run build`
 
 **Checklist**:
-1. Rodar `npm run copy-webviewer` antes do build
-2. Verificar variáveis de ambiente
-3. Limpar cache: `rm -rf .next`
+1. Verificar variáveis de ambiente (incluindo `NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY`)
+2. Limpar cache: `rm -rf .next`
+3. Reinstalar dependências se necessário
 
 ## PDFs e Upload
 
@@ -67,18 +70,131 @@ ls -la public/uploads/
 npm run migrate-pdf-urls
 ```
 
-### WebViewer Trial Expired
+### Syncfusion Trial Expired
 
 **Sintomas**:
-- Erro: "Your 7-day trial has expired"
-- PDF não carrega
+- Mensagem de trial expirado
+- Viewer exibe marca d'água
+- PDF não carrega completamente
 
-**Solução Automática**: Sistema detecta e recarrega automaticamente
+**Solução**:
+1. Obter nova chave trial em https://www.syncfusion.com/account/manage-trials/start-trials
+2. Atualizar variável de ambiente `NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY`
+3. Reiniciar servidor de desenvolvimento
+4. Limpar cache do browser
 
-**Solução Manual**:
-1. Limpar cache do browser
-2. Recarregar a página
-3. Se persistir, obter trial key em https://dev.apryse.com/
+### Controles de visualização não aparecem
+
+**Sintomas**:
+- Botão de Settings (⚙️) não visível no header
+- Modal de ajustes não abre
+- Toolbar do Syncfusion oculta no mobile
+
+**Causa**: Toolbar padrão do Syncfusion pode estar oculta em telas pequenas
+
+**Solução implementada**:
+- Controles customizados no **header da página** (não na toolbar do Syncfusion)
+- Botão Settings (⚙️) sempre visível entre cronômetro e botão Salvar
+- Modal flutuante com todas as opções de visualização
+
+**Verificar**:
+```typescript
+// apps/mobile/src/app/material/[id]/page.tsx
+<button onClick={() => setShowDisplaySettings(!showDisplaySettings)}>
+  <Settings className="h-4 w-4 text-gray-600" />
+</button>
+```
+
+### Controles de zoom nativos (Magnification) não aparecem
+
+**Sintomas**:
+- Toolbar do Syncfusion não mostra controles de zoom
+- Não é possível ajustar zoom manualmente (zoom in/out)
+- `enableMagnification={true}` definido mas controles invisíveis
+
+**Causa**: Toolbar com muitos itens pode colapsar/ocultar alguns controles em telas mobile pequenas
+
+**Solução implementada**:
+1. Simplificar toolbar focando em itens essenciais para mobile
+2. Posicionar MagnificationTool no início da toolbar para maior visibilidade
+3. Adicionar `enableToolbar={true}` explicitamente
+
+**Verificar**:
+```typescript
+// apps/mobile/src/components/pdf/SyncfusionPdfViewer.tsx
+const toolbarSettings: ToolbarSettingsModel = {
+  showTooltip: true,
+  toolbarItems: [
+    'PageNavigationTool',
+    'MagnificationTool',  // ← Posicionado no início para visibilidade
+    'SearchOption',
+    'AnnotationEditTool',
+    // ... outros controles customizados
+  ]
+};
+
+<PdfViewerComponent
+  enableToolbar={true}  // ← Explicitamente habilitado
+  enableMagnification={true}
+  toolbarSettings={toolbarSettings}
+  // ...
+/>
+```
+
+**Controles de zoom disponíveis**:
+- **Zoom In (+)**: Aumentar zoom
+- **Zoom Out (-)**: Diminuir zoom
+- **Zoom %**: Dropdown com percentuais predefinidos
+- **Fit to Page**: Ajustar página inteira à tela
+- **Fit to Width**: Ajustar largura à tela
+
+### Modo Reflow não funciona
+
+**Sintomas**:
+- Ativar "Modo Reflow" não muda visualização
+- Ainda precisa scroll horizontal
+- Erro no console sobre TextReflow
+
+**Causa**: Syncfusion TextReflow pode não estar disponível ou configurado incorretamente
+
+**Solução implementada**:
+Usar API de `Magnification` ao invés de `TextReflow`:
+```typescript
+// Simula "reflow" com zoom otimizado
+viewerRef.current.magnification.fitToWidth();
+const currentZoom = viewerRef.current.magnification.zoomFactor;
+viewerRef.current.magnification.zoomTo(currentZoom * 1.2);
+```
+
+**Alternativa**:
+Use controles de **Modo de Ajuste**:
+- **Largura**: `fitToWidth` - melhor para leitura mobile
+- **Página**: `fitToPage` - visualiza página completa
+- **Auto**: zoom 100%
+
+### Preferências não são salvas
+
+**Sintomas**:
+- Ao reabrir PDF, configurações voltam ao padrão
+- Brilho/Contraste resetam
+- Modo de leitura não persiste
+
+**Causa**: LocalStorage não está salvando ou sendo limpado
+
+**Debug**:
+```javascript
+// No console do browser
+localStorage.getItem('syncfusion-pdf-brightness')
+localStorage.getItem('syncfusion-pdf-contrast')
+localStorage.getItem('syncfusion-pdf-reading-mode')
+localStorage.getItem('syncfusion-pdf-fit-mode')
+localStorage.getItem('syncfusion-pdf-reflow-mode')
+```
+
+**Solução**:
+- Verificar se browser permite localStorage
+- Não usar "Private/Incognito Mode"
+- Verificar se o domínio/porta não mudou
 
 ## Planos de Estudo
 
@@ -276,11 +392,14 @@ npx prisma db pull
 # Build test
 npm run build
 
-# WebViewer files
-ls -la public/lib/webviewer/
+# WASM files
+ls -la public/wasm/
 
 # Uploads
 ls -la public/uploads/ | head -20
+
+# Verificar variáveis de ambiente
+echo $NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY
 ```
 
 ### Reset completo (desenvolvimento)
@@ -290,11 +409,152 @@ ls -la public/uploads/ | head -20
 rm -rf .next
 rm -rf node_modules
 npm install
-npm run copy-webviewer
 npx prisma generate
 npx prisma db push
 npm run dev
 ```
+
+## Mobile/PWA (studesk-monorepo)
+
+### App mobile não funciona no celular (rede local)
+
+**Sintomas**:
+- Funciona em `http://localhost:3031` no PC
+- Falha ao acessar via `http://192.168.15.8:3031` no celular
+- Erro: `ERR_CONNECTION_REFUSED` ou `Failed to fetch`
+
+**Causa**: URLs hardcoded para `localhost:3030` no código
+
+**Solução**:
+Usar utilitário de detecção dinâmica de URL. **Arquivos já corrigidos**:
+```typescript
+import { getBackendBaseUrl, getApiBaseUrl } from '@/lib/api-base-url'
+
+// Para PDFs e recursos
+const backendUrl = getBackendBaseUrl() // http://192.168.15.8:3030
+
+// Para chamadas API
+const apiUrl = getApiBaseUrl() // http://192.168.15.8:3030/api
+```
+
+**Arquivos corrigidos**:
+- `apps/mobile/src/app/disciplinas/[disciplinaId]/materiais/page.tsx`
+- `apps/mobile/src/app/materiais/page.tsx`
+- `apps/mobile/src/app/material/[id]/page.tsx`
+- `apps/mobile/src/components/materiais/google-drive-picker-mobile.tsx`
+
+### Erro CORS: "wildcard '*' when credentials mode is 'include'"
+
+**Sintoma completo**:
+```
+Access to fetch at 'http://192.168.15.8:3030/api/disciplinas' from origin
+'http://192.168.15.8:3031' has been blocked by CORS policy:
+The value of the 'Access-Control-Allow-Origin' header in the response must not
+be the wildcard '*' when the request's credentials mode is 'include'.
+```
+
+**Causa**:
+- Mobile app usa `credentials: 'include'` para enviar cookies de autenticação
+- Backend retorna `Access-Control-Allow-Origin: *` (wildcard)
+- CORS não permite wildcard quando credentials são usados
+
+**Solução**:
+Configurar origem específica no `next.config.ts` do backend (`/studesk/next.config.ts`):
+
+```typescript
+async headers() {
+  return [
+    {
+      source: '/api/:path*',
+      headers: [
+        // ✅ Origem específica ao invés de '*'
+        { key: 'Access-Control-Allow-Origin', value: 'http://192.168.15.8:3031' },
+        { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, PATCH, DELETE, OPTIONS' },
+        { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization, X-Requested-With, Accept, Origin' },
+        { key: 'Access-Control-Allow-Credentials', value: 'true' },
+        { key: 'Access-Control-Max-Age', value: '86400' },
+      ],
+    },
+  ]
+}
+```
+
+**Verificar**: Após mudança, reiniciar servidor backend (`npm run dev` na porta 3030).
+
+### PDF não baixa para cache offline
+
+**Sintomas**:
+- Clica em "Baixar" mas nada acontece
+- Console mostra erro de fetch
+- Badge permanece "Online" (não muda para "Offline")
+
+**Debug via Chrome DevTools**:
+```bash
+# No PC, conectar celular via USB
+# Abrir Chrome → chrome://inspect
+# Selecionar dispositivo e inspecionar
+```
+
+**Verificar no console do celular**:
+1. URL gerada está correta? (deve usar IP da rede, não localhost)
+2. Erro de CORS?
+3. Erro 404? (backend não está servindo o arquivo)
+
+**Checklist**:
+- ✅ Backend rodando na porta 3030
+- ✅ Arquivo existe em `public/uploads/` no backend
+- ✅ CORS configurado corretamente
+- ✅ Firewall permite conexões na porta 3030
+
+### IndexedDB quota exceeded
+
+**Sintomas**:
+- Erro ao baixar PDF grande
+- "QuotaExceededError"
+
+**Causa**: Cache atingiu limite de 500MB
+
+**Solução**: Service faz cleanup automático (LRU), mas pode forçar:
+```typescript
+// No console do celular (Chrome DevTools)
+await pdfCacheService.cleanupOldPdfs(100 * 1024 * 1024) // Remove até atingir 100MB livre
+```
+
+**Ou**: Remover PDFs manualmente da lista de materiais (botão 🗑️).
+
+### Google Drive não conecta no mobile
+
+**Sintomas**:
+- Botão "Conectar Google Drive" não funciona
+- Popup OAuth não abre
+
+**Causa**: OAuth flow precisa redirecionar para o backend (porta 3030)
+
+**Importante**:
+- Autenticação OAuth acontece no **backend** (porta 3030)
+- Tokens são salvos no banco de dados
+- Mobile apenas consome a API para listar/importar arquivos
+
+**Solução**: Conectar Google Drive pelo app **web** primeiro (localhost:3030 ou IP:3030), depois usar no mobile.
+
+### Logs de debug mobile
+
+**Como ver logs do celular**:
+
+1. **Chrome DevTools** (recomendado):
+   ```bash
+   # Conectar celular via USB
+   # Ativar "Depuração USB" no celular
+   # Chrome → chrome://inspect → selecionar dispositivo
+   ```
+
+2. **Console.log estratégicos**:
+   ```typescript
+   console.log('🟠 [api-base-url] Detectando URL:', { hostname, protocol })
+   console.log('🔵 [api-client] Fazendo requisição:', { url, method })
+   console.log('🟢 [api-client] Resposta recebida:', { status, ok })
+   console.log('🔴 [api-client] Erro:', error)
+   ```
 
 ## Quando Pedir Ajuda
 
@@ -302,10 +562,11 @@ Se nenhuma solução acima funcionou, coletar:
 
 1. **Erro completo**: Console do browser + terminal
 2. **Contexto**: O que estava fazendo quando erro ocorreu?
-3. **Ambiente**: Dev ou produção?
+3. **Ambiente**: Dev ou produção? PC ou celular?
 4. **Versão**: Node, npm, PostgreSQL
 5. **Tentativas**: O que já tentou?
+6. **Para mobile**: Logs do Chrome DevTools do celular
 
 ---
 
-**Última atualização**: 2025-01-11
+**Última atualização**: 2025-12-28

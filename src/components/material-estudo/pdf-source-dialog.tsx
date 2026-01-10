@@ -67,12 +67,8 @@ export function PdfSourceDialog({
                             </div>
                             <div className="flex-1 text-left">
                                 <div className="font-semibold text-sm text-gray-900">Google Drive</div>
-                                <div className="text-xs text-gray-500">Abrir PDF do Google Drive</div>
+                                <div className="text-xs text-gray-500">Importar PDF do Google Drive</div>
                             </div>
-                            {/* Badge "Em breve" */}
-                            <span className="px-2 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded-full border border-amber-200">
-                                Em breve
-                            </span>
                         </div>
                     </Button>
                 </div>

@@ -23,8 +23,7 @@ interface AdicionarDisciplinaModalProps {
 interface FormData {
   nome: string
   descricao: string
-  cargaHoraria: number
-  peso: number
+  cor: string
 }
 
 export function AdicionarDisciplinaModal({ onSuccess }: AdicionarDisciplinaModalProps) {
@@ -33,8 +32,7 @@ export function AdicionarDisciplinaModal({ onSuccess }: AdicionarDisciplinaModal
   const [formData, setFormData] = useState<FormData>({
     nome: "",
     descricao: "",
-    cargaHoraria: 0,
-    peso: 1,
+    cor: "#3b82f6",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,8 +41,7 @@ export function AdicionarDisciplinaModal({ onSuccess }: AdicionarDisciplinaModal
       const response = await criarDisciplina({
         nome: formData.nome,
         descricao: formData.descricao,
-        cargaHoraria: formData.cargaHoraria,
-        peso: formData.peso,
+        cor: formData.cor,
       })
 
       if (response.success) {
@@ -56,8 +53,7 @@ export function AdicionarDisciplinaModal({ onSuccess }: AdicionarDisciplinaModal
         setFormData({
           nome: "",
           descricao: "",
-          cargaHoraria: 0,
-          peso: 1,
+          cor: "#3b82f6",
         })
         onSuccess?.()
       } else {
@@ -81,7 +77,7 @@ export function AdicionarDisciplinaModal({ onSuccess }: AdicionarDisciplinaModal
       <DialogTrigger asChild>
         <Button>Adicionar Disciplina</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="w-[95vw] max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Criar Nova Disciplina</DialogTitle>
@@ -90,51 +86,42 @@ export function AdicionarDisciplinaModal({ onSuccess }: AdicionarDisciplinaModal
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="nome" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+              <Label htmlFor="nome" className="text-left sm:text-right">
                 Nome
               </Label>
               <Input
                 id="nome"
                 value={formData.nome}
                 onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                className="col-span-3"
+                className="col-span-1 sm:col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="descricao" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+              <Label htmlFor="descricao" className="text-left sm:text-right">
                 Descrição
               </Label>
               <Input
                 id="descricao"
                 value={formData.descricao}
                 onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                className="col-span-3"
+                className="col-span-1 sm:col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="cargaHoraria" className="text-right">
-                Carga Horária
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+              <Label htmlFor="cor" className="text-left sm:text-right">
+                Cor
               </Label>
-              <Input
-                id="cargaHoraria"
-                type="number"
-                value={formData.cargaHoraria}
-                onChange={(e) => setFormData({ ...formData, cargaHoraria: Number(e.target.value) })}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="peso" className="text-right">
-                Peso
-              </Label>
-              <Input
-                id="peso"
-                type="number"
-                value={formData.peso}
-                onChange={(e) => setFormData({ ...formData, peso: Number(e.target.value) })}
-                className="col-span-3"
-              />
+              <div className="col-span-1 sm:col-span-3 flex items-center gap-3">
+                <Input
+                  id="cor"
+                  type="color"
+                  value={formData.cor}
+                  onChange={(e) => setFormData({ ...formData, cor: e.target.value })}
+                  className="w-20 h-10 cursor-pointer"
+                />
+                <span className="text-sm text-muted-foreground">{formData.cor}</span>
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -91,6 +91,7 @@ export default function AgendaPage() {
   ]
 
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+  const dayNamesShort = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] // Para mobile
 
   const days = getDaysInMonth(currentDate)
 
@@ -126,11 +127,11 @@ export default function AgendaPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           <h2 className="text-lg font-semibold min-w-[180px] text-center">
             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
           </h2>
-          
+
           <Button
             variant="outline"
             size="icon"
@@ -146,8 +147,8 @@ export default function AgendaPage() {
         <CardContent className="p-4">
           {/* Day Headers */}
           <div className="grid grid-cols-7 gap-2 mb-4">
-            {dayNames.map(day => (
-              <div key={day} className="p-2 text-center font-semibold text-muted-foreground">
+            {dayNames.map((day) => (
+              <div key={day} className="p-2 text-center font-semibold text-muted-foreground text-sm">
                 {day}
               </div>
             ))}
@@ -169,21 +170,18 @@ export default function AgendaPage() {
                     <div className="flex justify-between items-start">
                       <span className="font-medium text-sm">{day}</span>
                       {agendaData?.dias?.[day] && (
-                        <Badge variant="secondary" className="text-xs px-1">
+                        <Badge variant="secondary" className="text-xs">
                           {agendaData.dias[day].length}
                         </Badge>
                       )}
                     </div>
-                    
-                    {/* Disciplinas do dia */}
+
                     <div className="space-y-1">
                       {agendaData?.dias[day]?.map((disciplina, idx) => (
                         <div
                           key={idx}
-                          className={`
-                            ${disciplina.cor || 'bg-gray-500'} text-white text-xs px-2 py-1 rounded
-                            truncate font-medium
-                          `}
+                          className="rounded text-white text-xs px-2 py-1 truncate font-medium"
+                          style={{ backgroundColor: disciplina.cor || '#6b7280' }}
                           title={disciplina.nome}
                         >
                           {disciplina.nome}
@@ -201,13 +199,16 @@ export default function AgendaPage() {
       {/* Legend */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Disciplinas</CardTitle>
+          <CardTitle>Disciplinas</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {todasDisciplinas.map(disciplina => (
               <div key={disciplina.id} className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded ${disciplina.cor || 'bg-gray-500'}`}></div>
+                <div
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: disciplina.cor || '#6b7280' }}
+                ></div>
                 <span className="text-sm">{disciplina.nome}</span>
               </div>
             ))}

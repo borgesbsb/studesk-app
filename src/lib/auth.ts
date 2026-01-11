@@ -7,8 +7,6 @@ import { compare } from 'bcryptjs'
 export const authOptions: NextAuthOptions = {
   // Adapter removido - não é compatível com CredentialsProvider
   // adapter: PrismaAdapter(prisma),
-  // Confiar nos headers do proxy (Nginx)
-  trustHost: true,
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -107,37 +105,8 @@ export const authOptions: NextAuthOptions = {
   jwt: {
     maxAge: 24 * 60 * 60, // 24 horas
   },
-  cookies: {
-    sessionToken: {
-      name: 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        // Usar secure apenas se NEXTAUTH_URL começar com https://
-        // Permite desenvolvimento local (http://localhost) e produção com proxy reverso
-        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
-        maxAge: 24 * 60 * 60, // 24 horas em segundos
-      }
-    },
-    callbackUrl: {
-      name: 'next-auth.callback-url',
-      options: {
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
-      }
-    },
-    csrfToken: {
-      name: 'next-auth.csrf-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
-      }
-    }
-  },
+  // Usar configuração padrão de cookies do NextAuth
+  // Em desenvolvimento/localhost não usa secure, o Nginx cuida do HTTPS
   secret: process.env.NEXTAUTH_SECRET,
   debug: true, // Habilita logs detalhados do NextAuth
   logger: {

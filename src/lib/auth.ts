@@ -17,10 +17,15 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
+        console.log('🔐 [AUTH] Iniciando autorização...')
+        console.log('🔐 [AUTH] Email recebido:', credentials?.email)
+
         if (!credentials?.email || !credentials?.password) {
+          console.log('❌ [AUTH] Credenciais incompletas')
           throw new Error('Email e senha são obrigatórios')
         }
 
+        console.log('🔐 [AUTH] Buscando usuário no banco...')
         const user = await prisma.user.findUnique({
           where: {
             email: credentials.email
@@ -28,14 +33,21 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (!user) {
+          console.log('❌ [AUTH] Usuário não encontrado:', credentials.email)
           throw new Error('Usuário não encontrado')
         }
+
+        console.log('🔐 [AUTH] Usuário encontrado:', user.email, 'Hash:', user.hash)
+        console.log('🔐 [AUTH] Verificando senha...')
 
         const isPasswordValid = await compare(credentials.password, user.password)
 
         if (!isPasswordValid) {
+          console.log('❌ [AUTH] Senha inválida')
           throw new Error('Senha inválida')
         }
+
+        console.log('✅ [AUTH] Autenticação bem-sucedida! User ID:', user.id)
 
         return {
           id: user.id,
@@ -49,26 +61,36 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
+      console.log('🎫 [JWT] Callback chamado')
       if (user) {
+        console.log('🎫 [JWT] Novo usuário logado, adicionando ao token:', user.id)
         token.id = user.id
         token.hash = (user as any).hash
       }
+      console.log('🎫 [JWT] Token gerado com hash:', token.hash)
       return token
     },
     async session({ session, token }) {
+      console.log('👤 [SESSION] Callback chamado')
       if (session.user) {
         session.user.id = token.id as string
         session.user.hash = token.hash as string
+        console.log('👤 [SESSION] Sessão criada para usuário:', session.user.id, 'Hash:', session.user.hash)
       }
       return session
     },
     async redirect({ url, baseUrl }) {
+      console.log('🔀 [REDIRECT] Callback chamado')
+      console.log('🔀 [REDIRECT] URL:', url)
+      console.log('🔀 [REDIRECT] BaseURL:', baseUrl)
+
       // Se o usuário acabou de fazer login, obter o hash do token para redirecionar
       // Para isso, precisamos garantir que redirecionamos para a URL com hash
       if (url === baseUrl || url.startsWith(baseUrl + '/login')) {
-        // Redirecionar para root, o middleware vai cuidar de redirecionar para /{hash}/hoje
+        console.log('🔀 [REDIRECT] Redirecionando para root (middleware vai redirecionar para /{hash}/hoje)')
         return baseUrl
       }
+      console.log('🔀 [REDIRECT] Redirecionando para:', url)
       return url
     }
   },
@@ -99,4 +121,16 @@ export const authOptions: NextAuthOptions = {
     }
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: true, // Habilita logs detalhados do NextAuth
+  logger: {
+    error(code, metadata) {
+      console.error('❌ [NEXTAUTH ERROR]', code, metadata)
+    },
+    warn(code) {
+      console.warn('⚠️ [NEXTAUTH WARN]', code)
+    },
+    debug(code, metadata) {
+      console.log('🐛 [NEXTAUTH DEBUG]', code, metadata)
+    }
+  }
 }

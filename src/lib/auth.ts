@@ -59,6 +59,15 @@ export const authOptions: NextAuthOptions = {
         session.user.hash = token.hash as string
       }
       return session
+    },
+    async redirect({ url, baseUrl }) {
+      // Se o usuário acabou de fazer login, obter o hash do token para redirecionar
+      // Para isso, precisamos garantir que redirecionamos para a URL com hash
+      if (url === baseUrl || url.startsWith(baseUrl + '/login')) {
+        // Redirecionar para root, o middleware vai cuidar de redirecionar para /{hash}/hoje
+        return baseUrl
+      }
+      return url
     }
   },
   pages: {

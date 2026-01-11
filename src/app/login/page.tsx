@@ -19,44 +19,23 @@ export default function LoginPage() {
 
     try {
       console.log("Iniciando login...")
-      const result = await signIn("credentials", {
+
+      // Usar redirect automático do NextAuth
+      // O callback redirect no authOptions vai redirecionar para /
+      // E o middleware vai redirecionar de / para /{hash}/hoje
+      await signIn("credentials", {
         email,
         password,
-        redirect: false,
+        redirect: true,
+        callbackUrl: "/",
       })
 
-      console.log("Resultado do signIn:", result)
-
-      if (result?.error) {
-        console.error("Erro no signIn:", result.error)
-        setError("Email ou senha inválidos")
-        setLoading(false)
-        return
-      }
-
-      console.log("Login bem-sucedido, aguardando estabelecimento da sessão...")
-
-      // Aguardar um pouco para o cookie da sessão ser estabelecido
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Buscar a sessão para obter o hash do usuário
-      const response = await fetch("/api/auth/session")
-      const session = await response.json()
-
-      console.log("Sessão retornada:", session)
-
-      if (session?.user?.hash) {
-        console.log("Redirecionando para:", `/${session.user.hash}/hoje`)
-        // Redirecionar para a página inicial do usuário usando seu hash
-        window.location.href = `/${session.user.hash}/hoje`
-      } else {
-        console.error("Hash não encontrado na sessão:", session)
-        setError("Erro ao obter dados do usuário")
-        setLoading(false)
-      }
-    } catch (err) {
-      console.error("Erro no catch:", err)
+      // Se chegou aqui, houve um erro (o redirect não aconteceu)
       setError("Erro ao fazer login. Tente novamente.")
+      setLoading(false)
+    } catch (err) {
+      console.error("Erro no login:", err)
+      setError("Email ou senha inválidos")
       setLoading(false)
     }
   }

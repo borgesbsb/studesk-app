@@ -1,6 +1,6 @@
 "use client"
 
-import { signIn } from "next-auth/react"
+import { signIn, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
@@ -30,9 +30,18 @@ export default function LoginPage() {
         return
       }
 
-      // Redirecionar para a página inicial do usuário
-      router.push("/hoje")
-      router.refresh()
+      // Buscar a sessão para obter o hash do usuário
+      const response = await fetch("/api/auth/session")
+      const session = await response.json()
+
+      if (session?.user?.hash) {
+        // Redirecionar para a página inicial do usuário usando seu hash
+        router.push(`/${session.user.hash}/hoje`)
+        router.refresh()
+      } else {
+        setError("Erro ao obter dados do usuário")
+        setLoading(false)
+      }
     } catch (err) {
       setError("Erro ao fazer login. Tente novamente.")
       setLoading(false)

@@ -18,31 +18,42 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      console.log("Iniciando login...")
       const result = await signIn("credentials", {
         email,
         password,
         redirect: false,
       })
 
+      console.log("Resultado do signIn:", result)
+
       if (result?.error) {
+        console.error("Erro no signIn:", result.error)
         setError("Email ou senha inválidos")
         setLoading(false)
         return
       }
 
+      console.log("Login bem-sucedido, buscando sessão...")
+
       // Buscar a sessão para obter o hash do usuário
       const response = await fetch("/api/auth/session")
       const session = await response.json()
 
+      console.log("Sessão retornada:", session)
+
       if (session?.user?.hash) {
+        console.log("Redirecionando para:", `/${session.user.hash}/hoje`)
         // Redirecionar para a página inicial do usuário usando seu hash
         router.push(`/${session.user.hash}/hoje`)
         router.refresh()
       } else {
+        console.error("Hash não encontrado na sessão:", session)
         setError("Erro ao obter dados do usuário")
         setLoading(false)
       }
     } catch (err) {
+      console.error("Erro no catch:", err)
       setError("Erro ao fazer login. Tente novamente.")
       setLoading(false)
     }

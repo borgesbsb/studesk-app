@@ -45,8 +45,7 @@ export default function LoginPage() {
       if (session?.user?.hash) {
         console.log("Redirecionando para:", `/${session.user.hash}/hoje`)
         // Redirecionar para a página inicial do usuário usando seu hash
-        router.push(`/${session.user.hash}/hoje`)
-        router.refresh()
+        window.location.href = `/${session.user.hash}/hoje`
       } else {
         console.error("Hash não encontrado na sessão:", session)
         setError("Erro ao obter dados do usuário")

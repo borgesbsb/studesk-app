@@ -25,28 +25,16 @@ export default function LoginPage() {
       // Usar redirect automático do NextAuth
       // O callback redirect no authOptions vai redirecionar para /
       // E o middleware vai redirecionar de / para /{hash}/hoje
-      const result = await signIn("credentials", {
+      await signIn("credentials", {
         email,
         password,
-        redirect: false, // Mudando para false para capturar o resultado
+        redirect: true, // Deixar o NextAuth fazer o redirect automático
         callbackUrl: "/",
       })
 
-      console.log("🔵 [LOGIN CLIENT] Resultado do signIn:", result)
-
-      if (result?.error) {
-        console.log("❌ [LOGIN CLIENT] Erro:", result.error)
-        setError(result.error)
-        setLoading(false)
-      } else if (result?.ok) {
-        console.log("✅ [LOGIN CLIENT] Login bem-sucedido! Redirecionando...")
-        // Redirecionar manualmente
-        window.location.href = "/"
-      } else {
-        console.log("⚠️ [LOGIN CLIENT] Resultado inesperado:", result)
-        setError("Erro ao fazer login. Tente novamente.")
-        setLoading(false)
-      }
+      // Se chegou aqui sem redirecionar, houve erro
+      console.log("⚠️ [LOGIN CLIENT] Não redirecionou - pode ter havido erro")
+      setLoading(false)
     } catch (err) {
       console.error("❌ [LOGIN CLIENT] Erro no login:", err)
       setError("Email ou senha inválidos")

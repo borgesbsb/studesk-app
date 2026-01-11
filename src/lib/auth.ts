@@ -118,6 +118,23 @@ export const authOptions: NextAuthOptions = {
         secure: process.env.NODE_ENV === 'production',
         maxAge: 24 * 60 * 60, // 24 horas em segundos
       }
+    },
+    callbackUrl: {
+      name: 'next-auth.callback-url',
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      }
+    },
+    csrfToken: {
+      name: 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      }
     }
   },
   secret: process.env.NEXTAUTH_SECRET,

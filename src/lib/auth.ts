@@ -108,6 +108,7 @@ export const authOptions: NextAuthOptions = {
   // Usar configuração padrão de cookies do NextAuth
   // Em desenvolvimento/localhost não usa secure, o Nginx cuida do HTTPS
   secret: process.env.NEXTAUTH_SECRET,
+  trustHost: true, // Necessário em produção com proxy reverso (Nginx)
   debug: true, // Habilita logs detalhados do NextAuth
   logger: {
     error(code, metadata) {

@@ -114,8 +114,9 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        // Em produção, usar secure: true para HTTPS
-        secure: process.env.NODE_ENV === 'production',
+        // Usar secure apenas se NEXTAUTH_URL começar com https://
+        // Permite desenvolvimento local (http://localhost) e produção com proxy reverso
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
         maxAge: 24 * 60 * 60, // 24 horas em segundos
       }
     },
@@ -124,7 +125,7 @@ export const authOptions: NextAuthOptions = {
       options: {
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
       }
     },
     csrfToken: {
@@ -133,7 +134,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
       }
     }
   },

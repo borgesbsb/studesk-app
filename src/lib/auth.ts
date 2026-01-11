@@ -7,6 +7,8 @@ import { compare } from 'bcryptjs'
 export const authOptions: NextAuthOptions = {
   // Adapter removido - não é compatível com CredentialsProvider
   // adapter: PrismaAdapter(prisma),
+  // Confiar nos headers do proxy (Nginx)
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -90,8 +92,8 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        // Apenas usar secure: true em HTTPS real (não em localhost)
-        secure: process.env.NEXTAUTH_URL?.startsWith('https://') ?? false,
+        // Em produção, usar secure: true para HTTPS
+        secure: process.env.NODE_ENV === 'production',
         maxAge: 24 * 60 * 60, // 24 horas em segundos
       }
     }

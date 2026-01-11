@@ -34,7 +34,10 @@ export default function LoginPage() {
         return
       }
 
-      console.log("Login bem-sucedido, buscando sessão...")
+      console.log("Login bem-sucedido, aguardando estabelecimento da sessão...")
+
+      // Aguardar um pouco para o cookie da sessão ser estabelecido
+      await new Promise(resolve => setTimeout(resolve, 500))
 
       // Buscar a sessão para obter o hash do usuário
       const response = await fetch("/api/auth/session")

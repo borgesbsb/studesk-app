@@ -44,16 +44,29 @@ export class PdfBackgroundProcessorService {
       }
 
       // Carregar arquivo PDF
-      const pathParts = material.arquivoPdfUrl.replace(/^\/uploads\//, '').split('/')
+      console.log('📁 DEBUG - arquivoPdfUrl:', material.arquivoPdfUrl)
+      console.log('📁 DEBUG - process.cwd():', process.cwd())
+
+      // Remove /api/uploads/ ou /uploads/ do início da URL
+      const pathParts = material.arquivoPdfUrl.replace(/^\/(api\/)?uploads\//, '').split('/')
       const fileOwnerId = pathParts[0]
       const uploadDir = path.join(process.cwd(), 'public', 'uploads')
       const fileName = material.arquivoPdfUrl.split('/').pop()
       const pdfPath = path.join(uploadDir, fileOwnerId, fileName || '')
 
+      console.log('📁 DEBUG - pathParts:', pathParts)
+      console.log('📁 DEBUG - fileOwnerId:', fileOwnerId)
+      console.log('📁 DEBUG - uploadDir:', uploadDir)
+      console.log('📁 DEBUG - fileName:', fileName)
+      console.log('📁 DEBUG - pdfPath construído:', pdfPath)
+
       // Verificar se arquivo existe
       try {
         await fs.stat(pdfPath)
+        console.log('✅ DEBUG - Arquivo encontrado!')
       } catch (error) {
+        console.log('❌ DEBUG - Arquivo NÃO encontrado no caminho:', pdfPath)
+        console.log('❌ DEBUG - Erro:', error)
         throw new Error('Arquivo PDF não encontrado')
       }
 

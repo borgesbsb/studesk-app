@@ -171,14 +171,38 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
     setLoading(true)
 
     try {
-      // 1. Criar material no banco
+      let arquivoPdfUrl = ''
+      let arquivoVideoUrl = ''
+
+      // 1. Upload do arquivo para o servidor (se for PDF)
+      if (tipo === 'PDF') {
+        console.log('🔵 [UPLOAD] Fazendo upload do PDF para o servidor...')
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json()
+          throw new Error(errorData.error || 'Erro ao fazer upload do arquivo')
+        }
+
+        const uploadData = await uploadResponse.json()
+        arquivoPdfUrl = uploadData.fileUrl
+        console.log('✅ [UPLOAD] Upload concluído. URL:', arquivoPdfUrl)
+      }
+
+      // 2. Criar material no banco com a URL do arquivo
       const response = await criarMaterialEstudo({
         nome,
         tipo,
         totalPaginas: tipo === 'PDF' ? totalPaginas : 0,
         duracaoSegundos: tipo === 'VIDEO' ? duracaoSegundos : undefined,
-        arquivoPdfUrl: '',
-        arquivoVideoUrl: '',
+        arquivoPdfUrl,
+        arquivoVideoUrl,
         disciplinaIds: [disciplinaId],
       })
 
@@ -188,7 +212,7 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
 
       const materialId = response.data.id
 
-      // 2. Salvar arquivo no IndexedDB (cache local)
+      // 3. Salvar arquivo no IndexedDB (cache local para acesso offline)
       if (tipo === 'PDF') {
         await pdfCacheService.savePdf(materialId, selectedFile)
       } else {
@@ -196,7 +220,9 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
       }
 
       toast.success("Material adicionado com sucesso!", {
-        description: `${tipo === 'PDF' ? 'PDF' : 'Vídeo'} salvo no cache local do navegador`
+        description: tipo === 'PDF'
+          ? 'PDF enviado ao servidor e processamento com IA iniciado'
+          : 'Vídeo salvo no cache local do navegador'
       })
 
       setOpen(false)

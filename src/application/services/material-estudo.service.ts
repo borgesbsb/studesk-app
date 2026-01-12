@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db"
 import { MaterialEstudo, CreateMaterialEstudoDTO, UpdateMaterialEstudoDTO } from "@/domain/entities/MaterialEstudo"
 import { logError, formatPrismaError } from "@/lib/error-handler"
+import { PdfBackgroundProcessorService } from "./pdf-background-processor.service"
 
 export class MaterialEstudoService {
   static async criarMaterialEstudo(userId: string, data: CreateMaterialEstudoDTO) {
@@ -30,14 +31,10 @@ export class MaterialEstudoService {
       if (material.tipo === 'PDF' && material.arquivoPdfUrl) {
         console.log(`🚀 Material PDF criado (${material.id}), iniciando processamento em background...`)
 
-        // Chamar endpoint de processamento em background (não aguarda conclusão)
-        const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3030}`
-        fetch(`${baseUrl}/api/pdf/start-background-processing`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ materialId: material.id }),
-        }).catch((error) => {
-          console.error('❌ Erro ao iniciar processamento em background:', error)
+        // Chamar serviço diretamente (não aguarda conclusão)
+        const processor = new PdfBackgroundProcessorService()
+        processor.processFullPdf(material.id).catch((error) => {
+          console.error('❌ Erro ao processar PDF em background:', error)
         })
       }
 

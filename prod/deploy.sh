@@ -6,14 +6,11 @@
 set -e  # Para na primeira falha
 
 SERVER="root@195.35.17.216"
-REPO_PATH="/var/www/studesk-app/studesk"
+REPO_PATH="/var/www/studesk-app"
 BRANCH="main"
 
 echo "🚀 Iniciando deploy do Studesk..."
 echo ""
-
-# Navega para o diretório do studesk
-cd ../studesk
 
 # 1. Push das alterações
 echo "📤 Fazendo push das alterações..."
@@ -26,13 +23,10 @@ echo "📥 Fazendo pull no servidor de produção..."
 ssh $SERVER << 'ENDSSH'
     set -e
 
-    # Atualiza repositório git
+    # Atualiza repositório git e instala dependências
     echo "🔄 Atualizando código no repositório..."
     cd /var/www/studesk-app
     git pull origin main
-
-    # Vai para o diretório do projeto studesk
-    cd studesk
 
     echo "📦 Instalando dependências..."
     npm install

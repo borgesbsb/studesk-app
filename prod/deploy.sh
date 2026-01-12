@@ -6,7 +6,7 @@
 set -e  # Para na primeira falha
 
 SERVER="root@195.35.17.216"
-REPO_PATH="/var/www/studesk"
+REPO_PATH="/var/www/studesk-app"
 BRANCH="main"
 
 echo "🚀 Iniciando deploy do Studesk..."
@@ -26,28 +26,35 @@ echo "📥 Fazendo pull no servidor de produção..."
 ssh $SERVER << 'ENDSSH'
     set -e
 
-    # Navega para o diretório do projeto
-    cd /var/www/studesk || {
-        echo "❌ Erro: Diretório /var/www/studesk não encontrado!"
-        echo "Criando estrutura..."
-        mkdir -p /var/www
-        cd /var/www
-        git clone git@github.com:borgesbsb/studesk-app.git studesk
-        cd studesk
-    }
+    # Atualiza repositório git
+    echo "🔄 Atualizando código no repositório..."
+    cd /var/www/studesk-app
+    git pull origin main
 
-    echo "🔄 Atualizando código..."
-    git fetch origin
-    git reset --hard origin/main
+    # Copia arquivos para o diretório de execução
+    echo "📋 Copiando arquivos para /var/www/studesk..."
+    rsync -av --exclude 'node_modules' --exclude '.git' --exclude '.next' /var/www/studesk-app/ /var/www/studesk/
+
+    # Vai para o diretório de execução
+    cd /var/www/studesk
 
     echo "📦 Instalando dependências..."
     npm install
 
-    echo "🏗️  Fazendo build da aplicação..."
+    echo "🛑 Parando aplicação..."
+    pm2 stop studesk 2>/dev/null || true
+
+    echo "🧹 Limpando build anterior..."
+    rm -rf .next
+
+    echo "🏗️  Fazendo build limpo da aplicação..."
     npm run build
 
     echo "🔄 Reiniciando aplicação..."
     pm2 restart studesk || pm2 start npm --name "studesk" -- start
+
+    echo "💾 Salvando configuração do PM2..."
+    pm2 save
 
     echo "✅ Deploy concluído com sucesso!"
 ENDSSH

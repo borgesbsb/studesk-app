@@ -9,7 +9,7 @@ import type { ApiResponse } from '@studesk/types'
 function getApiBaseUrl(): string {
   // No servidor, retornar URL genérica (será sobrescrita no cliente)
   if (typeof window === 'undefined') {
-    return 'http://localhost:3030/api'
+    return '/api'
   }
 
   // No cliente, detectar baseado no hostname atual
@@ -18,16 +18,16 @@ function getApiBaseUrl(): string {
 
   console.log('🟠 [api-client] Detectando URL da API:', { hostname, protocol })
 
-  // Se for localhost, usar localhost:3030
+  // Se for localhost, usar localhost:3030 (desenvolvimento)
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     const url = 'http://localhost:3030/api'
-    console.log('🟠 [api-client] URL da API (localhost):', url)
+    console.log('🟠 [api-client] URL da API (localhost - backend):', url)
     return url
   }
 
-  // Se for IP da rede, usar o mesmo IP na porta 3030
-  const url = `${protocol}//${hostname}:3030/api`
-  console.log('🟠 [api-client] URL da API (rede):', url)
+  // Em produção (studesk.pro), usar APIs locais do próprio mobile
+  const url = '/api'
+  console.log('🟠 [api-client] URL da API (produção - APIs locais):', url)
   return url
 }
 

@@ -96,6 +96,8 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   useEffect(() => {
     const verificarTextoProcessado = async () => {
       try {
+        console.log('\n📊 [STATUS CHECK] Verificando status de processamento dos PDFs...')
+
         const entries = await Promise.all(
           materiais
             .filter(mat => mat.tipo === 'PDF')
@@ -103,13 +105,25 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
               try {
                 const res = await fetch(`/api/pdf/${mat.id}/check-processed`)
                 const data = await res.json()
+
+                // Log do status individual
+                if (data.status !== 'complete') {
+                  console.log(`   📄 ${mat.nome}:`)
+                  console.log(`      Status: ${data.status}`)
+                  console.log(`      Progresso: ${data.processedPages}/${data.totalPages} páginas (${data.progress}%)`)
+
+                  if (data.status === 'processing' || data.status === 'partial') {
+                    console.log('      💡 DICA: Veja logs detalhados no TERMINAL DO SERVIDOR')
+                  }
+                }
+
                 return {
                   id: mat.id,
                   hasProcessedPages: data.hasProcessedPages || false,
                   status: data
                 }
               } catch (e) {
-                console.error(`Erro ao verificar texto processado do material ${mat.id}:`, e)
+                console.error(`❌ Erro ao verificar status do material ${mat.nome}:`, e)
                 return {
                   id: mat.id,
                   hasProcessedPages: false,
@@ -125,6 +139,15 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
             })
         )
 
+        const processandoAtivo = entries.some(e =>
+          e.status.status === 'processing' || e.status.status === 'partial'
+        )
+
+        if (processandoAtivo) {
+          console.log('⏳ [PROCESSAMENTO ATIVO] Há PDFs sendo processados com IA')
+          console.log('🔄 [AUTO-REFRESH] Status será atualizado automaticamente a cada 3 segundos')
+        }
+
         setMateriaisComTextoProcessado(
           Object.fromEntries(entries.map(e => [e.id, e.hasProcessedPages]))
         )
@@ -132,7 +155,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
           Object.fromEntries(entries.map(e => [e.id, e.status]))
         )
       } catch (e) {
-        console.error('Erro ao verificar textos processados:', e)
+        console.error('❌ Erro ao verificar textos processados:', e)
       }
     }
     if (materiais.length > 0) {
@@ -142,6 +165,64 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       setStatusProcessamento({})
     }
   }, [materiais])
+
+  // Polling para atualizar status de PDFs em processamento
+  useEffect(() => {
+    // Verificar se há algum material em processamento
+    const temProcessamento = Object.values(statusProcessamento).some(
+      status => status.status === 'processing' || status.status === 'partial'
+    )
+
+    if (!temProcessamento) return
+
+    console.log('🔄 [POLLING] Iniciando atualização automática do status...')
+
+    // Atualizar a cada 3 segundos
+    const interval = setInterval(async () => {
+      try {
+        const entries = await Promise.all(
+          materiais
+            .filter(mat => mat.tipo === 'PDF')
+            .map(async (mat) => {
+              try {
+                const res = await fetch(`/api/pdf/${mat.id}/check-processed`)
+                const data = await res.json()
+
+                // Log apenas se houver mudança significativa
+                const oldStatus = statusProcessamento[mat.id]
+                if (oldStatus && oldStatus.processedPages !== data.processedPages) {
+                  console.log(`📊 [UPDATE] ${mat.nome}: ${data.processedPages}/${data.totalPages} páginas (${data.progress}%)`)
+                }
+
+                return { id: mat.id, status: data }
+              } catch (e) {
+                return { id: mat.id, status: statusProcessamento[mat.id] }
+              }
+            })
+        )
+
+        const novoStatus = Object.fromEntries(entries.map(e => [e.id, e.status]))
+        setStatusProcessamento(novoStatus)
+
+        // Parar polling se todos completaram
+        const todosCompletos = Object.values(novoStatus).every(
+          status => status.status === 'complete' || status.status === 'error'
+        )
+
+        if (todosCompletos) {
+          console.log('✅ [POLLING] Todos os processamentos concluídos! Parando atualização automática.')
+        }
+
+      } catch (e) {
+        console.error('❌ [POLLING] Erro ao atualizar status:', e)
+      }
+    }, 3000) // 3 segundos
+
+    return () => {
+      console.log('🛑 [POLLING] Parando atualização automática')
+      clearInterval(interval)
+    }
+  }, [statusProcessamento, materiais])
 
   const formatarTempo = (segundosTotais: number): string => {
     const horas = Math.floor(segundosTotais / 3600)

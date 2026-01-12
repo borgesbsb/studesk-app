@@ -35,6 +35,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       where: { materialId },
     })
 
+    // DEBUG: Log do estado atual
+    console.log(`🔍 [CHECK] Material ${materialId} (${material.nome}):`)
+    if (!mobileText) {
+      console.log(`   ⚠️  Nenhum registro PdfMobileText encontrado - processamento não iniciado`)
+    } else {
+      console.log(`   📊 Status: ${mobileText.processingStatus}`)
+      console.log(`   📄 Progresso: ${mobileText.processedPages}/${mobileText.totalPages} páginas`)
+      console.log(`   📈 Percentual: ${mobileText.totalPages > 0 ? Math.round((mobileText.processedPages / mobileText.totalPages) * 100) : 0}%`)
+      if (mobileText.processingError) {
+        console.log(`   ❌ Erro: ${mobileText.processingError}`)
+      }
+    }
+
     // Se não existe registro de processamento
     if (!mobileText) {
       return NextResponse.json({
@@ -60,7 +73,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       processingError: mobileText.processingError,
     })
   } catch (error) {
-    console.error('Erro ao verificar páginas processadas:', error)
+    console.error('❌ [CHECK] Erro ao verificar páginas processadas:', error)
     return NextResponse.json(
       {
         error: 'Erro ao verificar páginas processadas',

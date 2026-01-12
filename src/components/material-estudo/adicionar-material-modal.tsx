@@ -196,6 +196,17 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
       }
 
       // 2. Criar material no banco com a URL do arquivo
+      console.log('\n' + '='.repeat(80))
+      console.log('📦 [CRIAR MATERIAL] Criando material no banco de dados...')
+      console.log('='.repeat(80))
+      console.log('   Nome:', nome)
+      console.log('   Tipo:', tipo)
+      if (tipo === 'PDF') {
+        console.log('   Total de páginas:', totalPaginas)
+        console.log('   URL do PDF:', arquivoPdfUrl)
+      }
+      console.log('='.repeat(80) + '\n')
+
       const response = await criarMaterialEstudo({
         nome,
         tipo,
@@ -212,17 +223,31 @@ export function AdicionarMaterialModal({ disciplinaId, onSuccess, className }: A
 
       const materialId = response.data.id
 
+      console.log('\n' + '='.repeat(80))
+      console.log('✅ [SUCESSO] Material criado com ID:', materialId)
+      if (tipo === 'PDF') {
+        console.log('🚀 [BACKGROUND] Processamento com IA iniciado no servidor!')
+        console.log('📊 [INFO] Acompanhe o progresso no TERMINAL DO SERVIDOR (onde você rodou npm run dev)')
+        console.log('💡 [DICA] Os logs detalhados aparecem no terminal, não nesta console do navegador')
+      }
+      console.log('='.repeat(80) + '\n')
+
       // 3. Salvar arquivo no IndexedDB (cache local para acesso offline)
       if (tipo === 'PDF') {
+        console.log('💾 [CACHE] Salvando PDF no cache local (IndexedDB)...')
         await pdfCacheService.savePdf(materialId, selectedFile)
+        console.log('✅ [CACHE] PDF salvo no cache local')
       } else {
+        console.log('💾 [CACHE] Salvando vídeo no cache local (IndexedDB)...')
         await videoCacheService.saveVideo(materialId, selectedFile, duracaoSegundos)
+        console.log('✅ [CACHE] Vídeo salvo no cache local')
       }
 
       toast.success("Material adicionado com sucesso!", {
         description: tipo === 'PDF'
-          ? 'PDF enviado ao servidor e processamento com IA iniciado'
-          : 'Vídeo salvo no cache local do navegador'
+          ? 'PDF enviado ao servidor e processamento com IA iniciado. Veja o terminal do servidor para logs detalhados.'
+          : 'Vídeo salvo no cache local do navegador',
+        duration: 5000
       })
 
       setOpen(false)

@@ -56,21 +56,27 @@ export class OpenAIFormatService {
     }
 
     const prompt = this.buildPrompt(rawText)
+    const startTime = Date.now()
 
     // Tentar com o provider primário primeiro
     if (this.primaryProvider === 'groq' && this.groqClient) {
       try {
-        console.log('🤖 Tentando formatação com Groq (GRATUITO)...')
-        return await this.formatWithGroq(prompt)
+        const result = await this.formatWithGroq(prompt, rawText)
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+        console.log(`      ⚡ Formatação concluída em ${duration}s`)
+        return result
       } catch (error) {
-        console.warn('⚠️ Erro com Groq, tentando fallback para OpenAI:', error)
+        console.log('      ⚠️  Groq falhou, tentando OpenAI...')
 
         // Fallback para OpenAI se disponível
         if (this.openaiClient) {
           try {
-            return await this.formatWithOpenAI(prompt)
+            const result = await this.formatWithOpenAI(prompt)
+            const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+            console.log(`      ⚡ Formatação concluída em ${duration}s (fallback OpenAI)`)
+            return result
           } catch (fallbackError) {
-            console.error('❌ Erro também com OpenAI:', fallbackError)
+            console.error('      ❌ Ambas as APIs falharam')
             throw new Error('Falha ao reformatar texto com ambas as APIs')
           }
         }
@@ -78,10 +84,12 @@ export class OpenAIFormatService {
       }
     } else if (this.primaryProvider === 'openai' && this.openaiClient) {
       try {
-        console.log('🤖 Usando OpenAI...')
-        return await this.formatWithOpenAI(prompt)
+        const result = await this.formatWithOpenAI(prompt)
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+        console.log(`      ⚡ Formatação concluída em ${duration}s`)
+        return result
       } catch (error) {
-        console.error('❌ Erro com OpenAI:', error)
+        console.error('      ❌ OpenAI falhou:', error)
         throw new Error('Falha ao reformatar texto com IA')
       }
     }
@@ -97,16 +105,9 @@ export class OpenAIFormatService {
     const originalMarkers = originalText.match(/\[PAGE_\d+\]/g) || []
     const formattedMarkers = formattedText.match(/\[PAGE_\d+\]/g) || []
 
-    console.log(`🔍 Verificando marcadores de página:`)
-    console.log(`   Original: ${originalMarkers.length} marcadores`)
-    console.log(`   Formatado: ${formattedMarkers.length} marcadores`)
-
     if (originalMarkers.length !== formattedMarkers.length) {
-      console.error(`❌ ERRO CRÍTICO: Marcadores de página perdidos!`)
-      console.error(`   Esperado: ${originalMarkers.length}`)
-      console.error(`   Encontrado: ${formattedMarkers.length}`)
-      console.error(`   Original: ${originalMarkers.slice(0, 10).join(', ')}${originalMarkers.length > 10 ? '...' : ''}`)
-      console.error(`   Formatado: ${formattedMarkers.slice(0, 10).join(', ')}${formattedMarkers.length > 10 ? '...' : ''}`)
+      console.error(`      ❌ ERRO: Marcadores de página perdidos!`)
+      console.error(`         Esperado: ${originalMarkers.length} | Encontrado: ${formattedMarkers.length}`)
 
       // Encontrar quais marcadores foram perdidos
       const originalSet = new Set(originalMarkers)
@@ -114,13 +115,11 @@ export class OpenAIFormatService {
       const missing = [...originalSet].filter(m => !formattedSet.has(m))
 
       if (missing.length > 0) {
-        console.error(`   Marcadores perdidos: ${missing.join(', ')}`)
+        console.error(`         Perdidos: ${missing.join(', ')}`)
       }
 
-      throw new Error(`IA removeu ${originalMarkers.length - formattedMarkers.length} marcadores de página! Isso é INACEITÁVEL.`)
+      throw new Error(`IA removeu ${originalMarkers.length - formattedMarkers.length} marcadores de página!`)
     }
-
-    console.log(`✅ Todos os ${originalMarkers.length} marcadores preservados corretamente`)
   }
 
   /**
@@ -158,12 +157,10 @@ export class OpenAIFormatService {
       this.validatePageMarkers(originalText, formattedText)
     }
 
-    console.log(`✅ Formatação com Groq completa (${tokensUsed} tokens) - GRATUITO`)
-
     return {
       formattedText,
       tokensUsed,
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.3-70b-versatile (Groq - GRATUITO)',
     }
   }
 
@@ -196,12 +193,10 @@ export class OpenAIFormatService {
     const formattedText = this.cleanFormattedText(rawFormattedText)
     const tokensUsed = response.usage?.total_tokens || 0
 
-    console.log(`✅ Formatação com OpenAI completa (${tokensUsed} tokens)`)
-
     return {
       formattedText,
       tokensUsed,
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o-mini (OpenAI)',
     }
   }
 

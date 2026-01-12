@@ -6,6 +6,7 @@ import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { nanoid } from 'nanoid'
 import { handleCors } from '@/lib/cors'
+import { PdfBackgroundProcessorService } from '@/application/services/pdf-background-processor.service'
 
 export async function OPTIONS(request: NextRequest) {
   return NextResponse.json({}, { status: 200, headers: handleCors(request) })
@@ -113,17 +114,35 @@ export async function POST(request: NextRequest) {
 
     // Iniciar processamento em background automaticamente
     if (material.tipo === 'PDF' && material.arquivoPdfUrl) {
-      console.log(`🚀 Material PDF criado (${material.id}), iniciando processamento em background...`)
+      console.log('\n' + '='.repeat(80))
+      console.log('🚀 INICIANDO PROCESSAMENTO EM BACKGROUND (Google Drive Import)')
+      console.log('='.repeat(80))
+      console.log(`📄 Material: ${material.nome}`)
+      console.log(`🆔 ID: ${material.id}`)
+      console.log(`📁 PDF URL: ${material.arquivoPdfUrl}`)
+      console.log(`📊 Total de páginas: ${material.totalPaginas || 'não informado'}`)
+      console.log(`⏰ Iniciado em: ${new Date().toLocaleString('pt-BR')}`)
+      console.log('='.repeat(80) + '\n')
 
-      // Chamar endpoint de processamento em background (não aguarda conclusão)
-      const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3030}`
-      fetch(`${baseUrl}/api/pdf/start-background-processing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ materialId: material.id }),
-      }).catch((error) => {
-        console.error('❌ Erro ao iniciar processamento em background:', error)
-      })
+      // Chamar serviço diretamente (mesmo método do upload local)
+      const processor = new PdfBackgroundProcessorService()
+
+      processor.processFullPdf(material.id)
+        .then(() => {
+          console.log(`\n✅ [SUCCESS] Processamento do material ${material.id} completado com sucesso!\n`)
+        })
+        .catch((error) => {
+          console.log('\n' + '='.repeat(80))
+          console.log('❌ ERRO NO PROCESSAMENTO EM BACKGROUND')
+          console.log('='.repeat(80))
+          console.log(`Material ID: ${material.id}`)
+          console.log(`Material Nome: ${material.nome}`)
+          console.error('Erro completo:', error)
+          console.error('Stack:', error.stack)
+          console.log('='.repeat(80) + '\n')
+        })
+
+      console.log('✅ [ASYNC] Processamento iniciado de forma assíncrona (não bloqueia resposta HTTP)\n')
     }
 
     return NextResponse.json({

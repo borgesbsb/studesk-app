@@ -29,13 +29,36 @@ export class MaterialEstudoService {
 
       // Se for PDF, iniciar processamento em background automaticamente
       if (material.tipo === 'PDF' && material.arquivoPdfUrl) {
-        console.log(`🚀 Material PDF criado (${material.id}), iniciando processamento em background...`)
+        console.log('\n' + '='.repeat(80))
+        console.log('🚀 INICIANDO PROCESSAMENTO EM BACKGROUND')
+        console.log('='.repeat(80))
+        console.log(`📄 Material: ${material.nome}`)
+        console.log(`🆔 ID: ${material.id}`)
+        console.log(`📁 PDF URL: ${material.arquivoPdfUrl}`)
+        console.log(`📊 Total de páginas: ${material.totalPaginas || 'não informado'}`)
+        console.log(`⏰ Iniciado em: ${new Date().toLocaleString('pt-BR')}`)
+        console.log('='.repeat(80) + '\n')
 
         // Chamar serviço diretamente (não aguarda conclusão)
         const processor = new PdfBackgroundProcessorService()
-        processor.processFullPdf(material.id).catch((error) => {
-          console.error('❌ Erro ao processar PDF em background:', error)
-        })
+
+        // Adicionar um then() para confirmar que foi chamado
+        processor.processFullPdf(material.id)
+          .then(() => {
+            console.log(`\n✅ [SUCCESS] Processamento do material ${material.id} completado com sucesso!\n`)
+          })
+          .catch((error) => {
+            console.log('\n' + '='.repeat(80))
+            console.log('❌ ERRO NO PROCESSAMENTO EM BACKGROUND')
+            console.log('='.repeat(80))
+            console.log(`Material ID: ${material.id}`)
+            console.log(`Material Nome: ${material.nome}`)
+            console.error('Erro completo:', error)
+            console.error('Stack:', error.stack)
+            console.log('='.repeat(80) + '\n')
+          })
+
+        console.log('✅ [ASYNC] Processamento iniciado de forma assíncrona (não bloqueia resposta HTTP)\n')
       }
 
       return material

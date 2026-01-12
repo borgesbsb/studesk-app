@@ -27,9 +27,13 @@ export class PdfBackgroundProcessorService {
 
     try {
       this.isProcessing = true
-      console.log(`🚀 Iniciando processamento em background para material ${materialId}`)
+      console.log(`\n${'▓'.repeat(80)}`)
+      console.log(`🔥 PROCESSAMENTO EM BACKGROUND - INICIADO`)
+      console.log(`${'▓'.repeat(80)}`)
+      console.log(`🆔 Material ID: ${materialId}`)
 
       // Buscar material
+      console.log(`\n📊 [1/4] Buscando material no banco de dados...`)
       const material = await prisma.materialEstudo.findFirst({
         where: { id: materialId },
         include: { mobileText: true },
@@ -38,14 +42,16 @@ export class PdfBackgroundProcessorService {
       if (!material) {
         throw new Error('Material não encontrado')
       }
+      console.log(`✅ Material encontrado: "${material.nome}"`)
 
       if (material.tipo !== 'PDF' || !material.arquivoPdfUrl) {
         throw new Error('Material não é um PDF válido')
       }
+      console.log(`✅ Tipo confirmado: PDF`)
 
       // Carregar arquivo PDF
-      console.log('📁 DEBUG - arquivoPdfUrl:', material.arquivoPdfUrl)
-      console.log('📁 DEBUG - process.cwd():', process.cwd())
+      console.log(`\n📂 [2/4] Carregando arquivo PDF do disco...`)
+      console.log(`   URL do arquivo: ${material.arquivoPdfUrl}`)
 
       // Remove /api/uploads/ ou /uploads/ do início da URL
       const pathParts = material.arquivoPdfUrl.replace(/^\/(api\/)?uploads\//, '').split('/')
@@ -54,20 +60,14 @@ export class PdfBackgroundProcessorService {
       const fileName = material.arquivoPdfUrl.split('/').pop()
       const pdfPath = path.join(uploadDir, fileOwnerId, fileName || '')
 
-      console.log('📁 DEBUG - pathParts:', pathParts)
-      console.log('📁 DEBUG - fileOwnerId:', fileOwnerId)
-      console.log('📁 DEBUG - uploadDir:', uploadDir)
-      console.log('📁 DEBUG - fileName:', fileName)
-      console.log('📁 DEBUG - pdfPath construído:', pdfPath)
+      console.log(`   Caminho completo: ${pdfPath}`)
 
       // Verificar se arquivo existe
       try {
-        await fs.stat(pdfPath)
-        console.log('✅ DEBUG - Arquivo encontrado!')
+        const stats = await fs.stat(pdfPath)
+        console.log(`✅ Arquivo encontrado (${(stats.size / 1024 / 1024).toFixed(2)} MB)`)
       } catch (error) {
-        console.log('❌ DEBUG - Arquivo NÃO encontrado no caminho:', pdfPath)
-        console.log('❌ DEBUG - Erro:', error)
-        throw new Error('Arquivo PDF não encontrado')
+        throw new Error(`Arquivo PDF não encontrado: ${pdfPath}`)
       }
 
       // Ler arquivo
@@ -78,8 +78,10 @@ export class PdfBackgroundProcessorService {
       if (pdfHeader !== '%PDF') {
         throw new Error('Arquivo não é um PDF válido')
       }
+      console.log(`✅ PDF válido detectado (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
 
       // Inicializar ou recuperar registro de processamento
+      console.log(`\n⚙️  [3/4] Inicializando processamento...`)
       let mobileText = material.mobileText
 
       if (!mobileText) {
@@ -103,14 +105,21 @@ export class PdfBackgroundProcessorService {
           data: { totalPaginas: totalPages },
         })
 
-        console.log(`📊 PDF tem ${totalPages} páginas`)
+        console.log(`✅ Registro de processamento criado`)
+        console.log(`📖 Total de páginas: ${totalPages}`)
       } else {
+        console.log(`📋 Registro de processamento existente encontrado`)
+        console.log(`   Status: ${mobileText.processingStatus}`)
+        console.log(`   Progresso: ${mobileText.processedPages}/${mobileText.totalPages} páginas`)
+
         // Verificar integridade: se processou páginas mas [PAGE_1] não existe, resetar
         if (mobileText.lastProcessedPage > 0) {
           const hasPage1 = (mobileText.formattedText || '').includes('[PAGE_1]')
 
           if (!hasPage1) {
-            console.log(`⚠️  PROBLEMA DETECTADO: lastProcessedPage = ${mobileText.lastProcessedPage}, mas [PAGE_1] não encontrado!`)
+            console.log(`⚠️  PROBLEMA DETECTADO: Inconsistência nos dados`)
+            console.log(`   lastProcessedPage = ${mobileText.lastProcessedPage}`)
+            console.log(`   Mas [PAGE_1] não encontrado no texto formatado!`)
             console.log(`🔄 Resetando processamento para corrigir...`)
 
             // Resetar processamento
@@ -132,11 +141,27 @@ export class PdfBackgroundProcessorService {
       }
 
       // Processar todos os lotes
+      console.log(`\n🔄 [4/4] Processando PDF em lotes...`)
+      const startTime = Date.now()
       await this.processAllBatches(buffer, mobileText)
+      const endTime = Date.now()
+      const duration = ((endTime - startTime) / 1000).toFixed(2)
 
-      console.log(`✅ Processamento completo do material ${materialId}!`)
+      console.log(`\n${'▓'.repeat(80)}`)
+      console.log(`✅ PROCESSAMENTO COMPLETO`)
+      console.log(`${'▓'.repeat(80)}`)
+      console.log(`🆔 Material ID: ${materialId}`)
+      console.log(`📖 Total de páginas: ${mobileText.totalPages}`)
+      console.log(`⏱️  Tempo total: ${duration}s`)
+      console.log(`⏰ Finalizado em: ${new Date().toLocaleString('pt-BR')}`)
+      console.log(`${'▓'.repeat(80)}\n`)
     } catch (error) {
-      console.error(`❌ Erro no processamento em background:`, error)
+      console.log(`\n${'▓'.repeat(80)}`)
+      console.log(`❌ ERRO NO PROCESSAMENTO`)
+      console.log(`${'▓'.repeat(80)}`)
+      console.error(`Material ID: ${materialId}`)
+      console.error(`Erro:`, error)
+      console.log(`${'▓'.repeat(80)}\n`)
 
       // Atualizar status de erro no banco
       try {
@@ -164,11 +189,15 @@ export class PdfBackgroundProcessorService {
     const initialBatchSize = 5
     const batchSize = 10
 
+    console.log(`\n┌${'─'.repeat(78)}┐`)
+    console.log(`│ ETAPA 1: DETECÇÃO DE PADRÕES (CABEÇALHOS/RODAPÉS)${' '.repeat(28)}│`)
+    console.log(`└${'─'.repeat(78)}┘`)
+
     // Detectar padrões de cabeçalho/rodapé nas primeiras 3 páginas (SEM salvar o texto)
     let patterns: HeaderFooterPattern[] = []
 
     if (!mobileText.headerFooterPatterns && mobileText.lastProcessedPage === 0) {
-      console.log('🤖 Detectando padrões com IA nas primeiras 3 páginas (apenas análise)...')
+      console.log('🤖 Analisando primeiras 3 páginas com IA...')
       try {
         // Extrair APENAS para análise (não salvar no banco)
         const { pagesArray: initialPages } = await this.extractPagesText(buffer, 1, 3)
@@ -186,17 +215,22 @@ export class PdfBackgroundProcessorService {
             },
           })
 
-          console.log(`✅ IA detectou ${patterns.length} padrões (${detection.tokensUsed} tokens)`)
-          patterns.forEach((p, i) => {
-            console.log(`   ${i + 1}. ${p.type.toUpperCase()}: "${p.description}"`)
-          })
+          console.log(`✅ IA detectou ${patterns.length} padrões (${detection.tokensUsed} tokens usados)`)
+          if (patterns.length > 0) {
+            patterns.forEach((p, i) => {
+              console.log(`   ${i + 1}. ${p.type.toUpperCase()}: "${p.description}"`)
+            })
+          } else {
+            console.log(`   → Nenhum padrão repetitivo detectado`)
+          }
         }
       } catch (aiError) {
-        console.error('⚠️  Erro na detecção com IA, processando sem limpeza:', aiError)
+        console.log('⚠️  Erro na detecção com IA, processando sem limpeza de padrões')
+        console.error('   Detalhes:', aiError)
       }
     } else if (mobileText.headerFooterPatterns) {
       patterns = JSON.parse(mobileText.headerFooterPatterns)
-      console.log(`📋 Usando ${patterns.length} padrões já detectados`)
+      console.log(`📋 Usando ${patterns.length} padrões já detectados anteriormente`)
     }
 
     // Recarregar mobileText para garantir que temos os dados mais recentes
@@ -204,29 +238,33 @@ export class PdfBackgroundProcessorService {
       where: { id: mobileText.id },
     })
 
+    console.log(`\n┌${'─'.repeat(78)}┐`)
+    console.log(`│ ETAPA 2: PROCESSAMENTO EM LOTES (EXTRAÇÃO + FORMATAÇÃO IA)${' '.repeat(19)}│`)
+    console.log(`└${'─'.repeat(78)}┘`)
+
     // Processar primeiro lote COM os padrões aplicados (começando da página 1)
     let currentPage = mobileText.lastProcessedPage + 1
     const endPage = Math.min(currentPage + initialBatchSize - 1, mobileText.totalPages)
+    let batchNumber = 1
+    const totalBatches = Math.ceil(mobileText.totalPages / batchSize) + 1
 
-    console.log(`📄 Processando primeiro lote COM padrões aplicados: páginas ${currentPage} a ${endPage}`)
-    console.log(`📊 Estado atual: lastProcessedPage=${mobileText.lastProcessedPage}, processedPages=${mobileText.processedPages}`)
-    await this.processBatch(buffer, mobileText, currentPage, endPage, patterns)
+    console.log(`\n📦 LOTE ${batchNumber}/${totalBatches} - Páginas ${currentPage} a ${endPage}`)
+    await this.processBatch(buffer, mobileText, currentPage, endPage, patterns, batchNumber, totalBatches)
 
     // CRÍTICO: Recarregar mobileText após primeiro lote para ter dados atualizados
     mobileText = await prisma.pdfMobileText.findUnique({
       where: { id: mobileText.id },
     })
 
-    console.log(`🔄 Após primeiro lote: lastProcessedPage=${mobileText.lastProcessedPage}, processedPages=${mobileText.processedPages}`)
-
     // Processar lotes subsequentes (10 páginas cada)
     currentPage = endPage + 1
 
     while (currentPage <= mobileText.totalPages) {
+      batchNumber++
       const batchEndPage = Math.min(currentPage + batchSize - 1, mobileText.totalPages)
 
-      console.log(`📄 Processando lote: páginas ${currentPage} a ${batchEndPage}`)
-      await this.processBatch(buffer, mobileText, currentPage, batchEndPage, patterns)
+      console.log(`\n📦 LOTE ${batchNumber}/${totalBatches} - Páginas ${currentPage} a ${batchEndPage}`)
+      await this.processBatch(buffer, mobileText, currentPage, batchEndPage, patterns, batchNumber, totalBatches)
 
       currentPage = batchEndPage + 1
 
@@ -242,7 +280,10 @@ export class PdfBackgroundProcessorService {
       data: { processingStatus: 'complete' },
     })
 
-    console.log(`✅ Todas as ${mobileText.totalPages} páginas foram processadas!`)
+    console.log(`\n┌${'─'.repeat(78)}┐`)
+    console.log(`│ ✅ PROCESSAMENTO DE LOTES CONCLUÍDO${' '.repeat(42)}│`)
+    console.log(`└${'─'.repeat(78)}┘`)
+    console.log(`📊 Total processado: ${mobileText.totalPages} páginas`)
   }
 
   /**
@@ -253,26 +294,24 @@ export class PdfBackgroundProcessorService {
     mobileText: any,
     startPage: number,
     endPage: number,
-    patterns: HeaderFooterPattern[]
+    patterns: HeaderFooterPattern[],
+    batchNumber: number = 1,
+    totalBatches: number = 1
   ): Promise<void> {
-    console.log(`\n🔄 INICIANDO PROCESSBATCH:`)
-    console.log(`   Páginas solicitadas: ${startPage} → ${endPage}`)
-    console.log(`   Padrões a aplicar: ${patterns.length}`)
-    console.log(`   Estado do mobileText: lastProcessedPage=${mobileText.lastProcessedPage}, processedPages=${mobileText.processedPages}`)
+    const batchStartTime = Date.now()
 
     // Extrair texto das páginas
+    console.log(`   ⬇️  Extraindo texto (páginas ${startPage}-${endPage})...`)
     const { text: extractedText, actualEndPage } = await this.extractPagesText(
       buffer,
       startPage,
       endPage,
       patterns.length > 0 ? patterns : undefined
     )
-
-    console.log(`📝 Extraídos ${extractedText.length} caracteres das páginas ${startPage}-${actualEndPage}`)
-    console.log(`📄 Primeiros 200 chars do texto extraído: ${extractedText.substring(0, 200)}`)
+    console.log(`   ✅ Extraídos ${extractedText.length.toLocaleString()} caracteres`)
 
     // Formatar texto com IA
-    console.log(`🤖 Formatando texto para Markdown com IA...`)
+    console.log(`   🤖 Formatando com IA...`)
     let formattedMarkdown = extractedText
     let markdownTokensUsed = 0
 
@@ -282,39 +321,41 @@ export class PdfBackgroundProcessorService {
       formattedMarkdown = formatResult.formattedText
       markdownTokensUsed = formatResult.tokensUsed
 
-      console.log(`✅ Markdown gerado (${markdownTokensUsed} tokens usando ${formatResult.model})`)
+      console.log(`   ✅ Formatação concluída (${markdownTokensUsed} tokens - ${formatResult.model})`)
     } catch (formatError) {
-      console.error(`⚠️  Erro ao formatar com IA, usando texto bruto:`, formatError)
+      console.log(`   ⚠️  Erro na formatação, usando texto bruto`)
+      console.error('   Detalhes:', formatError)
       formattedMarkdown = extractedText
     }
 
     // Salvar no banco
     const pagesProcessed = actualEndPage - startPage + 1
+    const newProcessedPages = mobileText.processedPages + pagesProcessed
+    const progressPercent = Math.round((newProcessedPages / mobileText.totalPages) * 100)
 
-    console.log(`\n💾 SALVANDO NO BANCO:`)
-    console.log(`   Páginas processadas neste lote: ${pagesProcessed} (${startPage} → ${actualEndPage})`)
-    console.log(`   processedPages ANTES: ${mobileText.processedPages}`)
-    console.log(`   processedPages DEPOIS: ${mobileText.processedPages + pagesProcessed}`)
-    console.log(`   lastProcessedPage ANTES: ${mobileText.lastProcessedPage}`)
-    console.log(`   lastProcessedPage DEPOIS: ${actualEndPage}`)
-    console.log(`   Tamanho do texto formatado sendo adicionado: ${formattedMarkdown.length} chars`)
-    console.log(`   Tamanho total do formattedText: ${(mobileText.formattedText || '').length + formattedMarkdown.length} chars`)
-
+    console.log(`   💾 Salvando no banco...`)
     await prisma.pdfMobileText.update({
       where: { id: mobileText.id },
       data: {
         formattedText: mobileText.formattedText + formattedMarkdown,
         rawText: mobileText.rawText + extractedText,
-        processedPages: mobileText.processedPages + pagesProcessed,
+        processedPages: newProcessedPages,
         lastProcessedPage: actualEndPage,
         processingStatus: actualEndPage >= mobileText.totalPages ? 'complete' : 'partial',
         tokensUsed: (mobileText.tokensUsed || 0) + markdownTokensUsed,
       },
     })
 
-    console.log(
-      `✅ Salvo no banco: ${mobileText.processedPages + pagesProcessed}/${mobileText.totalPages} páginas (${Math.round(((mobileText.processedPages + pagesProcessed) / mobileText.totalPages) * 100)}%)`
-    )
+    const batchDuration = ((Date.now() - batchStartTime) / 1000).toFixed(1)
+
+    console.log(`   ✅ Lote ${batchNumber}/${totalBatches} concluído em ${batchDuration}s`)
+    console.log(`   📊 Progresso total: ${newProcessedPages}/${mobileText.totalPages} páginas (${progressPercent}%)`)
+
+    // Barra de progresso visual
+    const barLength = 40
+    const filledLength = Math.round((progressPercent / 100) * barLength)
+    const bar = '█'.repeat(filledLength) + '░'.repeat(barLength - filledLength)
+    console.log(`   [${bar}] ${progressPercent}%`)
   }
 
   /**
@@ -326,9 +367,6 @@ export class PdfBackgroundProcessorService {
     endPage: number,
     patterns?: HeaderFooterPattern[]
   ): Promise<{ text: string; actualEndPage: number; pagesArray: string[] }> {
-    console.log(`\n📖 EXTRACTPAGESTEXT: Extraindo páginas ${startPage} → ${endPage}`)
-    console.log(`   Padrões disponíveis: ${patterns ? patterns.length : 0}`)
-
     const pdfParse = (await import('pdf-parse')).default
     const detector = patterns ? new HeaderFooterDetectorService() : null
 
@@ -345,7 +383,6 @@ export class PdfBackgroundProcessorService {
         }
 
         pagesExtracted++
-        console.log(`   📄 Extraindo página ${currentPageNum}...`)
 
         return pageData.getTextContent().then(function (textContent: any) {
           const items = textContent.items
@@ -392,13 +429,6 @@ export class PdfBackgroundProcessorService {
 
     const totalPages = data.numpages
     const actualEndPage = Math.min(endPage, totalPages)
-
-    console.log(`✅ EXTRACTPAGESTEXT concluído:`)
-    console.log(`   Total de páginas no PDF: ${totalPages}`)
-    console.log(`   Páginas extraídas: ${pagesExtracted} (solicitado: ${startPage} → ${endPage})`)
-    console.log(`   pagesArray.length: ${pagesArray.length}`)
-    console.log(`   Texto total extraído: ${data.text.length} chars`)
-    console.log(`   Primeiros 150 chars: ${data.text.substring(0, 150)}`)
 
     return {
       text: sanitizeUnicode(data.text.trim()),

@@ -35,6 +35,10 @@ Script de configuração inicial que:
 - Obtém certificados SSL do Let's Encrypt
 - Configura renovação automática de certificados
 
+## 📚 Documentação
+
+**Para instruções completas de deploy, veja**: [DEPLOY.md](./DEPLOY.md)
+
 ## Deployment
 
 ### Passo 1: Configurar DNS

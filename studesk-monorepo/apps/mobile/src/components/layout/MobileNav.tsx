@@ -105,11 +105,15 @@ const navItems = [
 
 export function MobileNav() {
   const pathname = usePathname()
-  const { data: session, status } = useSession()
-  const userHash = (session?.user as any)?.hash || ''
+  const { data: session } = useSession()
 
-  // Não renderizar até ter o hash do usuário
-  if (status === 'loading' || !userHash) {
+  // Tenta pegar o hash da sessão, senão pega da URL atual
+  const sessionHash = (session?.user as any)?.hash || ''
+  const pathHash = pathname.split('/')[1] || ''
+  const userHash = sessionHash || pathHash
+
+  // Se não houver hash disponível, não renderiza
+  if (!userHash) {
     return null
   }
 

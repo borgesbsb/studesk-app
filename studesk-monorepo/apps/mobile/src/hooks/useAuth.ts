@@ -37,7 +37,9 @@ export function useAuth() {
         return false
       }
 
-      router.push('/dashboard')
+      // Redirecionar para a home - o middleware irá redirecionar para /{hash}/hoje
+      router.push('/')
+      router.refresh()
       return true
     } catch (err) {
       setError('Erro ao fazer login. Tente novamente.')

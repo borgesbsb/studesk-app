@@ -43,11 +43,20 @@ ssh $SERVER << 'ENDSSH'
     echo "📦 Instalando dependências..."
     npm install
 
-    echo "🏗️  Fazendo build da aplicação..."
+    echo "🛑 Parando aplicação..."
+    pm2 stop studesk 2>/dev/null || true
+
+    echo "🧹 Limpando build anterior..."
+    rm -rf .next
+
+    echo "🏗️  Fazendo build limpo da aplicação..."
     npm run build
 
     echo "🔄 Reiniciando aplicação..."
     pm2 restart studesk || pm2 start npm --name "studesk" -- start
+
+    echo "💾 Salvando configuração do PM2..."
+    pm2 save
 
     echo "✅ Deploy concluído com sucesso!"
 ENDSSH

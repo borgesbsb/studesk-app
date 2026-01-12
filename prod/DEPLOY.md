@@ -51,11 +51,8 @@ cd /home/borgesbsb/projetos/studesk-app/prod
 4. **Cria arquivos .env**: Configura variáveis de ambiente
 5. **Instala dependências**: `pnpm install`
 6. **Gera Prisma Client**: `pnpm exec prisma generate`
-7. **Para aplicação**: `pm2 stop studesk-mobile` (evita conflitos)
-8. **Limpa build anterior**: `rm -rf .next` (previne builds corrompidos)
-9. **Build limpo**: `pnpm run build`
-10. **Restart PM2**: Reinicia o processo `studesk-mobile`
-11. **Salva config**: `pm2 save`
+7. **Build**: `pnpm run build`
+8. **Restart PM2**: Reinicia o processo `studesk-mobile`
 
 ### Tempo estimado
 
@@ -78,11 +75,8 @@ cd /home/borgesbsb/projetos/studesk-app/prod
 2. **SSH no servidor**: Conecta em `root@195.35.17.216`
 3. **Git Pull**: Atualiza código no servidor
 4. **Instala dependências**: `npm install`
-5. **Para aplicação**: `pm2 stop studesk` (evita conflitos)
-6. **Limpa build anterior**: `rm -rf .next` (previne builds corrompidos)
-7. **Build limpo**: `npm run build`
-8. **Restart PM2**: Reinicia o processo `studesk`
-9. **Salva config**: `pm2 save`
+5. **Build**: `npm run build`
+6. **Restart PM2**: Reinicia o processo `studesk`
 
 ### Tempo estimado
 
@@ -125,28 +119,6 @@ ssh root@195.35.17.216 "pm2 logs studesk --lines 20 --nostream"
 - **Backend**: http://195.35.17.216:3030 (interno)
 - **Mobile**: http://195.35.17.216:3031 (interno)
 - **Produção**: https://studesk.pro (público)
-
----
-
-## 🛡️ Prevenção de Problemas
-
-### Build Corrompido (Erro 502)
-
-Os scripts de deploy agora **previnem builds corrompidos** automaticamente:
-
-**Como funcionava antes:**
-- Build incremental sobre código antigo
-- Conflitos entre versões
-- Crashes em loop → Erro 502
-
-**Como funciona agora:**
-1. ✅ Para a aplicação
-2. ✅ Remove `.next` completamente
-3. ✅ Build limpo do zero
-4. ✅ Reinicia com código novo
-5. ✅ Salva configuração
-
-**Resultado**: Zero problemas de build corrompido! 🎉
 
 ---
 

@@ -6,7 +6,7 @@
 set -e  # Para na primeira falha
 
 SERVER="root@195.35.17.216"
-REPO_PATH="/var/www/studesk-app"
+REPO_PATH="/var/www/studesk-app/studesk"
 BRANCH="main"
 
 echo "🚀 Iniciando deploy do Studesk..."
@@ -31,12 +31,8 @@ ssh $SERVER << 'ENDSSH'
     cd /var/www/studesk-app
     git pull origin main
 
-    # Copia arquivos para o diretório de execução
-    echo "📋 Copiando arquivos para /var/www/studesk..."
-    rsync -av --exclude 'node_modules' --exclude '.git' --exclude '.next' /var/www/studesk-app/ /var/www/studesk/
-
-    # Vai para o diretório de execução
-    cd /var/www/studesk
+    # Vai para o diretório do projeto studesk
+    cd studesk
 
     echo "📦 Instalando dependências..."
     npm install
@@ -51,7 +47,8 @@ ssh $SERVER << 'ENDSSH'
     npm run build
 
     echo "🔄 Reiniciando aplicação..."
-    pm2 restart studesk || pm2 start npm --name "studesk" -- start
+    pm2 delete studesk 2>/dev/null || true
+    pm2 start npm --name "studesk" -- start
 
     echo "💾 Salvando configuração do PM2..."
     pm2 save

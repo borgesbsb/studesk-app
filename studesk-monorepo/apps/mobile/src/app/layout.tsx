@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
+import { InstallPWABanner } from "@/components/layout/InstallPWABanner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           <OfflineBanner />
+          <InstallPWABanner />
           {children}
         </Providers>
       </body>

@@ -38,6 +38,7 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
   const [selectedVoice, setSelectedVoice] = useState<string>('')
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
   const wakeLockRef = useRef<any>(null)
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Cronômetro de leitura
   const [timeSpent, setTimeSpent] = useState(0)
@@ -89,8 +90,43 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
       // Limpar ao desmontar
       window.speechSynthesis.cancel()
       releaseWakeLock()
+      stopSilentAudio()
     }
   }, [])
+
+  // Listener para detectar mudanças de visibilidade da página
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        console.log('📱 Página ficou invisível (tela bloqueada)')
+
+        // Se está falando, tentar manter o Wake Lock
+        if (isSpeaking && !isPaused) {
+          console.log('🔄 Tentando manter Wake Lock ativo...')
+        }
+      } else {
+        console.log('📱 Página ficou visível (tela desbloqueada)')
+
+        // Reativar Wake Lock se estava falando
+        if (isSpeaking && !isPaused && 'wakeLock' in navigator) {
+          console.log('🔄 Reativando Wake Lock...')
+          await requestWakeLock()
+        }
+
+        // Verificar se o TTS parou e tentar reativar
+        if (isSpeaking && window.speechSynthesis.paused) {
+          console.log('🔄 TTS pausado detectado, tentando retomar...')
+          window.speechSynthesis.resume()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isSpeaking, isPaused])
 
   // Processar texto para extrair páginas baseado nos marcadores [PAGE_X]
   const pages = useMemo(() => {
@@ -464,15 +500,49 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
     }
   }
 
+  // Criar e tocar áudio silencioso para manter sessão ativa
+  const startSilentAudio = () => {
+    try {
+      if (!silentAudioRef.current) {
+        // Criar um áudio silencioso que toca em loop
+        const audio = new Audio()
+        // Data URI de um arquivo de áudio silencioso muito pequeno (1 segundo)
+        audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADhADExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExP/7UGQAAAGkACAAgAAAAgAAAgAAGAAAAIAAAIABAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//tQZAAAA0gAIACAAAACAAACAAAYAAAAAAAIABAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+        audio.loop = true
+        audio.volume = 0.01 // Muito baixo, quase inaudível
+        audio.play().catch(e => console.log('Erro ao tocar áudio silencioso:', e))
+        silentAudioRef.current = audio
+        console.log('🔇 Áudio silencioso iniciado para manter sessão')
+      }
+    } catch (err) {
+      console.error('Erro ao criar áudio silencioso:', err)
+    }
+  }
+
+  // Parar áudio silencioso
+  const stopSilentAudio = () => {
+    if (silentAudioRef.current) {
+      silentAudioRef.current.pause()
+      silentAudioRef.current = null
+      console.log('🔇 Áudio silencioso parado')
+    }
+  }
+
   // Requisitar Wake Lock para manter tela ativa durante leitura
   const requestWakeLock = async () => {
     try {
       if ('wakeLock' in navigator) {
+        // Se já existe, liberar primeiro
+        if (wakeLockRef.current) {
+          await wakeLockRef.current.release()
+        }
+
         wakeLockRef.current = await (navigator as any).wakeLock.request('screen')
         console.log('🔒 Wake Lock ativado - tela não será desligada')
 
         wakeLockRef.current.addEventListener('release', () => {
           console.log('🔓 Wake Lock liberado')
+          wakeLockRef.current = null
         })
       }
     } catch (err) {
@@ -535,9 +605,10 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
         setIsPaused(false)
         console.log('🔊 Iniciou leitura em voz alta')
 
-        // Configurar Media Session e Wake Lock
+        // Configurar Media Session, Wake Lock e áudio silencioso
         setupMediaSession()
         requestWakeLock()
+        startSilentAudio()
       }
 
       utterance.onend = () => {
@@ -545,8 +616,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
         setIsPaused(false)
         console.log('🔇 Finalizou leitura em voz alta')
 
-        // Liberar Wake Lock
+        // Liberar Wake Lock e parar áudio silencioso
         releaseWakeLock()
+        stopSilentAudio()
       }
 
       utterance.onerror = (event) => {
@@ -554,8 +626,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
         setIsSpeaking(false)
         setIsPaused(false)
 
-        // Liberar Wake Lock em caso de erro
+        // Liberar Wake Lock e parar áudio silencioso em caso de erro
         releaseWakeLock()
+        stopSilentAudio()
       }
 
       utteranceRef.current = utterance
@@ -568,8 +641,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
     setIsSpeaking(false)
     setIsPaused(false)
 
-    // Liberar Wake Lock ao parar
+    // Liberar Wake Lock e parar áudio silencioso ao parar
     releaseWakeLock()
+    stopSilentAudio()
   }
 
   if (loading) {

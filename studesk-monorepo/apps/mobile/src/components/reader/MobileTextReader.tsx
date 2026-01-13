@@ -915,13 +915,24 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
 
                 {/* Conteúdo da Página */}
                 <article
-                  className="prose prose-lg max-w-none prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:my-4 prose-ul:my-4 prose-ol:my-4 prose-li:my-1 dark:prose-invert"
+                  className="prose prose-lg max-w-none text-justify prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:my-4 prose-ul:my-4 prose-ol:my-4 prose-li:my-1 dark:prose-invert"
                   style={{
                     fontSize: `${fontSize}px`,
                     lineHeight: lineHeight,
                   }}
                 >
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      p: ({children}) => <p className="mb-4 text-justify">{children}</p>,
+                      h1: ({children}) => <h1 className="text-3xl font-bold mb-4 mt-6">{children}</h1>,
+                      h2: ({children}) => <h2 className="text-2xl font-bold mb-3 mt-5">{children}</h2>,
+                      h3: ({children}) => <h3 className="text-xl font-bold mb-3 mt-4">{children}</h3>,
+                      ul: ({children}) => <ul className="mb-4 ml-6 list-disc">{children}</ul>,
+                      ol: ({children}) => <ol className="mb-4 ml-6 list-decimal">{children}</ol>,
+                      li: ({children}) => <li className="mb-1">{children}</li>,
+                    }}
+                  >
                     {page.content}
                   </ReactMarkdown>
                 </article>
@@ -938,13 +949,24 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
         ) : (
           text && (
             <article
-              className="prose prose-lg max-w-none prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:my-4 prose-ul:my-4 prose-ol:my-4 prose-li:my-1 dark:prose-invert"
+              className="prose prose-lg max-w-none text-justify prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:my-4 prose-ul:my-4 prose-ol:my-4 prose-li:my-1 dark:prose-invert"
               style={{
                 fontSize: `${fontSize}px`,
                 lineHeight: lineHeight,
               }}
             >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({children}) => <p className="mb-4 text-justify">{children}</p>,
+                  h1: ({children}) => <h1 className="text-3xl font-bold mb-4 mt-6">{children}</h1>,
+                  h2: ({children}) => <h2 className="text-2xl font-bold mb-3 mt-5">{children}</h2>,
+                  h3: ({children}) => <h3 className="text-xl font-bold mb-3 mt-4">{children}</h3>,
+                  ul: ({children}) => <ul className="mb-4 ml-6 list-disc">{children}</ul>,
+                  ol: ({children}) => <ol className="mb-4 ml-6 list-decimal">{children}</ol>,
+                  li: ({children}) => <li className="mb-1">{children}</li>,
+                }}
+              >
                 {text}
               </ReactMarkdown>
             </article>

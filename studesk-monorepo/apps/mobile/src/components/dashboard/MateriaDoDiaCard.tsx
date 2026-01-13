@@ -2,19 +2,22 @@
 
 import { MateriaDoDia } from '@/lib/api/dashboard'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 
 interface MateriaDoDiaCardProps {
   materia: MateriaDoDia
 }
 
 export function MateriaDoDiaCard({ materia }: MateriaDoDiaCardProps) {
+  const params = useParams()
+  const userHash = params.userHash as string
   const progressoPercentual = materia.horasPlanejadas > 0
     ? Math.min(Math.round((materia.horasRealizadas / materia.horasPlanejadas) * 100), 100)
     : 0
 
   return (
     <Link
-      href={`/disciplinas/${materia.disciplinaId}`}
+      href={`/${userHash}/disciplinas/${materia.disciplinaId}`}
       className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 active:scale-98 transition-transform"
     >
       {/* Header com nome e status */}

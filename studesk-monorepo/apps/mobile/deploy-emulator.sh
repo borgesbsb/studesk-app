@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script para compilar Next.js, sincronizar Capacitor e instalar app no emulador Android
+# Script para sincronizar Capacitor e instalar app no emulador Android
 
 EMULATOR_NAME="Medium_Phone_API_36.1"
 EMULATOR_PATH="/home/borgesbsb/Android/Sdk/emulator/emulator"
@@ -22,19 +22,22 @@ else
 fi
 
 echo ""
-echo "🔨 Compilando Next.js (build estático)..."
-npm run build
-
-if [ $? -ne 0 ]; then
-    echo "❌ Erro ao compilar Next.js"
-    exit 1
+echo "🔄 Usando configuração para emulador..."
+# Fazer backup da config atual
+if [ -f capacitor.config.ts ]; then
+    cp capacitor.config.ts capacitor.config.device.ts.bak
 fi
 
-echo "✅ Next.js compilado com sucesso"
+# Copiar config do emulador
+cp capacitor.config.emulator.ts capacitor.config.ts
 
-echo ""
 echo "🔄 Sincronizando Capacitor..."
 npx cap sync android
+
+# Restaurar config original
+if [ -f capacitor.config.device.ts.bak ]; then
+    mv capacitor.config.device.ts.bak capacitor.config.ts
+fi
 
 if [ $? -ne 0 ]; then
     echo "❌ Erro ao sincronizar Capacitor"
@@ -56,4 +59,6 @@ echo ""
 echo "✅ App instalado com sucesso no emulador!"
 echo "📱 O app está pronto para uso"
 echo ""
-echo "💡 Dica: O app agora usa build estático compilado (muito mais rápido!)"
+echo "⚠️  IMPORTANTE: Certifique-se de que o dev server está rodando em localhost:3031"
+echo "   Execute: npm run dev (na pasta mobile)"
+echo "💡 Dica: O emulador usa 10.0.2.2 para acessar o host"

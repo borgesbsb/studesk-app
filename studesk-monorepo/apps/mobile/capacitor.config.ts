@@ -3,9 +3,11 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.studesk.mobile',
   appName: 'Studesk',
-  webDir: 'out', // Diretório do build estático do Next.js
+  webDir: '.next', // Build standalone do Next.js
   server: {
-    androidScheme: 'https', // Usar HTTPS para app compilado
+    url: 'http://localhost:3031', // Dev server via ADB reverse
+    cleartext: true,
+    androidScheme: 'http',
   },
   plugins: {
     SplashScreen: {

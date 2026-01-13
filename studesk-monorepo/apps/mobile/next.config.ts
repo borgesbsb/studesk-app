@@ -4,7 +4,8 @@ import withPWA from 'next-pwa'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  output: 'export', // Gerar build estático para Capacitor
+  // NÃO usar 'export' - app tem rotas dinâmicas e precisa de servidor
+  // Capacitor vai usar o build standalone em .next
   transpilePackages: ['@studesk/ui', '@studesk/types', '@studesk/database'],
   async headers() {
     return [

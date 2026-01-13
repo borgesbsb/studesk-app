@@ -579,37 +579,62 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
   // Funções para TTS nativo do Capacitor
   const speakWithCapacitor = async (text: string) => {
     try {
-      await TextToSpeech.speak({
-        text,
-        lang: 'pt-BR',
-        rate: speechRate,
-        pitch: 1.0,
-        volume: 1.0,
-        category: 'ambient',
-      })
+      console.log('🔊 Iniciando leitura com TTS nativo')
 
-      console.log('🔊 Iniciou leitura com TTS nativo')
+      // Atualizar estado ANTES de iniciar TTS (para UI responder imediatamente)
       setIsSpeaking(true)
       setIsPaused(false)
 
       // Configurar Media Session e Wake Lock
       setupMediaSession()
       requestWakeLock()
+
+      // Iniciar TTS (não bloqueia - retorna imediatamente)
+      TextToSpeech.speak({
+        text,
+        lang: 'pt-BR',
+        rate: speechRate,
+        pitch: 1.0,
+        volume: 1.0,
+        category: 'ambient',
+      }).then(() => {
+        console.log('🔇 TTS nativo finalizou')
+        // Quando terminar, resetar estado
+        setIsSpeaking(false)
+        setIsPaused(false)
+        releaseWakeLock()
+      }).catch((error) => {
+        console.error('Erro no TTS nativo:', error)
+        setIsSpeaking(false)
+        setIsPaused(false)
+        releaseWakeLock()
+      })
     } catch (error) {
-      console.error('Erro no TTS nativo:', error)
+      console.error('Erro ao iniciar TTS nativo:', error)
       alert('Erro ao iniciar leitura em voz alta')
+      setIsSpeaking(false)
+      setIsPaused(false)
+      releaseWakeLock()
     }
   }
 
   const stopCapacitorTTS = async () => {
     try {
-      await TextToSpeech.stop()
-      console.log('🔇 TTS nativo parado')
+      console.log('🔇 Parando TTS nativo')
+      // Atualizar estado IMEDIATAMENTE para UI responder
       setIsSpeaking(false)
       setIsPaused(false)
       releaseWakeLock()
+
+      // Então parar o TTS
+      await TextToSpeech.stop()
+      console.log('🔇 TTS nativo parado')
     } catch (error) {
       console.error('Erro ao parar TTS nativo:', error)
+      // Garantir que o estado seja limpo mesmo com erro
+      setIsSpeaking(false)
+      setIsPaused(false)
+      releaseWakeLock()
     }
   }
 
@@ -628,7 +653,8 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
           return
         }
 
-        await speakWithCapacitor(textToSpeak)
+        // Não usar await - deixar executar assincronamente para UI responder imediatamente
+        speakWithCapacitor(textToSpeak)
       }
       return
     }

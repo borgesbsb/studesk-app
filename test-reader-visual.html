@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POC - E-Reader Mobile com IA</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .device-frame {
+      background: #000;
+      border-radius: 40px;
+      padding: 15px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .device-screen {
+      background: white;
+      border-radius: 25px;
+      height: 700px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .device-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .device-content {
+      height: calc(100% - 50px);
+      overflow-y: auto;
+      padding: 20px;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* Estilo para texto original (ruim) */
+    .original-text {
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 14px;
+      color: #333;
+      line-height: 1.4;
+    }
+
+    /* Estilo para texto formatado (bom) */
+    .formatted-text {
+      color: #333;
+    }
+
+    .formatted-text h1 {
+      font-size: 24px;
+      margin: 20px 0 10px 0;
+      color: #1a1a1a;
+      text-align: left;
+    }
+
+    .formatted-text h2 {
+      font-size: 20px;
+      margin: 15px 0 8px 0;
+      color: #2d3748;
+      text-align: left;
+    }
+
+    .formatted-text p {
+      margin-bottom: 15px;
+      color: #4a5568;
+      text-align: justify;
+    }
+
+    .formatted-text strong {
+      color: #2d3748;
+      font-weight: 600;
+    }
+
+    .formatted-text ul, .formatted-text ol {
+      margin: 10px 0 15px 20px;
+    }
+
+    .formatted-text li {
+      margin-bottom: 8px;
+      color: #4a5568;
+    }
+
+    /* Controles de fonte */
+    .font-controls {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .font-controls button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .font-controls button:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+    }
+
+    .font-controls button:active {
+      transform: translateY(0);
+    }
+
+    .font-size-display {
+      font-size: 16px;
+      font-weight: 600;
+      color: #667eea;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .label {
+      font-weight: 600;
+      color: #666;
+    }
+
+    /* Badge com estatísticas */
+    .stats {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .stat-badge {
+      background: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      font-size: 14px;
+    }
+
+    .stat-badge strong {
+      color: #667eea;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Scrollbar customizada */
+    .device-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .device-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    .device-content::-webkit-scrollbar-thumb {
+      background: #667eea;
+      border-radius: 10px;
+    }
+
+    .device-content::-webkit-scrollbar-thumb:hover {
+      background: #5568d3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📱 POC - E-Reader Mobile com IA</h1>
+    <p class="subtitle">Reformatação de PDF usando OpenAI GPT-4o-mini</p>
+
+    <div class="stats">
+      <div class="stat-badge">⏱️ Tempo: <strong>4.5s</strong></div>
+      <div class="stat-badge">📊 Tokens: <strong>538</strong></div>
+      <div class="stat-badge">💰 Custo: <strong>$0.000081</strong></div>
+      <div class="stat-badge">🎯 Modelo: <strong>gpt-4o-mini</strong></div>
+    </div>
+
+    <div class="font-controls">
+      <span class="label">Tamanho da Fonte:</span>
+      <button onclick="decreaseFontSize()">A-</button>
+      <span class="font-size-display" id="fontSize">16px</span>
+      <button onclick="increaseFontSize()">A+</button>
+    </div>
+
+    <div class="comparison">
+      <!-- Texto Original (Ruim) -->
+      <div class="device-frame">
+        <div class="device-screen">
+          <div class="device-header">❌ Texto Original do PDF</div>
+          <div class="device-content original-text" id="originalContent">
+
+Aula 00
+Receita Federal (Auditor Fiscal) Direito
+Constitucional
+Autor:
+Equipe Direito Constitucional
+Estratégia Concursos
+26 de Agosto de 2025
+04612778243 - Anna Clara da Costa Baylão
+
+Equipe Direito Constitucional Estratégia Concursos
+Aula 00
+Índice
+1) Apresentação do Curso de Direito Constitucional 3
+2) Sentidos de Constituição 5
+3) Constituição: Estrutura e Elementos 12
+4) Classificação das Constituições 17
+5) Aplicabilidade das Normas Constitucionais 32
+6) Hierarquia das Normas 41
+7) Poder Constituinte 45
+
+APRESENTAÇÃO DO CURSO DE
+DIREITO CONSTITUCIONAL
+Olá, tudo bem?
+É com grande satisfação que
+apresentamos o nosso curso de Direito
+Constitucional para o concurso da
+Receita Federal do Brasil para o
+cargo de Auditor Fiscal.
+Este material foi elaborado pela equipe
+de professores do Estratégia Concursos,
+com o objetivo de proporcionar uma
+preparação completa e direcionada
+para a sua aprovação.
+
+O Direito Constitucional é uma das
+disciplinas mais importantes em
+concursos públicos, especialmente
+para a Receita Federal.
+          </div>
+        </div>
+      </div>
+
+      <!-- Texto Reformatado (Bom) -->
+      <div class="device-frame">
+        <div class="device-screen">
+          <div class="device-header">✅ Texto Reformatado pela IA</div>
+          <div class="device-content formatted-text" id="formattedContent">
+            <!-- Conteúdo será inserido via JavaScript -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Texto reformatado pela OpenAI
+    const markdownText = `# Aula 00
+## Receita Federal (Auditor Fiscal) Direito Constitucional
+**Autor:** Equipe Direito Constitucional
+**Estratégia Concursos**
+**26 de Agosto de 2025**
+04612778243 - Anna Clara da Costa Baylão
+
+## Índice
+1. Apresentação do Curso de Direito Constitucional 3
+2. Sentidos de Constituição 5
+3. Constituição: Estrutura e Elementos 12
+4. Classificação das Constituições 17
+5. Aplicabilidade das Normas Constitucionais 32
+6. Hierarquia das Normas 41
+7. Poder Constituinte 45
+
+# APRESENTAÇÃO DO CURSO DE DIREITO CONSTITUCIONAL
+
+Olá, tudo bem?
+
+É com grande satisfação que apresentamos o nosso curso de Direito Constitucional para o concurso da Receita Federal do Brasil para o cargo de Auditor Fiscal.
+
+Este material foi elaborado pela equipe de professores do Estratégia Concursos, com o objetivo de proporcionar uma preparação completa e direcionada para a sua aprovação.
+
+O Direito Constitucional é uma das disciplinas mais importantes em concursos públicos, especialmente para a Receita Federal.`;
+
+    // Renderizar markdown
+    document.getElementById('formattedContent').innerHTML = marked.parse(markdownText);
+
+    // Controle de tamanho de fonte
+    let currentFontSize = 16;
+
+    function increaseFontSize() {
+      if (currentFontSize < 24) {
+        currentFontSize += 2;
+        updateFontSize();
+      }
+    }
+
+    function decreaseFontSize() {
+      if (currentFontSize > 12) {
+        currentFontSize -= 2;
+        updateFontSize();
+      }
+    }
+
+    function updateFontSize() {
+      document.getElementById('formattedContent').style.fontSize = currentFontSize + 'px';
+      document.getElementById('fontSize').textContent = currentFontSize + 'px';
+    }
+  </script>
+</body>
+</html>

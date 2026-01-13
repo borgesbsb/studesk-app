@@ -64,6 +64,12 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
 
   // Carregar vozes disponíveis
   useEffect(() => {
+    // Verificar se speechSynthesis está disponível (não está no Capacitor WebView)
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      console.log('Speech Synthesis não disponível - usando TTS nativo do Capacitor')
+      return
+    }
+
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices()
       // Filtrar vozes em português
@@ -88,7 +94,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
 
     return () => {
       // Limpar ao desmontar
-      window.speechSynthesis.cancel()
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
       releaseWakeLock()
       stopSilentAudio()
     }
@@ -114,7 +122,7 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
         }
 
         // Verificar se o TTS parou e tentar reativar
-        if (isSpeaking && window.speechSynthesis.paused) {
+        if (isSpeaking && window.speechSynthesis && window.speechSynthesis.paused) {
           console.log('🔄 TTS pausado detectado, tentando retomar...')
           window.speechSynthesis.resume()
         }
@@ -479,14 +487,14 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
 
       // Configurar action handlers
       navigator.mediaSession.setActionHandler('play', () => {
-        if (isPaused) {
+        if (isPaused && window.speechSynthesis) {
           window.speechSynthesis.resume()
           setIsPaused(false)
         }
       })
 
       navigator.mediaSession.setActionHandler('pause', () => {
-        if (isSpeaking && !isPaused) {
+        if (isSpeaking && !isPaused && window.speechSynthesis) {
           window.speechSynthesis.pause()
           setIsPaused(true)
         }
@@ -637,7 +645,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
   }
 
   const handleStop = () => {
-    window.speechSynthesis.cancel()
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel()
+    }
     setIsSpeaking(false)
     setIsPaused(false)
 

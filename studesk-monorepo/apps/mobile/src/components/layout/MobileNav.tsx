@@ -118,7 +118,10 @@ export function MobileNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 pb-safe">
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}
+    >
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const href = `/${userHash}/${item.path}`

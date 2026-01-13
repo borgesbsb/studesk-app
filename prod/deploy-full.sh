@@ -7,7 +7,6 @@ set -e  # Para na primeira falha
 
 SERVER="root@195.35.17.216"
 REPO_PATH="/var/www/studesk-app"
-BACKEND_PATH="$REPO_PATH/studesk"
 MOBILE_PATH="$REPO_PATH/studesk-monorepo"
 BRANCH="main"
 
@@ -31,9 +30,6 @@ ssh $SERVER << 'BACKEND_SSH'
 
     git fetch origin
     git reset --hard origin/main
-
-    echo "🔄 [BACKEND] Navegando para backend..."
-    cd studesk
 
     echo "📦 [BACKEND] Instalando dependências..."
     npm install

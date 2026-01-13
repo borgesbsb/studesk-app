@@ -2,7 +2,7 @@
 
 import { MobileLayout } from '@/components/layout/MobileLayout'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { materiaisApi, type Material } from '@/lib/api/materiais'
 import { disciplinasApi, type Disciplina } from '@/lib/api/disciplinas'
@@ -11,6 +11,8 @@ import { getBackendBaseUrl } from '@/lib/api-base-url'
 
 export default function MateriaisPage() {
   const router = useRouter()
+  const params = useParams()
+  const userHash = params.userHash as string
   const { data: session } = useSession()
   const [materiais, setMateriais] = useState<Material[]>([])
   const [cacheStatus, setCacheStatus] = useState<Record<string, boolean>>({})
@@ -133,7 +135,7 @@ export default function MateriaisPage() {
 
   const handleDisciplinaSelect = (disciplinaId: string) => {
     // Navegar para a página de materiais da disciplina
-    window.location.href = `/disciplinas/${disciplinaId}/materiais`
+    window.location.href = `/${userHash}/disciplinas/${disciplinaId}/materiais`
   }
 
   if (loading) {

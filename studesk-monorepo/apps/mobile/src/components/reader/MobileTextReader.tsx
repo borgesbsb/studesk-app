@@ -5,6 +5,8 @@ import { ArrowLeft, Settings, Type, Minus, Plus, Clock, Bookmark, ChevronLeft, C
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { TextToSpeech } from '@capacitor-community/text-to-speech'
+import { Capacitor } from '@capacitor/core'
 
 interface MobileTextReaderProps {
   materialId: string
@@ -291,6 +293,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
       return () => clearTimeout(timer)
     }
   }, [initialPage, pages.length, loading])
+
+  // Helper para detectar se estamos no Capacitor (app nativo)
+  const isNativeApp = Capacitor.isNativePlatform()
 
   const fetchText = async () => {
     try {

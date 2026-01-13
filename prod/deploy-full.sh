@@ -6,8 +6,9 @@
 set -e  # Para na primeira falha
 
 SERVER="root@195.35.17.216"
-BACKEND_REPO_PATH="/var/www/studesk"
-MOBILE_PATH="/var/www/studesk-mobile"
+REPO_PATH="/var/www/studesk-app"
+BACKEND_PATH="$REPO_PATH/studesk"
+MOBILE_PATH="$REPO_PATH/studesk-monorepo"
 BRANCH="main"
 
 echo "🚀 Iniciando deploy completo do Studesk..."
@@ -16,9 +17,6 @@ echo ""
 # ============================================
 # 1. BACKEND (studesk)
 # ============================================
-echo "📦 Preparando deploy..."
-cd ../studesk
-
 echo "📤 Fazendo push das alterações..."
 git push origin $BRANCH
 
@@ -28,27 +26,33 @@ echo "📥 [BACKEND] Fazendo deploy no servidor..."
 ssh $SERVER << 'BACKEND_SSH'
     set -e
 
-    echo "🔄 [BACKEND] Atualizando backend..."
-    cd /var/www/studesk || {
-        echo "❌ Erro: Diretório /var/www/studesk não encontrado!"
-        echo "Criando estrutura..."
-        mkdir -p /var/www
-        cd /var/www
-        git clone https://github.com/borgesbsb/studesk-app.git studesk
-        cd studesk
-    }
+    echo "🔄 [BACKEND] Atualizando repositório principal..."
+    cd /var/www/studesk-app
 
     git fetch origin
     git reset --hard origin/main
 
+    echo "🔄 [BACKEND] Navegando para backend..."
+    cd studesk
+
     echo "📦 [BACKEND] Instalando dependências..."
     npm install
+
+    echo "🛑 [BACKEND] Parando aplicação..."
+    pm2 stop studesk 2>/dev/null || true
+
+    echo "🧹 [BACKEND] Limpando build anterior..."
+    rm -rf .next
 
     echo "🏗️ [BACKEND] Fazendo build..."
     npm run build
 
     echo "🔄 [BACKEND] Reiniciando backend..."
-    pm2 restart studesk || pm2 start npm --name "studesk" -- start
+    pm2 delete studesk 2>/dev/null || true
+    pm2 start npm --name "studesk" -- start
+
+    echo "💾 [BACKEND] Salvando configuração PM2..."
+    pm2 save
 
     echo "✅ [BACKEND] Deploy concluído!"
 BACKEND_SSH
@@ -57,66 +61,66 @@ BACKEND_SSH
 # 2. MOBILE PWA
 # ============================================
 echo ""
-echo "📱 [MOBILE] Preparando deploy do mobile PWA..."
+echo "📱 [MOBILE] Fazendo deploy do mobile PWA..."
 
-# Criar tarball do monorepo completo (agora dentro do repo studesk)
-cd studesk-monorepo
-echo "📦 [MOBILE] Criando pacote do monorepo..."
-tar -czf /tmp/studesk-mobile.tar.gz \
-    --exclude=node_modules \
-    --exclude='apps/mobile/node_modules' \
-    --exclude='packages/*/node_modules' \
-    --exclude='apps/mobile/.next' \
-    --exclude='.next' \
-    --exclude='.certificates' \
-    --exclude='.turbo' \
-    .
-
-# Copiar para o servidor
-echo "📤 [MOBILE] Enviando mobile para servidor..."
-scp /tmp/studesk-mobile.tar.gz $SERVER:/tmp/
-
-# Deploy no servidor
-echo "📥 [MOBILE] Fazendo deploy no servidor..."
 ssh $SERVER << 'MOBILE_SSH'
     set -e
 
-    echo "🔄 [MOBILE] Preparando diretório..."
-    rm -rf /var/www/studesk-mobile
-    mkdir -p /var/www/studesk-mobile
-    cd /var/www/studesk-mobile
+    echo "🔄 [MOBILE] Navegando para monorepo..."
+    cd /var/www/studesk-app/studesk-monorepo
 
-    echo "📦 [MOBILE] Extraindo arquivos..."
-    tar -xzf /tmp/studesk-mobile.tar.gz
-    rm /tmp/studesk-mobile.tar.gz
+    echo "📝 [MOBILE] Configurando arquivos .env..."
+    # .env no package database
+    cat > packages/database/.env << 'ENVEOF'
+DATABASE_URL="postgresql://studesk:studesk2026@localhost:5432/studesk"
+ENVEOF
 
-    echo "📦 [MOBILE] Instalando dependências do monorepo com pnpm..."
+    # .env no mobile app
+    cat > apps/mobile/.env.local << 'ENVEOF'
+# Database
+DATABASE_URL="postgresql://studesk:studesk2026@localhost:5432/studesk"
+
+# NextAuth
+NEXTAUTH_SECRET=PPT5Un1oRL+W5dNyWh0s9f5+oI3Gb0yuQy3H/QQDTA4=
+NEXTAUTH_URL=http://localhost:3031
+
+# Node
+NODE_ENV=production
+ENVEOF
+
+    echo "📦 [MOBILE] Instalando dependências com pnpm..."
     pnpm install --shamefully-hoist
 
-    echo "📦 [MOBILE] Gerando Prisma client..."
+    echo "🔨 [MOBILE] Gerando Prisma client..."
     cd packages/database
     pnpm exec prisma generate
     cd ../..
 
-    echo "🏗️ [MOBILE] Fazendo build do mobile app..."
+    echo "🛑 [MOBILE] Parando mobile..."
+    pm2 stop studesk-mobile 2>/dev/null || true
+
+    echo "🧹 [MOBILE] Limpando build anterior..."
     cd apps/mobile
+    rm -rf .next
+
+    echo "🏗️ [MOBILE] Fazendo build..."
     pnpm run build
 
-    echo "🔄 [MOBILE] Reiniciando mobile..."
+    echo "🔄 [MOBILE] Reiniciando mobile no PM2..."
     pm2 delete studesk-mobile 2>/dev/null || true
     pm2 start "pnpm start" --name "studesk-mobile"
 
+    echo "💾 [MOBILE] Salvando configuração PM2..."
+    pm2 save
+
     echo "✅ [MOBILE] Deploy concluído!"
 MOBILE_SSH
-
-# Limpar arquivo local
-rm /tmp/studesk-mobile.tar.gz
 
 echo ""
 echo "✅ Deploy completo finalizado!"
 echo ""
 echo "🌐 URLs disponíveis:"
-echo "   Backend:  http://195.35.17.216:3030"
-echo "   Mobile:   http://195.35.17.216:3031"
+echo "   Backend:  https://studesk.pro (porta 3030)"
+echo "   Mobile:   https://studesk.pro/mobile (porta 3031)"
 echo ""
-echo "💡 Configure HTTPS com Nginx + Let's Encrypt para habilitar PWA!"
+echo "💡 Acesse o backend ou mobile via Nginx!"

@@ -1,8 +1,8 @@
 {
-  "name": "Studesk Mobile",
-  "short_name": "Studesk",
+  "name": "Studesk Mobile v2",
+  "short_name": "Studesk v2",
   "description": "Transforme seus estudos em resultados - Gerencie materiais, planos de estudo e acompanhe seu progresso",
-  "start_url": "/",
+  "start_url": "/?v=2",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",

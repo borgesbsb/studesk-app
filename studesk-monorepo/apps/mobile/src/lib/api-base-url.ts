@@ -5,7 +5,7 @@
 
 /**
  * Retorna a URL base do backend (sem /api no final)
- * Exemplo: http://localhost:3030 ou http://192.168.15.8:3030
+ * Exemplo: http://localhost:3030 ou https://studesk.pro
  */
 export function getBackendBaseUrl(): string {
   // No servidor, retornar URL genérica (será sobrescrita no cliente)
@@ -19,22 +19,23 @@ export function getBackendBaseUrl(): string {
 
   console.log('🟠 [api-base-url] Detectando URL do backend:', { hostname, protocol })
 
-  // Se for localhost, usar localhost:3030
+  // Se for localhost, usar localhost:3030 (desenvolvimento - backend separado)
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     const url = 'http://localhost:3030'
     console.log('🟠 [api-base-url] URL do backend (localhost):', url)
     return url
   }
 
-  // Se for IP da rede, usar o mesmo IP na porta 3030
-  const url = `${protocol}//${hostname}:3030`
-  console.log('🟠 [api-base-url] URL do backend (rede):', url)
+  // Em produção, usar a mesma origem (protocolo e hostname atual, sem porta extra)
+  // Exemplo: https://studesk.pro
+  const url = `${protocol}//${hostname}`
+  console.log('🟠 [api-base-url] URL do backend (produção):', url)
   return url
 }
 
 /**
  * Retorna a URL completa da API (com /api no final)
- * Exemplo: http://localhost:3030/api ou http://192.168.15.8:3030/api
+ * Exemplo: http://localhost:3030/api ou https://studesk.pro/api
  */
 export function getApiBaseUrl(): string {
   return `${getBackendBaseUrl()}/api`

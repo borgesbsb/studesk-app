@@ -45,3 +45,4 @@ public/workbox-*.js.map
 android/
 ios/
 .capacitor/
+capacitor.config.*.bak

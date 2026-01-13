@@ -19,6 +19,13 @@ export function getBackendBaseUrl(): string {
 
   console.log('🟠 [api-base-url] Detectando URL do backend:', { hostname, protocol })
 
+  // Se for emulador Android (10.0.2.2), usar 10.0.2.2:3030
+  if (hostname === '10.0.2.2') {
+    const url = 'http://10.0.2.2:3030'
+    console.log('🟠 [api-base-url] URL do backend (emulador):', url)
+    return url
+  }
+
   // Se for localhost, usar localhost:3030 (desenvolvimento - backend separado)
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     const url = 'http://localhost:3030'

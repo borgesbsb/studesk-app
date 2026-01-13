@@ -22,8 +22,22 @@ else
 fi
 
 echo ""
+echo "🔄 Usando configuração para emulador..."
+# Fazer backup da config atual
+if [ -f capacitor.config.ts ]; then
+    cp capacitor.config.ts capacitor.config.device.ts.bak
+fi
+
+# Copiar config do emulador
+cp capacitor.config.emulator.ts capacitor.config.ts
+
 echo "🔄 Sincronizando Capacitor..."
 npx cap sync android
+
+# Restaurar config original
+if [ -f capacitor.config.device.ts.bak ]; then
+    mv capacitor.config.device.ts.bak capacitor.config.ts
+fi
 
 if [ $? -ne 0 ]; then
     echo "❌ Erro ao sincronizar Capacitor"

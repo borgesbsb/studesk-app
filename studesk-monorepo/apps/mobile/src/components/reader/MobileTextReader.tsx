@@ -576,7 +576,64 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
     }
   }
 
-  const handlePlayPause = () => {
+  // Funções para TTS nativo do Capacitor
+  const speakWithCapacitor = async (text: string) => {
+    try {
+      await TextToSpeech.speak({
+        text,
+        lang: 'pt-BR',
+        rate: speechRate,
+        pitch: 1.0,
+        volume: 1.0,
+        category: 'ambient',
+      })
+
+      console.log('🔊 Iniciou leitura com TTS nativo')
+      setIsSpeaking(true)
+      setIsPaused(false)
+
+      // Configurar Media Session e Wake Lock
+      setupMediaSession()
+      requestWakeLock()
+    } catch (error) {
+      console.error('Erro no TTS nativo:', error)
+      alert('Erro ao iniciar leitura em voz alta')
+    }
+  }
+
+  const stopCapacitorTTS = async () => {
+    try {
+      await TextToSpeech.stop()
+      console.log('🔇 TTS nativo parado')
+      setIsSpeaking(false)
+      setIsPaused(false)
+      releaseWakeLock()
+    } catch (error) {
+      console.error('Erro ao parar TTS nativo:', error)
+    }
+  }
+
+  const handlePlayPause = async () => {
+    // Se for app nativo, usar TTS do Capacitor
+    if (isNativeApp) {
+      if (isSpeaking) {
+        // Parar leitura (Capacitor TTS não suporta pause/resume bem)
+        await stopCapacitorTTS()
+      } else {
+        // Iniciar nova leitura
+        const textToSpeak = getCurrentPageText()
+
+        if (!textToSpeak) {
+          alert('Nenhum texto para ler na página atual')
+          return
+        }
+
+        await speakWithCapacitor(textToSpeak)
+      }
+      return
+    }
+
+    // Código original para Web Speech API
     if (!window.speechSynthesis) {
       alert('Seu navegador não suporta leitura em voz alta')
       return
@@ -649,7 +706,14 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
     }
   }
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    // Se for app nativo, usar TTS do Capacitor
+    if (isNativeApp) {
+      await stopCapacitorTTS()
+      return
+    }
+
+    // Código original para Web Speech API
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel()
     }

@@ -37,6 +37,7 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const [selectedVoice, setSelectedVoice] = useState<string>('')
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const wakeLockRef = useRef<any>(null)
 
   // Cronômetro de leitura
   const [timeSpent, setTimeSpent] = useState(0)
@@ -87,6 +88,7 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
     return () => {
       // Limpar ao desmontar
       window.speechSynthesis.cancel()
+      releaseWakeLock()
     }
   }, [])
 
@@ -427,6 +429,70 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
       .trim()
   }
 
+  // Configurar Media Session API para controles de mídia na tela de bloqueio
+  const setupMediaSession = () => {
+    if ('mediaSession' in navigator) {
+      const currentPageData = pages.find(p => p.pageNum === currentPage)
+      const pageTitle = currentPageData ? `Página ${currentPage}` : 'Leitura em voz alta'
+
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: pageTitle,
+        artist: 'Studesk - Leitor de PDF',
+        album: 'Leitura em voz alta',
+      })
+
+      // Configurar action handlers
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (isPaused) {
+          window.speechSynthesis.resume()
+          setIsPaused(false)
+        }
+      })
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (isSpeaking && !isPaused) {
+          window.speechSynthesis.pause()
+          setIsPaused(true)
+        }
+      })
+
+      navigator.mediaSession.setActionHandler('stop', () => {
+        handleStop()
+      })
+
+      console.log('📱 Media Session configurada')
+    }
+  }
+
+  // Requisitar Wake Lock para manter tela ativa durante leitura
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen')
+        console.log('🔒 Wake Lock ativado - tela não será desligada')
+
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('🔓 Wake Lock liberado')
+        })
+      }
+    } catch (err) {
+      console.error('Erro ao requisitar Wake Lock:', err)
+    }
+  }
+
+  // Liberar Wake Lock
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release()
+        wakeLockRef.current = null
+        console.log('🔓 Wake Lock liberado manualmente')
+      } catch (err) {
+        console.error('Erro ao liberar Wake Lock:', err)
+      }
+    }
+  }
+
   const handlePlayPause = () => {
     if (!window.speechSynthesis) {
       alert('Seu navegador não suporta leitura em voz alta')
@@ -468,18 +534,28 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
         setIsSpeaking(true)
         setIsPaused(false)
         console.log('🔊 Iniciou leitura em voz alta')
+
+        // Configurar Media Session e Wake Lock
+        setupMediaSession()
+        requestWakeLock()
       }
 
       utterance.onend = () => {
         setIsSpeaking(false)
         setIsPaused(false)
         console.log('🔇 Finalizou leitura em voz alta')
+
+        // Liberar Wake Lock
+        releaseWakeLock()
       }
 
       utterance.onerror = (event) => {
         console.error('Erro no TTS:', event)
         setIsSpeaking(false)
         setIsPaused(false)
+
+        // Liberar Wake Lock em caso de erro
+        releaseWakeLock()
       }
 
       utteranceRef.current = utterance
@@ -491,6 +567,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
     window.speechSynthesis.cancel()
     setIsSpeaking(false)
     setIsPaused(false)
+
+    // Liberar Wake Lock ao parar
+    releaseWakeLock()
   }
 
   if (loading) {

@@ -5,8 +5,8 @@ import { ArrowLeft, Settings, Type, Minus, Plus, Clock, Bookmark, ChevronLeft, C
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { TextToSpeech } from '@capacitor-community/text-to-speech'
-import { Capacitor } from '@capacitor/core'
+
+// Capacitor será importado dinamicamente para evitar erros de SSR
 
 interface MobileTextReaderProps {
   materialId: string
@@ -38,6 +38,7 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
   const [speechRate, setSpeechRate] = useState(1.0)
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const [selectedVoice, setSelectedVoice] = useState<string>('')
+  const [isNativeApp, setIsNativeApp] = useState(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
   const wakeLockRef = useRef<any>(null)
   const silentAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -63,6 +64,22 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
   useEffect(() => {
     fetchText()
   }, [materialId])
+
+  // Detectar se estamos no Capacitor (app nativo)
+  useEffect(() => {
+    const checkNativeApp = async () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const { Capacitor } = await import('@capacitor/core')
+          setIsNativeApp(Capacitor.isNativePlatform())
+        } catch (error) {
+          console.log('Capacitor não disponível, usando modo web')
+          setIsNativeApp(false)
+        }
+      }
+    }
+    checkNativeApp()
+  }, [])
 
   // Carregar vozes disponíveis
   useEffect(() => {
@@ -293,9 +310,6 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
       return () => clearTimeout(timer)
     }
   }, [initialPage, pages.length, loading])
-
-  // Helper para detectar se estamos no Capacitor (app nativo)
-  const isNativeApp = Capacitor.isNativePlatform()
 
   const fetchText = async () => {
     try {
@@ -589,6 +603,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
       setupMediaSession()
       requestWakeLock()
 
+      // Importar TextToSpeech dinamicamente
+      const { TextToSpeech } = await import('@capacitor-community/text-to-speech')
+
       // Iniciar TTS (não bloqueia - retorna imediatamente)
       TextToSpeech.speak({
         text,
@@ -625,6 +642,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
       setIsSpeaking(false)
       setIsPaused(false)
       releaseWakeLock()
+
+      // Importar TextToSpeech dinamicamente
+      const { TextToSpeech } = await import('@capacitor-community/text-to-speech')
 
       // Então parar o TTS
       await TextToSpeech.stop()

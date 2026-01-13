@@ -919,6 +919,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
                   style={{
                     fontSize: `${fontSize}px`,
                     lineHeight: lineHeight,
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word',
+                    hyphens: 'auto',
                   }}
                 >
                   <ReactMarkdown
@@ -953,6 +956,9 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
               style={{
                 fontSize: `${fontSize}px`,
                 lineHeight: lineHeight,
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+                hyphens: 'auto',
               }}
             >
               <ReactMarkdown

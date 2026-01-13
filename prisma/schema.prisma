@@ -190,6 +190,7 @@ model PdfMobileText {
   processingStatus  String         @default("pending") // pending, processing, partial, complete, error
   lastProcessedPage Int            @default(0) // Última página processada
   processingError   String?        // Mensagem de erro se houver
+  retryCount        Int            @default(0) // Contador de tentativas de processamento
 
   // Padrões de cabeçalho/rodapé detectados pela IA
   headerFooterPatterns String?     @db.Text // JSON com padrões regex detectados pela IA

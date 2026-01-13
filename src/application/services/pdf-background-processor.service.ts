@@ -50,28 +50,70 @@ export class PdfBackgroundProcessorService {
       console.log(`✅ Tipo confirmado: PDF`)
 
       // Carregar arquivo PDF
-      console.log(`\n📂 [2/4] Carregando arquivo PDF do disco...`)
-      console.log(`   URL do arquivo: ${material.arquivoPdfUrl}`)
+      console.log(`\n📂 [2/4] Carregando arquivo PDF...`)
+      console.log(`   Fonte: ${material.fonteOrigem || 'Upload local'}`)
 
-      // Remove /api/uploads/ ou /uploads/ do início da URL
-      const pathParts = material.arquivoPdfUrl.replace(/^\/(api\/)?uploads\//, '').split('/')
-      const fileOwnerId = pathParts[0]
-      const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-      const fileName = material.arquivoPdfUrl.split('/').pop()
-      const pdfPath = path.join(uploadDir, fileOwnerId, fileName || '')
+      let buffer: Buffer
 
-      console.log(`   Caminho completo: ${pdfPath}`)
+      // Verificar se é do Google Drive
+      if (material.fonteOrigem?.startsWith('Google Drive (')) {
+        console.log(`   📥 Baixando do Google Drive...`)
 
-      // Verificar se arquivo existe
-      try {
-        const stats = await fs.stat(pdfPath)
-        console.log(`✅ Arquivo encontrado (${(stats.size / 1024 / 1024).toFixed(2)} MB)`)
-      } catch (error) {
-        throw new Error(`Arquivo PDF não encontrado: ${pdfPath}`)
+        // Extrair fileId do fonteOrigem
+        const fileIdMatch = material.fonteOrigem.match(/Google Drive \(([^)]+)\)/)
+        if (!fileIdMatch) {
+          throw new Error('Formato inválido de fonteOrigem do Google Drive')
+        }
+        const fileId = fileIdMatch[1]
+        console.log(`   🆔 File ID: ${fileId}`)
+
+        // Buscar tokens do Google Drive do usuário
+        const user = await prisma.user.findUnique({
+          where: { id: material.userId },
+          select: {
+            googleDriveAccessToken: true,
+            googleDriveRefreshToken: true,
+          },
+        })
+
+        if (!user?.googleDriveAccessToken) {
+          throw new Error('Usuário não possui tokens do Google Drive')
+        }
+
+        // Baixar arquivo do Google Drive
+        const { GoogleDriveService } = await import('@/lib/google-drive')
+        const driveService = new GoogleDriveService(
+          user.googleDriveAccessToken,
+          user.googleDriveRefreshToken || undefined
+        )
+
+        buffer = await driveService.downloadPdfBuffer(fileId)
+        console.log(`✅ Arquivo baixado do Google Drive (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`)
+      } else {
+        // Upload local - ler do disco
+        console.log(`   📁 Lendo do disco local...`)
+        console.log(`   URL do arquivo: ${material.arquivoPdfUrl}`)
+
+        // Remove /api/uploads/ ou /uploads/ do início da URL
+        const pathParts = material.arquivoPdfUrl.replace(/^\/(api\/)?uploads\//, '').split('/')
+        const fileOwnerId = pathParts[0]
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+        const fileName = material.arquivoPdfUrl.split('/').pop()
+        const pdfPath = path.join(uploadDir, fileOwnerId, fileName || '')
+
+        console.log(`   Caminho completo: ${pdfPath}`)
+
+        // Verificar se arquivo existe
+        try {
+          const stats = await fs.stat(pdfPath)
+          console.log(`✅ Arquivo encontrado (${(stats.size / 1024 / 1024).toFixed(2)} MB)`)
+        } catch (error) {
+          throw new Error(`Arquivo PDF não encontrado: ${pdfPath}`)
+        }
+
+        // Ler arquivo
+        buffer = await fs.readFile(pdfPath)
       }
-
-      // Ler arquivo
-      const buffer = await fs.readFile(pdfPath)
 
       // Verificar se é PDF válido
       const pdfHeader = buffer.slice(0, 4).toString()

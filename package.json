@@ -12,6 +12,7 @@
     "migrate-pdf-urls": "node scripts/migrate-pdf-urls.js",
     "test-delete-material": "node scripts/test-delete-material.js",
     "create-user": "tsx scripts/create-default-user.ts",
+    "worker:pdf": "tsx workers/pdf-processor-worker.ts",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",

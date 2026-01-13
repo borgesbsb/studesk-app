@@ -123,6 +123,93 @@ export class OpenAIFormatService {
   }
 
   /**
+   * Tenta recuperar marcadores perdidos re-inserindo-os no texto formatado
+   * Usa o texto original como referência para saber onde colocar os marcadores
+   */
+  private recoverLostMarkers(originalText: string, formattedText: string): string {
+    const originalMarkers = originalText.match(/\[PAGE_\d+\]/g) || []
+    const formattedMarkers = formattedText.match(/\[PAGE_\d+\]/g) || []
+
+    if (originalMarkers.length === formattedMarkers.length) {
+      return formattedText // Nada a fazer
+    }
+
+    console.log(`      🔧 Tentando recuperar marcadores perdidos...`)
+
+    const originalSet = new Set(originalMarkers)
+    const formattedSet = new Set(formattedMarkers)
+    const missing = [...originalSet].filter(m => !formattedSet.has(m))
+
+    if (missing.length === 0) {
+      return formattedText
+    }
+
+    // Dividir texto original por marcadores para encontrar conteúdo entre eles
+    let recovered = formattedText
+
+    for (const marker of missing) {
+      const pageNum = marker.match(/\[PAGE_(\d+)\]/)?.[1]
+      if (!pageNum) continue
+
+      // Procurar contexto ao redor do marcador no texto original
+      const markerIndex = originalText.indexOf(marker)
+      if (markerIndex === -1) continue
+
+      // Pegar 100 caracteres antes e depois do marcador como contexto
+      const contextBefore = originalText.substring(Math.max(0, markerIndex - 100), markerIndex)
+        .replace(/\[PAGE_\d+\]/g, '')
+        .trim()
+        .slice(-50) // Últimos 50 chars
+
+      const contextAfter = originalText.substring(markerIndex + marker.length, markerIndex + marker.length + 100)
+        .replace(/\[PAGE_\d+\]/g, '')
+        .trim()
+        .slice(0, 50) // Primeiros 50 chars
+
+      // Tentar encontrar posição similar no texto formatado
+      if (contextBefore && contextAfter) {
+        const searchPattern = `${contextBefore.slice(-20)}.*?${contextAfter.slice(0, 20)}`
+        const regex = new RegExp(searchPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 's')
+        const match = recovered.match(regex)
+
+        if (match && match.index !== undefined) {
+          // Inserir marcador no meio do match
+          const insertPos = match.index + Math.floor(match[0].length / 2)
+          recovered = recovered.slice(0, insertPos) + `\n\n${marker}\n\n` + recovered.slice(insertPos)
+          console.log(`      ✅ Marcador ${marker} recuperado`)
+        } else {
+          // Fallback: inserir no final da seção anterior
+          const prevMarkerNum = parseInt(pageNum) - 1
+          if (prevMarkerNum > 0) {
+            const prevMarker = `[PAGE_${prevMarkerNum}]`
+            const prevMarkerPos = recovered.lastIndexOf(prevMarker)
+            if (prevMarkerPos !== -1) {
+              // Procurar próximo parágrafo após o marcador anterior
+              const nextParaPos = recovered.indexOf('\n\n', prevMarkerPos + prevMarker.length)
+              if (nextParaPos !== -1) {
+                recovered = recovered.slice(0, nextParaPos) + `\n\n${marker}` + recovered.slice(nextParaPos)
+                console.log(`      ⚠️  Marcador ${marker} inserido após ${prevMarker}`)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Verificar se conseguiu recuperar todos
+    const recoveredMarkers = recovered.match(/\[PAGE_\d+\]/g) || []
+    const stillMissing = originalMarkers.length - recoveredMarkers.length
+
+    if (stillMissing > 0) {
+      console.error(`      ⚠️  Ainda faltam ${stillMissing} marcadores`)
+    } else {
+      console.log(`      ✅ Todos os marcadores recuperados!`)
+    }
+
+    return recovered
+  }
+
+  /**
    * Formata texto usando Groq (GRATUITO - 14,400 req/dia)
    * Modelos disponíveis: llama-3.3-70b-versatile, mixtral-8x7b-32768
    */
@@ -149,11 +236,14 @@ export class OpenAIFormatService {
     })
 
     const rawFormattedText = response.choices[0].message.content || ''
-    const formattedText = this.cleanFormattedText(rawFormattedText)
+    let formattedText = this.cleanFormattedText(rawFormattedText)
     const tokensUsed = response.usage?.total_tokens || 0
 
-    // VALIDAÇÃO CRÍTICA: Verificar se todos os marcadores foram preservados
+    // RECUPERAÇÃO AUTOMÁTICA: Tentar recuperar marcadores perdidos antes de validar
     if (originalText) {
+      formattedText = this.recoverLostMarkers(originalText, formattedText)
+
+      // VALIDAÇÃO CRÍTICA: Verificar se todos os marcadores foram preservados
       this.validatePageMarkers(originalText, formattedText)
     }
 

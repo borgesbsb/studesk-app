@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ArrowLeft, Settings, Type, Minus, Plus, Clock, Bookmark, ChevronLeft, ChevronRight, Search, Volume2, VolumeX, Play, Pause, Square } from 'lucide-react'
+import { ArrowLeft, Settings, Type, Minus, Plus, Clock, Bookmark, ChevronLeft, ChevronRight, Search, Volume2, VolumeX, Play, Pause, Square, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -48,6 +48,7 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
   const [savingProgress, setSavingProgress] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [reloading, setReloading] = useState(false)
 
   // Navegação de páginas
   const [showGoToPage, setShowGoToPage] = useState(false)
@@ -311,13 +312,19 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
     }
   }, [initialPage, pages.length, loading])
 
-  const fetchText = async () => {
+  const fetchText = async (forceReload = false) => {
     try {
       setLoading(true)
+      setError(null)
+
+      // Adicionar timestamp para forçar cache bust
+      const cacheBuster = forceReload ? `?t=${Date.now()}` : ''
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/pdf/${materialId}/mobile-text`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/pdf/${materialId}/mobile-text${cacheBuster}`,
         {
-          credentials: 'include'
+          credentials: 'include',
+          cache: forceReload ? 'no-cache' : 'default'
         }
       )
 
@@ -329,6 +336,11 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
 
       if (data.success && data.data?.formattedText) {
         setText(data.data.formattedText)
+
+        if (forceReload) {
+          console.log('✅ Texto recarregado do servidor')
+          alert('Texto atualizado com sucesso!')
+        }
       } else {
         throw new Error('Texto não disponível')
       }
@@ -337,6 +349,21 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Função para recarregar texto do servidor
+  const handleReloadText = async () => {
+    if (reloading) return
+
+    const confirmed = confirm('Deseja recarregar o texto do servidor? Isso substituirá o cache atual.')
+    if (!confirmed) return
+
+    setReloading(true)
+    try {
+      await fetchText(true)
+    } finally {
+      setReloading(false)
     }
   }
 
@@ -864,6 +891,18 @@ export function MobileTextReader({ materialId, initialPage }: MobileTextReaderPr
               title="Marcar Progresso"
             >
               <Bookmark className="w-5 h-5" />
+            </button>
+
+            {/* Botão Recarregar Texto */}
+            <button
+              onClick={handleReloadText}
+              disabled={reloading}
+              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 ${
+                reloading ? 'animate-spin' : ''
+              }`}
+              title="Recarregar texto do servidor"
+            >
+              <RefreshCw className="w-5 h-5" />
             </button>
 
             {/* Botão Configurações */}

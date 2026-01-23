@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { handleCors } from '@/lib/cors'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -159,9 +160,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    // Verificar autenticação
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    // Verificar autenticação (suporta NextAuth e JWT)
+    let auth
+    try {
+      auth = await requireAuth()
+    } catch (authError) {
       return NextResponse.json(
         { error: 'Não autorizado' },
         { status: 401, headers: handleCors(request) }
@@ -177,14 +180,14 @@ export async function POST(
       paginaAtual,
       tempoLeituraSegundos,
       assuntosEstudados,
-      userId: session.user.id
+      userId: auth.userId
     })
 
     // Verifica se o material existe e pertence ao usuário
     const materialExistente = await prisma.materialEstudo.findUnique({
       where: {
         id: materialId,
-        userId: session.user.id
+        userId: auth.userId
       },
       select: { id: true, nome: true, tipo: true, totalPaginas: true }
     })

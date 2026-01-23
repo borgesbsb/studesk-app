@@ -71,7 +71,7 @@ export class OpenAIFormatService {
         // Fallback para OpenAI se disponível
         if (this.openaiClient) {
           try {
-            const result = await this.formatWithOpenAI(prompt)
+            const result = await this.formatWithOpenAI(prompt, rawText)
             const duration = ((Date.now() - startTime) / 1000).toFixed(1)
             console.log(`      ⚡ Formatação concluída em ${duration}s (fallback OpenAI)`)
             return result
@@ -84,7 +84,7 @@ export class OpenAIFormatService {
       }
     } else if (this.primaryProvider === 'openai' && this.openaiClient) {
       try {
-        const result = await this.formatWithOpenAI(prompt)
+        const result = await this.formatWithOpenAI(prompt, rawText)
         const duration = ((Date.now() - startTime) / 1000).toFixed(1)
         console.log(`      ⚡ Formatação concluída em ${duration}s`)
         return result
@@ -257,7 +257,7 @@ export class OpenAIFormatService {
   /**
    * Formata texto usando OpenAI
    */
-  private async formatWithOpenAI(prompt: string): Promise<FormatTextResult> {
+  private async formatWithOpenAI(prompt: string, originalText?: string): Promise<FormatTextResult> {
     if (!this.openaiClient) {
       throw new Error('OpenAI client não configurado')
     }
@@ -268,7 +268,7 @@ export class OpenAIFormatService {
         {
           role: 'system',
           content:
-            'Você é um assistente especializado em reformatar textos de PDFs acadêmicos e profissionais para leitura digital (web e mobile).',
+            'Você é um assistente especializado em reformatar textos de PDFs acadêmicos e profissionais para leitura digital (web e mobile). NUNCA remova marcadores [PAGE_X].',
         },
         {
           role: 'user',
@@ -280,8 +280,16 @@ export class OpenAIFormatService {
     })
 
     const rawFormattedText = response.choices[0].message.content || ''
-    const formattedText = this.cleanFormattedText(rawFormattedText)
+    let formattedText = this.cleanFormattedText(rawFormattedText)
     const tokensUsed = response.usage?.total_tokens || 0
+
+    // RECUPERAÇÃO AUTOMÁTICA: Tentar recuperar marcadores perdidos antes de validar
+    if (originalText) {
+      formattedText = this.recoverLostMarkers(originalText, formattedText)
+
+      // VALIDAÇÃO CRÍTICA: Verificar se todos os marcadores foram preservados
+      this.validatePageMarkers(originalText, formattedText)
+    }
 
     return {
       formattedText,
@@ -306,15 +314,20 @@ TAREFA: Reformatar o texto abaixo para uma experiência de leitura otimizada, se
    - **NÃO mescle, pule ou remova nenhuma marcação de página**
    - **Esta é a regra MAIS IMPORTANTE - violá-la torna o resultado inútil**
 
-2. **PRESERVAÇÃO OBRIGATÓRIA DE CONTEÚDO:**
-   - Todo o conteúdo original: títulos, subtítulos, parágrafos, citações, referências
-   - Todos os números de páginas mencionados no texto
-   - Todos os parágrafos completos - não quebre parágrafos no meio
-   - A estrutura hierárquica completa do documento
-   - Numeração de listas, tópicos e seções
-   - Citações, notas de rodapé e referências bibliográficas
+2. **PRESERVAÇÃO OBRIGATÓRIA DE 100% DO CONTEÚDO:**
+   - **SUMÁRIO/ÍNDICE**: SEMPRE preserve completamente, mesmo que pareça redundante
+   - **TODOS os títulos, subtítulos, parágrafos, citações e referências**
+   - **Cabeçalhos e rodapés**: Preserve nomes de autores, capítulos, numeração
+   - **Números de páginas** mencionados no texto original
+   - **Todos os parágrafos completos** - NUNCA quebre parágrafos no meio
+   - **Estrutura hierárquica completa** do documento (índice → capítulos → seções)
+   - **Numeração de listas, tópicos e seções** exatamente como no original
+   - **Citações, notas de rodapé e referências bibliográficas** completas
+   - **Tabelas, gráficos e legendas** (descrever se necessário)
+   - **Informações repetidas**: Preserve TUDO, mesmo que apareça múltiplas vezes
+   - **Texto introdutório**: Prefácios, apresentações, agradecimentos, etc.
 
-2. **FORMATAÇÃO MARKDOWN PROFISSIONAL:**
+3. **FORMATAÇÃO MARKDOWN PROFISSIONAL:**
    - Títulos principais: # (H1)
    - Seções: ## (H2)
    - Subseções: ### (H3)
@@ -327,24 +340,32 @@ TAREFA: Reformatar o texto abaixo para uma experiência de leitura otimizada, se
    - Tabelas em markdown quando aplicável
    - --- para separadores horizontais quando necessário
 
-3. **MELHORIAS DE LEGIBILIDADE:**
+4. **MELHORIAS DE LEGIBILIDADE:**
    - Espaçamento adequado entre seções e parágrafos
    - Quebras de linha estratégicas para facilitar escaneamento visual
    - Destaque visual para conceitos-chave usando **negrito**
    - Estrutura clara e hierárquica
    - Formatação consistente ao longo de todo o documento
 
-4. **REGRAS CRÍTICAS:**
-   - ✅ MANTER: Todo o conteúdo, estrutura, marcadores [PAGE_X], números de página
-   - ❌ NÃO: Adicionar conteúdo extra, resumir, omitir informações, alterar significado
+5. **REGRAS CRÍTICAS - O QUE FAZER E NÃO FAZER:**
+   - ✅ MANTER: **TODO** o conteúdo, estrutura, marcadores [PAGE_X], números de página
+   - ✅ PRESERVAR: Sumário, índice, listas de figuras, tabelas, referências
+   - ❌ **NUNCA RESUMIR**: Transcreva TODO o texto, palavra por palavra
+   - ❌ **NUNCA OMITIR**: Nenhum parágrafo, seção, título ou item pode ser removido
+   - ❌ **NUNCA ABSTRAIR**: Não substitua texto por descrições como "lista de itens", "conteúdo técnico", etc.
+   - ❌ **NUNCA SIMPLIFICAR**: Mantenha toda a complexidade, detalhes técnicos e termos especializados
+   - ❌ NÃO: Adicionar conteúdo extra que não existe no original
    - ❌ NÃO: Remover ou modificar marcadores [PAGE_X] - JAMAIS!
    - ❌ NÃO: Alterar títulos, números de página ou estrutura hierárquica
-   - ✅ APENAS: Reformatar o layout com markdown mantendo 100% do conteúdo original
+   - ✅ APENAS: Reformatar o **layout** com markdown mantendo **100%** do conteúdo original
+   - ✅ TRANSCRIÇÃO COMPLETA: Se o original tem 50 páginas, o resultado deve ter 50 páginas de conteúdo
 
-5. **🔍 VERIFICAÇÃO FINAL OBRIGATÓRIA ANTES DE RETORNAR:**
+6. **🔍 VERIFICAÇÃO FINAL OBRIGATÓRIA ANTES DE RETORNAR:**
    - ✓ Conte TODOS os marcadores [PAGE_X] no texto original
    - ✓ Conte TODOS os marcadores [PAGE_X] no texto formatado
-   - ✓ Os números DEVEM ser EXATAMENTE iguais
+   - ✓ **Os marcadores devem corresponder ao número REAL de páginas do PDF**
+   - ✓ Se o PDF tem 50 páginas, deve ter marcadores de [PAGE_1] até [PAGE_50]
+   - ✓ Os números DEVEM ser EXATAMENTE iguais ao original
    - ✓ Se o original tem [PAGE_1], [PAGE_2], [PAGE_3], [PAGE_4], [PAGE_5]...
    - ✓ O formatado DEVE ter [PAGE_1], [PAGE_2], [PAGE_3], [PAGE_4], [PAGE_5]...
    - ✓ SEM EXCEÇÕES - todos os marcadores devem estar presentes

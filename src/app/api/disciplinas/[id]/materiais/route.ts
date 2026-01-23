@@ -3,25 +3,23 @@ import { listarMateriaisPorDisciplina } from '@/interface/actions/material-estud
 import { handleCors } from '@/lib/cors'
 
 export async function OPTIONS(request: NextRequest) {
-  const headers = handleCors(request)
-  return NextResponse.json({}, { headers })
+  return NextResponse.json({}, { headers: handleCors(request) })
 }
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const headers = handleCors(request)
-
   try {
-    const result = await listarMateriaisPorDisciplina(params.id)
+    const { id } = await params
+    const result = await listarMateriaisPorDisciplina(id)
+    const headers = handleCors(request)
 
-    return NextResponse.json(
-      result,
-      { headers }
-    )
+    return NextResponse.json(result, { headers })
   } catch (error) {
     console.error('Erro no endpoint materiais por disciplina:', error)
+    const headers = handleCors(request)
+
     return NextResponse.json(
       {
         success: false,

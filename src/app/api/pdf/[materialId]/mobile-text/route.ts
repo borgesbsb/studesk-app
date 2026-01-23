@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { handleCors } from '@/lib/cors'
 
 /**
- * Limpa texto formatado, removendo code blocks malformados
+ * Limpa texto formatado, removendo code blocks malformados e corrigindo quebras de linha
  */
 function cleanFormattedText(text: string): string {
   let cleaned = text
@@ -29,7 +29,61 @@ function cleanFormattedText(text: string): string {
   // Clean up multiple consecutive empty lines (max 2 newlines)
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
 
+  // CORREÇÃO DE QUEBRAS DE LINHA DENTRO DE PARÁGRAFOS
+  cleaned = fixParagraphBreaks(cleaned)
+
   return cleaned
+}
+
+/**
+ * Remove quebras de linha simples dentro de parágrafos, mantendo apenas quebras duplas
+ */
+function fixParagraphBreaks(text: string): string {
+  // 1. Preservar marcadores de página adicionando marcador especial
+  let fixed = text.replace(/\[PAGE_(\d+)\]/g, '<<<PAGE_MARKER_$1>>>')
+
+  // 2. Preservar títulos markdown (linhas que começam com #)
+  fixed = fixed.replace(/^(#{1,6}\s+.+)$/gm, '<<<HEADING>>>$1<<<HEADING_END>>>')
+
+  // 3. Preservar listas (linhas que começam com - ou * ou número.)
+  fixed = fixed.replace(/^(\s*[-*]\s+.+)$/gm, '<<<LIST_ITEM>>>$1<<<LIST_ITEM_END>>>')
+  fixed = fixed.replace(/^(\s*\d+\.\s+.+)$/gm, '<<<LIST_ITEM>>>$1<<<LIST_ITEM_END>>>')
+
+  // 4. Preservar blocos de citação (linhas que começam com >)
+  fixed = fixed.replace(/^(>\s+.+)$/gm, '<<<QUOTE>>>$1<<<QUOTE_END>>>')
+
+  // 5. Preservar quebras de parágrafo (substituir \n\n por marcador especial)
+  fixed = fixed.replace(/\n\n+/g, '<<<PARAGRAPH_BREAK>>>')
+
+  // 6. AGORA: Remover TODAS as quebras de linha simples restantes
+  // Essas são as quebras DENTRO dos parágrafos que estão causando o problema
+  fixed = fixed.replace(/\n/g, ' ')
+
+  // 7. Limpar múltiplos espaços que podem ter sido criados
+  fixed = fixed.replace(/\s{2,}/g, ' ')
+
+  // 8. Restaurar quebras de parágrafo
+  fixed = fixed.replace(/<<<PARAGRAPH_BREAK>>>/g, '\n\n')
+
+  // 9. Restaurar marcadores de página (com quebras de parágrafo ao redor)
+  fixed = fixed.replace(/<<<PAGE_MARKER_(\d+)>>>/g, '\n\n[PAGE_$1]\n\n')
+
+  // 10. Restaurar títulos markdown (com quebras ao redor)
+  fixed = fixed.replace(/<<<HEADING>>>(.+?)<<<HEADING_END>>>/g, '\n\n$1\n\n')
+
+  // 11. Restaurar listas (com quebra antes)
+  fixed = fixed.replace(/<<<LIST_ITEM>>>(.+?)<<<LIST_ITEM_END>>>/g, '\n$1')
+
+  // 12. Restaurar blocos de citação (com quebra antes)
+  fixed = fixed.replace(/<<<QUOTE>>>(.+?)<<<QUOTE_END>>>/g, '\n$1')
+
+  // 13. Limpar quebras múltiplas que podem ter sido criadas
+  fixed = fixed.replace(/\n{3,}/g, '\n\n')
+
+  // 14. Trim
+  fixed = fixed.trim()
+
+  return fixed
 }
 
 interface RouteParams {

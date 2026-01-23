@@ -247,6 +247,82 @@ export async function POST(
 
     console.log('✅ API - Histórico de leitura salvo:', historicoLeitura)
 
+    // ============================================
+    // Atualizar DisciplinaDia se estiver programada para hoje
+    // ============================================
+    let horasAdicionadas = 0
+    let disciplinasAtualizadas: string[] = []
+
+    try {
+      // 1. Buscar disciplinas associadas ao material
+      const disciplinasDoMaterial = await prisma.disciplinaMaterial.findMany({
+        where: { materialId },
+        select: {
+          disciplinaId: true,
+          disciplina: {
+            select: { nome: true }
+          }
+        }
+      })
+
+      if (disciplinasDoMaterial.length > 0) {
+        const agora = new Date()
+        const inicioDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0, 0)
+        const fimDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999)
+
+        // Determinar dia da semana (1=segunda, 7=domingo)
+        // JavaScript: domingo=0, segunda=1, ..., sábado=6
+        // Banco: dia1=segunda, dia2=terça, ..., dia7=domingo
+        const diaDaSemanaJS = agora.getDay()
+        const diaDaSemana = diaDaSemanaJS === 0 ? 7 : diaDaSemanaJS
+        const diaKey = `dia${diaDaSemana}`
+
+        console.log(`📅 Verificando plano para hoje: ${diaKey} (${agora.toLocaleDateString()})`)
+
+        // 2. Para cada disciplina, buscar DisciplinaSemana ativa para a semana atual
+        for (const { disciplinaId, disciplina } of disciplinasDoMaterial) {
+          const disciplinaSemanaAtiva = await prisma.disciplinaSemana.findFirst({
+            where: {
+              disciplinaId,
+              semana: {
+                dataInicio: { lte: fimDoDia },
+                dataFim: { gte: inicioDoDia },
+                plano: { ativo: true }
+              }
+            },
+            include: {
+              dias: {
+                where: { dia: diaKey }
+              }
+            }
+          })
+
+          if (disciplinaSemanaAtiva && disciplinaSemanaAtiva.dias.length > 0) {
+            // 3. Atualizar horasRealizadas do dia atual
+            const diaHoje = disciplinaSemanaAtiva.dias[0]
+            const horasAdicionar = tempoLeituraSegundos / 3600 // converter segundos para horas
+
+            await prisma.disciplinaDia.update({
+              where: { id: diaHoje.id },
+              data: {
+                horasRealizadas: { increment: horasAdicionar }
+              }
+            })
+
+            horasAdicionadas += horasAdicionar
+            disciplinasAtualizadas.push(disciplina.nome)
+
+            console.log(`✅ Tempo adicionado ao plano: ${horasAdicionar.toFixed(2)}h para ${disciplina.nome} - ${diaKey}`)
+          } else {
+            console.log(`ℹ️  Disciplina ${disciplina.nome} não está programada para ${diaKey}`)
+          }
+        }
+      }
+    } catch (error) {
+      // Não falhar a request se houver erro ao atualizar plano
+      console.error('⚠️ Erro ao atualizar plano de estudos (não crítico):', error)
+    }
+
     const mensagem = assuntosEstudados
       ? `Sessão de estudo salva: página ${paginaAtual}, ${Math.floor(tempoLeituraSegundos / 60)}min ${tempoLeituraSegundos % 60}s, assuntos registrados`
       : `Histórico de leitura salvo: página ${paginaAtual}, ${Math.floor(tempoLeituraSegundos / 60)}min ${tempoLeituraSegundos % 60}s`
@@ -254,7 +330,10 @@ export async function POST(
     return NextResponse.json({
       success: true,
       historicoLeitura,
-      message: mensagem
+      message: mensagem,
+      planoAtualizado: disciplinasAtualizadas.length > 0,
+      horasAdicionadas: horasAdicionadas,
+      disciplinasAtualizadas: disciplinasAtualizadas
     }, { headers: handleCors(request) })
   } catch (error) {
     console.error('❌ API - Erro ao salvar histórico de leitura:', error)

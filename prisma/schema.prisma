@@ -98,27 +98,30 @@ model Disciplina {
 }
 
 model MaterialEstudo {
-  id                String               @id @default(cuid())
-  userId            String
-  nome              String
-  tipo              String               @default("PDF")  // PDF ou VIDEO
-  totalPaginas      Int
-  paginasLidas      Int                  @default(0)
-  duracaoSegundos   Int?                 // Duração do vídeo em segundos (para vídeos)
-  tempoAssistido    Int?                 @default(0) // Tempo assistido em segundos (para vídeos)
-  arquivoPdfUrl     String?              // Opcional - PDFs armazenados no IndexedDB
-  arquivoVideoUrl   String?              // Opcional - Vídeos armazenados no IndexedDB
-  fonteOrigem       String?              // Fonte de origem (ex: "Google Drive (fileId)")
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  anotacoes         Anotacao[]
-  disciplinas       DisciplinaMaterial[]
-  historicoLeitura  HistoricoLeitura[]
-  mobileText        PdfMobileText?       // Texto formatado para mobile
+  id                  String               @id @default(cuid())
+  userId              String
+  nome                String
+  tipo                String               @default("PDF")  // PDF ou VIDEO
+  totalPaginas        Int
+  paginasLidas        Int                  @default(0)
+  duracaoSegundos     Int?                 // Duração do vídeo em segundos (para vídeos)
+  tempoAssistido      Int?                 @default(0) // Tempo assistido em segundos (para vídeos)
+  arquivoPdfUrl       String?              // Opcional - PDFs armazenados no IndexedDB
+  arquivoVideoUrl     String?              // Opcional - Vídeos armazenados no IndexedDB ou URL de streaming
+  googleDriveFileId   String?              // FileId do Google Drive (para vídeos)
+  googleDriveFileName String?              // Nome original do arquivo no Google Drive
+  fonteOrigem         String?              // Fonte de origem (ex: "Google Drive: path/to/file")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anotacoes           Anotacao[]
+  disciplinas         DisciplinaMaterial[]
+  historicoLeitura    HistoricoLeitura[]
+  mobileText          PdfMobileText?       // Texto formatado para mobile
 
   @@index([userId])
   @@index([tipo])
+  @@index([googleDriveFileId])
 }
 
 model DisciplinaMaterial {

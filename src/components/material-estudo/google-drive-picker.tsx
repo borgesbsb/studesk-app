@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Cloud, Loader2, FileText, Calendar, HardDrive, CheckCircle2, Search, Folder, ChevronRight, Home } from "lucide-react"
+import { Cloud, Loader2, FileText, Calendar, HardDrive, CheckCircle2, Search, Folder, ChevronRight, Home, Video } from "lucide-react"
 import { toast } from "sonner"
 
 interface DriveFile {
@@ -123,7 +123,7 @@ export function GoogleDrivePicker({
 
   const handleImport = async () => {
     if (!selectedFileId) {
-      toast.error('Selecione um arquivo PDF')
+      toast.error('Selecione um arquivo')
       return
     }
 
@@ -131,14 +131,25 @@ export function GoogleDrivePicker({
     if (!selectedFile) return
 
     if (selectedFile.isFolder) {
-      toast.error('Selecione um arquivo PDF, não uma pasta')
+      toast.error('Selecione um arquivo, não uma pasta')
       return
     }
 
     setIsImporting(true)
 
     try {
-      const response = await fetch('/api/google-drive/import-pdf', {
+      // Detectar tipo de arquivo
+      const isVideo = selectedFile.mimeType.startsWith('video/')
+      const isPdf = selectedFile.mimeType === 'application/pdf'
+
+      if (!isVideo && !isPdf) {
+        throw new Error('Apenas PDFs e vídeos são suportados')
+      }
+
+      // Escolher endpoint correto baseado no tipo
+      const endpoint = isVideo ? '/api/google-drive/import-video' : '/api/google-drive/import-pdf'
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -151,12 +162,22 @@ export function GoogleDrivePicker({
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao importar PDF')
+        throw new Error(data.error || `Erro ao importar ${isVideo ? 'vídeo' : 'PDF'}`)
       }
 
-      toast.success('PDF importado com sucesso!', {
-        description: `${data.material.totalPaginas} páginas`
-      })
+      if (isVideo) {
+        const duration = data.material.duracaoSegundos
+        const minutes = Math.floor(duration / 60)
+        const seconds = duration % 60
+
+        toast.success('Vídeo importado com sucesso!', {
+          description: `Duração estimada: ${minutes}min ${seconds}s`
+        })
+      } else {
+        toast.success('PDF importado com sucesso!', {
+          description: `${data.material.totalPaginas} páginas`
+        })
+      }
 
       onFileImported()
       onOpenChange(false)
@@ -166,8 +187,8 @@ export function GoogleDrivePicker({
       setSearchTerm("")
 
     } catch (error) {
-      console.error('Erro ao importar PDF:', error)
-      toast.error(error instanceof Error ? error.message : 'Erro ao importar PDF')
+      console.error('Erro ao importar arquivo:', error)
+      toast.error(error instanceof Error ? error.message : 'Erro ao importar arquivo')
     } finally {
       setIsImporting(false)
     }
@@ -300,6 +321,8 @@ export function GoogleDrivePicker({
                   <div className="divide-y">
                     {filteredFiles.map((file) => {
                       const isFolder = file.isFolder
+                      const isVideo = file.mimeType.startsWith('video/')
+                      const isPdf = file.mimeType === 'application/pdf'
                       const isSelected = selectedFileId === file.id && !isFolder
 
                       return (
@@ -316,8 +339,12 @@ export function GoogleDrivePicker({
                               <Folder className="h-5 w-5 text-yellow-500" />
                             ) : isSelected ? (
                               <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                            ) : (
+                            ) : isVideo ? (
+                              <Video className="h-5 w-5 text-purple-600" />
+                            ) : isPdf ? (
                               <FileText className="h-5 w-5 text-red-600" />
+                            ) : (
+                              <FileText className="h-5 w-5 text-gray-400" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">

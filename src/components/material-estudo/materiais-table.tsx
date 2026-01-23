@@ -399,8 +399,10 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         <div className="md:hidden space-y-3">
           {materiais.map((material) => {
             const tempoEstudadoSegundos = horasPorMaterialSegundos[material.id] ?? 0
+            // Para vídeos: usar tempoAssistido (posição atual) ao invés de tempo total estudado
+            const tempoVideoAssistido = tipo === 'VIDEO' ? (material.tempoAssistido || 0) : 0
             const progresso = tipo === 'VIDEO'
-              ? Math.min(100, (tempoEstudadoSegundos / (material.duracaoSegundos || 1)) * 100)
+              ? Math.min(100, (tempoVideoAssistido / (material.duracaoSegundos || 1)) * 100)
               : (material.paginasLidas / material.totalPaginas) * 100
             const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
 
@@ -432,7 +434,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                     <p className="font-medium">
                       {tipo === 'VIDEO' ? (
                         <span>
-                          {Math.floor((material.tempoAssistido || 0) / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
+                          {Math.floor(tempoVideoAssistido / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
                         </span>
                       ) : (
                         <span>
@@ -534,8 +536,10 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
           <TableBody>
             {materiais.map((material) => {
               const tempoEstudadoSegundos = horasPorMaterialSegundos[material.id] ?? 0
+              // Para vídeos: usar tempoAssistido (posição atual) ao invés de tempo total estudado
+              const tempoVideoAssistido = tipo === 'VIDEO' ? (material.tempoAssistido || 0) : 0
               const progresso = tipo === 'VIDEO'
-                ? Math.min(100, (tempoEstudadoSegundos / (material.duracaoSegundos || 1)) * 100)
+                ? Math.min(100, (tempoVideoAssistido / (material.duracaoSegundos || 1)) * 100)
                 : (material.paginasLidas / material.totalPaginas) * 100
               const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
 
@@ -564,7 +568,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                   <TableCell className="text-sm text-muted-foreground">
                     {tipo === 'VIDEO' ? (
                       <span>
-                        {Math.floor((material.tempoAssistido || 0) / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
+                        {Math.floor(tempoVideoAssistido / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
                       </span>
                     ) : (
                       <span>

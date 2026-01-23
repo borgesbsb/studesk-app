@@ -46,8 +46,8 @@ export class GoogleDriveService {
         query += " and 'root' in parents"
       }
 
-      // Buscar pastas e PDFs
-      query += " and (mimeType='application/vnd.google-apps.folder' or mimeType='application/pdf')"
+      // Buscar pastas, PDFs e vídeos
+      query += " and (mimeType='application/vnd.google-apps.folder' or mimeType='application/pdf' or mimeType contains 'video/')"
 
       const response = await this.drive.files.list({
         q: query,

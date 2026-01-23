@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import { buscarMaterialEstudoPorId } from "@/interface/actions/material-estudo/list"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, AlertCircle, Save } from "lucide-react"
+import { ArrowLeft, AlertCircle, Save, Download, Wifi, WifiOff } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { AdicionarTempoCicloDialog } from "@/components/material-estudo/adicionar-tempo-ciclo-dialog"
 import { videoCacheService } from "@/services/video-cache.service"
@@ -40,6 +40,9 @@ export default function VideoViewerPage({ params }: PageProps) {
     const [disciplinaIdFromUrl, setDisciplinaIdFromUrl] = useState<string>("")
     const [videoBlobUrl, setVideoBlobUrl] = useState<string>("")
     const [fromCache, setFromCache] = useState<boolean>(false)
+    const [isGoogleDriveVideo, setIsGoogleDriveVideo] = useState<boolean>(false)
+    const [showVideoOptions, setShowVideoOptions] = useState<boolean>(false)
+    const [loadingVideo, setLoadingVideo] = useState<boolean>(false)
 
     // Estados do cronômetro
     const [elapsedTime, setElapsedTime] = useState(0) // em segundos
@@ -85,21 +88,45 @@ export default function VideoViewerPage({ params }: PageProps) {
                 if (materialResponse.success && materialResponse.data) {
                     setMaterial(materialResponse.data)
 
-                    // Buscar vídeo APENAS do cache IndexedDB
-                    console.log('🔍 Buscando vídeo do cache local...')
-                    const cachedVideo = await videoCacheService.getVideo(id)
+                    // Verificar se é vídeo do Google Drive
+                    const isGDrive = materialResponse.data.arquivoVideoUrl?.startsWith('gdrive://') ||
+                                    materialResponse.data.googleDriveFileId !== null
 
-                    if (cachedVideo) {
-                        // Vídeo encontrado no cache
-                        const blobUrl = URL.createObjectURL(cachedVideo.blob)
-                        setVideoBlobUrl(blobUrl)
-                        setFromCache(true)
-                        console.log('📦 Vídeo carregado do cache local!')
-                        toast.success('Vídeo carregado do cache local')
+                    if (isGDrive) {
+                        console.log('☁️ Vídeo do Google Drive detectado')
+                        setIsGoogleDriveVideo(true)
+
+                        // Tentar buscar no cache primeiro
+                        console.log('🔍 Verificando cache local...')
+                        const cachedVideo = await videoCacheService.getVideo(id)
+
+                        if (cachedVideo) {
+                            // Vídeo encontrado no cache - reproduzir imediatamente
+                            const blobUrl = URL.createObjectURL(cachedVideo.blob)
+                            setVideoBlobUrl(blobUrl)
+                            setFromCache(true)
+                            console.log('📦 Vídeo carregado do cache local!')
+                            toast.success('Vídeo carregado do cache local')
+                        } else {
+                            // Vídeo não está no cache - mostrar opções
+                            console.log('⚠️ Vídeo não está no cache - mostrando opções')
+                            setShowVideoOptions(true)
+                        }
                     } else {
-                        // Vídeo não encontrado no cache
-                        console.warn('⚠️ Vídeo não encontrado no cache local')
-                        toast.error('Vídeo não encontrado no cache. Faça upload novamente do material')
+                        // Vídeo tradicional (upload local)
+                        console.log('🔍 Buscando vídeo local do cache...')
+                        const cachedVideo = await videoCacheService.getVideo(id)
+
+                        if (cachedVideo) {
+                            const blobUrl = URL.createObjectURL(cachedVideo.blob)
+                            setVideoBlobUrl(blobUrl)
+                            setFromCache(true)
+                            console.log('📦 Vídeo local carregado do cache!')
+                            toast.success('Vídeo carregado do cache local')
+                        } else {
+                            console.warn('⚠️ Vídeo não encontrado no cache local')
+                            toast.error('Vídeo não encontrado no cache. Faça upload novamente do material')
+                        }
                     }
                 }
             }
@@ -176,6 +203,38 @@ export default function VideoViewerPage({ params }: PageProps) {
     const handleVideoTimeUpdate = (time: number) => {
         setCurrentTime(time)
         console.log(`📹 Tempo do vídeo: ${Math.floor(time)}s`)
+    }
+
+    // Handler para atualizar duração real do vídeo no banco
+    const handleVideoDurationLoad = async (duration: number) => {
+        if (!materialId || !material) return
+
+        // Verificar se a duração no banco é diferente da real
+        const currentDuration = material.duracaoSegundos || 0
+        const difference = Math.abs(currentDuration - duration)
+
+        // Se a diferença for maior que 5 segundos, atualizar
+        if (difference > 5) {
+            console.log(`📐 Duração real detectada: ${duration}s (banco: ${currentDuration}s) - atualizando...`)
+
+            try {
+                await fetch(`/api/material/${materialId}/update-duration`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duracaoSegundos: duration })
+                })
+
+                // Atualizar localmente
+                setMaterial((prev: any) => ({
+                    ...prev,
+                    duracaoSegundos: duration
+                }))
+
+                console.log('✅ Duração atualizada no banco')
+            } catch (error) {
+                console.error('❌ Erro ao atualizar duração:', error)
+            }
+        }
     }
 
     // Função para salvar histórico de visualização
@@ -357,6 +416,77 @@ export default function VideoViewerPage({ params }: PageProps) {
         }
     }
 
+    // Função para fazer streaming direto do Google Drive
+    const handleStreamOnline = async () => {
+        if (!materialId) return
+
+        setLoadingVideo(true)
+        setShowVideoOptions(false)
+
+        try {
+            console.log('📡 Fazendo streaming do Google Drive...')
+
+            // Usar endpoint de streaming (com suporte a range requests)
+            const streamUrl = `/api/video/google-drive-stream/${materialId}`
+            setVideoBlobUrl(streamUrl)
+            setFromCache(false)
+
+            toast.success('Streaming iniciado do Google Drive')
+        } catch (error) {
+            console.error('Erro ao fazer streaming:', error)
+            toast.error('Erro ao fazer streaming do vídeo')
+            setShowVideoOptions(true)
+        } finally {
+            setLoadingVideo(false)
+        }
+    }
+
+    // Função para baixar e cachear vídeo do Google Drive
+    const handleDownloadAndCache = async () => {
+        if (!materialId || !material) return
+
+        setLoadingVideo(true)
+        setShowVideoOptions(false)
+
+        try {
+            console.log('⬇️ Baixando vídeo do Google Drive...')
+            toast.info('Baixando vídeo... Isso pode levar alguns minutos')
+
+            // Fazer download usando fetch
+            const response = await fetch(`/api/video/google-drive-download/${materialId}`)
+
+            if (!response.ok) {
+                throw new Error(`Erro ao baixar: ${response.statusText}`)
+            }
+
+            const blob = await response.blob()
+            console.log('✅ Vídeo baixado, salvando no cache...')
+
+            // Salvar no cache IndexedDB
+            await videoCacheService.saveVideoFromBlob(
+                materialId,
+                blob,
+                material.googleDriveFileName || `${material.nome}.mp4`,
+                blob.type || 'video/mp4'
+            )
+
+            console.log('✅ Vídeo salvo no cache!')
+
+            // Criar Blob URL para reprodução
+            const blobUrl = URL.createObjectURL(blob)
+            setVideoBlobUrl(blobUrl)
+            setFromCache(true)
+
+            toast.success('Vídeo baixado e salvo no cache!')
+        } catch (error) {
+            console.error('Erro ao baixar e cachear vídeo:', error)
+            toast.error('Erro ao baixar vídeo. Tente fazer streaming online.')
+            setShowVideoOptions(true)
+        } finally {
+            setLoadingVideo(false)
+        }
+    }
+
     // Determinar a URL de retorno
     const getBackUrl = () => {
         // 1. Tentar usar disciplinaId da URL
@@ -476,12 +606,70 @@ export default function VideoViewerPage({ params }: PageProps) {
     return (
         <>
             <div style={{ height: 'calc(100vh - 4rem)', width: '100%' }}>
-                {/* Video Player em tela cheia */}
-                {videoUrl ? (
+                {/* Opções de vídeo do Google Drive */}
+                {showVideoOptions && isGoogleDriveVideo ? (
+                    <div className="h-full w-full flex items-center justify-center bg-gray-50">
+                        <div className="max-w-md w-full mx-4 bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="text-xl font-semibold mb-2 text-gray-900">
+                                Como deseja assistir?
+                            </h2>
+                            <p className="text-gray-600 text-sm mb-6">
+                                Este vídeo está armazenado no Google Drive. Escolha uma opção:
+                            </p>
+
+                            <div className="space-y-3">
+                                {/* Opção: Streaming Online */}
+                                <button
+                                    onClick={handleStreamOnline}
+                                    disabled={loadingVideo}
+                                    className="w-full flex items-start gap-3 p-4 border-2 border-blue-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Wifi className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
+                                    <div className="text-left flex-1">
+                                        <div className="font-medium text-gray-900 mb-1">
+                                            Fazer Streaming Online
+                                        </div>
+                                        <div className="text-sm text-gray-600">
+                                            Assista diretamente do Google Drive sem ocupar espaço no dispositivo.
+                                            Requer conexão com internet.
+                                        </div>
+                                    </div>
+                                </button>
+
+                                {/* Opção: Baixar e Cachear */}
+                                <button
+                                    onClick={handleDownloadAndCache}
+                                    disabled={loadingVideo}
+                                    className="w-full flex items-start gap-3 p-4 border-2 border-green-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Download className="h-6 w-6 text-green-600 shrink-0 mt-0.5" />
+                                    <div className="text-left flex-1">
+                                        <div className="font-medium text-gray-900 mb-1">
+                                            Baixar e Salvar no Cache
+                                        </div>
+                                        <div className="text-sm text-gray-600">
+                                            Baixe o vídeo para assistir offline. O vídeo ficará salvo no cache
+                                            do navegador (até 2GB).
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+
+                            {loadingVideo && (
+                                <div className="mt-4 flex items-center justify-center gap-2 text-blue-600">
+                                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-sm">Preparando vídeo...</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : videoUrl ? (
+                    /* Video Player em tela cheia */
                     <VideoPlayer
                         videoUrl={videoUrl}
                         tempoProgressoSegundos={material.tempoAssistido || 0}
                         onTimeUpdate={handleVideoTimeUpdate}
+                        onDurationLoad={handleVideoDurationLoad}
                     />
                 ) : (
                     <div className="h-full w-full flex items-center justify-center">

@@ -7,9 +7,10 @@ interface VideoPlayerProps {
     videoUrl: string;
     tempoProgressoSegundos?: number;
     onTimeUpdate?: (currentTime: number) => void;
+    onDurationLoad?: (duration: number) => void;
 }
 
-export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTimeUpdate }: VideoPlayerProps) {
+export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTimeUpdate, onDurationLoad }: VideoPlayerProps) {
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const containerRef = React.useRef<HTMLDivElement>(null);
     const progressBarRef = React.useRef<HTMLDivElement>(null);
@@ -30,6 +31,23 @@ export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTi
 
     React.useEffect(() => {
         setMounted(true);
+    }, []);
+
+    // Sincronizar estado de play/pause com eventos do vídeo
+    React.useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const handlePlay = () => setIsPlaying(true);
+        const handlePause = () => setIsPlaying(false);
+
+        video.addEventListener('play', handlePlay);
+        video.addEventListener('pause', handlePause);
+
+        return () => {
+            video.removeEventListener('play', handlePlay);
+            video.removeEventListener('pause', handlePause);
+        };
     }, []);
 
     // Calcular largura real do vídeo renderizado
@@ -81,8 +99,14 @@ export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTi
     // Atualizar duração
     const handleLoadedMetadata = () => {
         if (videoRef.current) {
-            setDuration(videoRef.current.duration);
+            const videoDuration = videoRef.current.duration;
+            setDuration(videoDuration);
             calculateVideoWidth();
+
+            // Notificar componente pai sobre a duração real do vídeo
+            if (onDurationLoad && videoDuration > 0) {
+                onDurationLoad(Math.floor(videoDuration));
+            }
         }
     };
 
@@ -91,14 +115,22 @@ export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTi
     const handleCanPlay = () => setIsBuffering(false);
 
     // Play/Pause
-    const togglePlay = () => {
+    const togglePlay = async () => {
         if (videoRef.current) {
             if (isPlaying) {
                 videoRef.current.pause();
+                setIsPlaying(false);
             } else {
-                videoRef.current.play();
+                try {
+                    await videoRef.current.play();
+                    setIsPlaying(true);
+                } catch (error) {
+                    // Ignorar erro se vídeo foi removido durante play
+                    if ((error as Error).name !== 'AbortError') {
+                        console.error('Erro ao reproduzir vídeo:', error);
+                    }
+                }
             }
-            setIsPlaying(!isPlaying);
         }
     };
 

@@ -320,7 +320,9 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
           disciplinaNome: disciplinaSemana.disciplina.nome,
           disciplinaCor: disciplinaSemana.disciplina.cor || undefined,
           horasPlanejadas: horasPorDia, // Horas planejadas para o dia específico
-          horasRealizadas: Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100, // Converter minutos para horas
+          horasRealizadas: disciplinaDia
+            ? Math.round(disciplinaDia.horasRealizadas * 100) / 100 // DisciplinaDia já está em horas
+            : Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100, // Fallback: converter minutos para horas
           tempoRealEstudo,
           tempoSessoesPdf,
           concluida: disciplinaSemana.concluida,

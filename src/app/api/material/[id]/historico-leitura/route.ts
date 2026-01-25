@@ -253,6 +253,11 @@ export async function POST(
     let horasAdicionadas = 0
     let disciplinasAtualizadas: string[] = []
 
+    console.log('\n🔍 ===== DEBUG: ATUALIZAÇÃO DO PLANO DE ESTUDOS =====')
+    console.log('📝 Material ID:', materialId)
+    console.log('⏱️  Tempo lido (segundos):', tempoLeituraSegundos)
+    console.log('⏱️  Tempo lido (horas):', (tempoLeituraSegundos / 3600).toFixed(4))
+
     try {
       // 1. Buscar disciplinas associadas ao material
       const disciplinasDoMaterial = await prisma.disciplinaMaterial.findMany({
@@ -265,15 +270,24 @@ export async function POST(
         }
       })
 
+      console.log('📚 Disciplinas associadas ao material:', disciplinasDoMaterial.length)
+      disciplinasDoMaterial.forEach(d => {
+        console.log(`   - ${d.disciplina.nome} (ID: ${d.disciplinaId})`)
+      })
+
       if (disciplinasDoMaterial.length > 0) {
         const agora = new Date()
         const inicioDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0, 0)
         const fimDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999)
 
-        console.log(`📅 Buscando plano ativo para atualizar tempo de estudo`)
+        console.log(`\n📅 Data/Hora atual: ${agora.toISOString()}`)
+        console.log(`📅 Início do dia: ${inicioDoDia.toISOString()}`)
+        console.log(`📅 Fim do dia: ${fimDoDia.toISOString()}`)
 
         // 2. Para cada disciplina, buscar DisciplinaSemana ativa para a semana atual
         for (const { disciplinaId, disciplina } of disciplinasDoMaterial) {
+          console.log(`\n🔍 Processando disciplina: ${disciplina.nome}`)
+
           const disciplinaSemanaAtiva = await prisma.disciplinaSemana.findFirst({
             where: {
               disciplinaId,
@@ -286,7 +300,14 @@ export async function POST(
             include: {
               semana: {
                 select: {
-                  dataInicio: true
+                  dataInicio: true,
+                  dataFim: true,
+                  plano: {
+                    select: {
+                      nome: true,
+                      ativo: true
+                    }
+                  }
                 }
               },
               dias: true // Buscar TODOS os dias, filtraremos depois
@@ -294,9 +315,16 @@ export async function POST(
           })
 
           if (!disciplinaSemanaAtiva) {
-            console.log(`ℹ️  Disciplina ${disciplina.nome} não está em nenhum plano ativo`)
+            console.log(`   ❌ Disciplina ${disciplina.nome} não está em nenhum plano ativo`)
+            console.log(`      (Procurando plano ativo com semana entre ${inicioDoDia.toISOString()} e ${fimDoDia.toISOString()})`)
             continue
           }
+
+          console.log(`   ✅ Encontrou DisciplinaSemana ativa:`)
+          console.log(`      Plano: ${disciplinaSemanaAtiva.semana.plano.nome}`)
+          console.log(`      Semana: ${disciplinaSemanaAtiva.semana.dataInicio.toISOString()} até ${disciplinaSemanaAtiva.semana.dataFim.toISOString()}`)
+          console.log(`      Dias cadastrados: ${disciplinaSemanaAtiva.dias.length}`)
+          console.log(`      Dias: ${disciplinaSemanaAtiva.dias.map(d => d.dia).join(', ')}`)
 
           // Calcular qual é o dia do ciclo (dia1, dia2, etc.) baseado na data de início do ciclo
           const inicioNormalizado = new Date(disciplinaSemanaAtiva.semana.dataInicio)
@@ -307,31 +335,58 @@ export async function POST(
           const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
           const diaKey = `dia${diffDays + 1}`
 
-          console.log(`📅 Dia do ciclo calculado: ${diaKey} (diffDays: ${diffDays}, início do ciclo: ${inicioNormalizado.toISOString()})`)
+          console.log(`   📆 Cálculo do dia do ciclo:`)
+          console.log(`      Início do ciclo: ${inicioNormalizado.toISOString()}`)
+          console.log(`      Hoje: ${consultadaNormalizada.toISOString()}`)
+          console.log(`      Diferença (ms): ${diffTime}`)
+          console.log(`      Diferença (dias): ${diffDays}`)
+          console.log(`      Dia do ciclo: ${diaKey}`)
 
           // Buscar o DisciplinaDia correspondente ao dia atual do ciclo
           const diaHoje = disciplinaSemanaAtiva.dias.find(d => d.dia === diaKey)
+
+          if (!diaHoje) {
+            console.log(`   ❌ ${diaKey} não encontrado nos dias cadastrados`)
+            console.log(`      Dias disponíveis: ${disciplinaSemanaAtiva.dias.map(d => d.dia).join(', ')}`)
+          } else {
+            console.log(`   ✅ Encontrou ${diaKey}:`)
+            console.log(`      ID: ${diaHoje.id}`)
+            console.log(`      Horas planejadas: ${diaHoje.horasPlanejadas}`)
+            console.log(`      Horas realizadas (antes): ${diaHoje.horasRealizadas}`)
+          }
 
           if (diaHoje) {
             // 3. Atualizar horasRealizadas do dia atual
             const horasAdicionar = tempoLeituraSegundos / 3600 // converter segundos para horas
 
-            await prisma.disciplinaDia.update({
+            console.log(`   🔄 Atualizando DisciplinaDia...`)
+            console.log(`      Incrementando: ${horasAdicionar.toFixed(4)}h`)
+
+            const updated = await prisma.disciplinaDia.update({
               where: { id: diaHoje.id },
               data: {
                 horasRealizadas: { increment: horasAdicionar }
               }
             })
 
+            console.log(`   ✅ DisciplinaDia atualizado!`)
+            console.log(`      Horas realizadas (depois): ${updated.horasRealizadas}`)
+
             horasAdicionadas += horasAdicionar
             disciplinasAtualizadas.push(disciplina.nome)
 
-            console.log(`✅ Tempo adicionado ao plano: ${horasAdicionar.toFixed(2)}h para ${disciplina.nome} - ${diaKey}`)
+            console.log(`   ✅ Tempo adicionado ao plano: ${horasAdicionar.toFixed(4)}h para ${disciplina.nome} - ${diaKey}`)
           } else {
-            console.log(`ℹ️  Disciplina ${disciplina.nome} não está programada para ${diaKey}`)
+            console.log(`   ❌ Disciplina ${disciplina.nome} não está programada para ${diaKey}`)
           }
         }
       }
+
+      console.log(`\n📊 ===== RESUMO DA ATUALIZAÇÃO =====`)
+      console.log(`✅ Horas adicionadas: ${horasAdicionadas.toFixed(4)}h`)
+      console.log(`📚 Disciplinas atualizadas: ${disciplinasAtualizadas.join(', ') || 'Nenhuma'}`)
+      console.log(`====================================\n`)
+
     } catch (error) {
       // Não falhar a request se houver erro ao atualizar plano
       console.error('⚠️ Erro ao atualizar plano de estudos (não crítico):', error)

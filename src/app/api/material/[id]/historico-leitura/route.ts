@@ -270,14 +270,7 @@ export async function POST(
         const inicioDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0, 0)
         const fimDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999)
 
-        // Determinar dia da semana (1=segunda, 7=domingo)
-        // JavaScript: domingo=0, segunda=1, ..., sábado=6
-        // Banco: dia1=segunda, dia2=terça, ..., dia7=domingo
-        const diaDaSemanaJS = agora.getDay()
-        const diaDaSemana = diaDaSemanaJS === 0 ? 7 : diaDaSemanaJS
-        const diaKey = `dia${diaDaSemana}`
-
-        console.log(`📅 Verificando plano para hoje: ${diaKey} (${agora.toLocaleDateString()})`)
+        console.log(`📅 Buscando plano ativo para atualizar tempo de estudo`)
 
         // 2. Para cada disciplina, buscar DisciplinaSemana ativa para a semana atual
         for (const { disciplinaId, disciplina } of disciplinasDoMaterial) {
@@ -291,15 +284,36 @@ export async function POST(
               }
             },
             include: {
-              dias: {
-                where: { dia: diaKey }
-              }
+              semana: {
+                select: {
+                  dataInicio: true
+                }
+              },
+              dias: true // Buscar TODOS os dias, filtraremos depois
             }
           })
 
-          if (disciplinaSemanaAtiva && disciplinaSemanaAtiva.dias.length > 0) {
+          if (!disciplinaSemanaAtiva) {
+            console.log(`ℹ️  Disciplina ${disciplina.nome} não está em nenhum plano ativo`)
+            continue
+          }
+
+          // Calcular qual é o dia do ciclo (dia1, dia2, etc.) baseado na data de início do ciclo
+          const inicioNormalizado = new Date(disciplinaSemanaAtiva.semana.dataInicio)
+          inicioNormalizado.setHours(0, 0, 0, 0)
+          const consultadaNormalizada = new Date(agora)
+          consultadaNormalizada.setHours(0, 0, 0, 0)
+          const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime()
+          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+          const diaKey = `dia${diffDays + 1}`
+
+          console.log(`📅 Dia do ciclo calculado: ${diaKey} (diffDays: ${diffDays}, início do ciclo: ${inicioNormalizado.toISOString()})`)
+
+          // Buscar o DisciplinaDia correspondente ao dia atual do ciclo
+          const diaHoje = disciplinaSemanaAtiva.dias.find(d => d.dia === diaKey)
+
+          if (diaHoje) {
             // 3. Atualizar horasRealizadas do dia atual
-            const diaHoje = disciplinaSemanaAtiva.dias[0]
             const horasAdicionar = tempoLeituraSegundos / 3600 // converter segundos para horas
 
             await prisma.disciplinaDia.update({

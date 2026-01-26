@@ -10,7 +10,7 @@ export interface DashboardStats {
     id: string
     nome: string
     paginaAtual: number
-    totalPaginas: number
+    totalPaginas: number | null
     createdAt: string
   }>
   tempoEstudadoHoje: number
@@ -30,15 +30,21 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       where: { userId }
     })
 
-    // Buscar materiais recentes (últimos 5)
+    // Buscar materiais recentes (últimos 5) com progresso do histórico
     const materiaisRecentesData = await prisma.materialEstudo.findMany({
       where: { userId },
       select: {
         id: true,
         nome: true,
-        paginaAtual: true,
-        totalPaginas: true,
-        createdAt: true
+        createdAt: true,
+        historicoLeitura: {
+          orderBy: { dataLeitura: 'desc' },
+          take: 1,
+          select: {
+            paginaAtual: true,
+            totalPaginas: true
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc'
@@ -49,8 +55,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const materiaisRecentes = materiaisRecentesData.map(material => ({
       id: material.id,
       nome: material.nome,
-      paginaAtual: material.paginaAtual,
-      totalPaginas: material.totalPaginas,
+      paginaAtual: material.historicoLeitura[0]?.paginaAtual || 0,
+      totalPaginas: material.historicoLeitura[0]?.totalPaginas || null,
       createdAt: material.createdAt.toISOString()
     }))
 

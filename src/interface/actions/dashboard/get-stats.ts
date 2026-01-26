@@ -41,8 +41,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
           orderBy: { dataLeitura: 'desc' },
           take: 1,
           select: {
-            paginaAtual: true,
-            totalPaginas: true
+            paginaAtual: true
           }
         }
       },
@@ -56,7 +55,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       id: material.id,
       nome: material.nome,
       paginaAtual: material.historicoLeitura[0]?.paginaAtual || 0,
-      totalPaginas: material.historicoLeitura[0]?.totalPaginas || null,
+      totalPaginas: null, // Campo removido - não existe em HistoricoLeitura
       createdAt: material.createdAt.toISOString()
     }))
 

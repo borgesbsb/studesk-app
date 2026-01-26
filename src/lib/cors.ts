@@ -5,6 +5,8 @@ const allowedOrigins = [
   'http://localhost:3031',
   'http://127.0.0.1:3030',
   'http://127.0.0.1:3031',
+  'http://195.35.17.216:3030',
+  'http://195.35.17.216:3031',
   // Adicione outros origins permitidos conforme necessário
 ]
 

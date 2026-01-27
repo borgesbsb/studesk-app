@@ -647,4 +647,151 @@ export class PlanoEstudoService {
       throw new Error(formatPrismaError(error))
     }
   }
+
+  /**
+   * Copia todas as disciplinas de um dia para outro dia, criando registros totalmente independentes
+   */
+  static async copiarDisciplinasDia(
+    userId: string,
+    data: { semanaId: string; diaOrigem: string; diaDestino: string }
+  ) {
+    try {
+      console.log('🔄 SERVICE: Iniciando cópia de disciplinas entre dias')
+      console.log('📊 Parâmetros:', { userId, ...data })
+
+      // 1. Verificar se a semana pertence ao usuário
+      const semana = await prisma.semanaEstudo.findUnique({
+        where: { id: data.semanaId },
+        include: {
+          plano: true,
+          disciplinas: {
+            include: {
+              disciplina: true,
+              dias: {
+                where: { dia: data.diaOrigem }
+              }
+            }
+          }
+        }
+      })
+
+      console.log('🔍 Semana encontrada:', !!semana)
+      console.log('📚 Total de disciplinas na semana:', semana?.disciplinas?.length || 0)
+      console.log('🔑 User match:', semana?.plano.userId === userId)
+
+      if (!semana || semana.plano.userId !== userId) {
+        throw new Error('Semana não encontrada ou sem permissão')
+      }
+
+      // 2. Filtrar disciplinas que têm dados no dia origem
+      const disciplinasComDiaOrigem = semana.disciplinas.filter(
+        disc => disc.dias && disc.dias.length > 0
+      )
+
+      console.log(`📊 Encontradas ${disciplinasComDiaOrigem.length} disciplinas no dia origem`)
+      console.log('📋 Detalhes das disciplinas:', disciplinasComDiaOrigem.map(d => ({
+        id: d.id,
+        disciplinaId: d.disciplinaId,
+        nome: d.disciplina.nome,
+        diasCount: d.dias?.length || 0,
+        dias: d.dias
+      })))
+
+      if (disciplinasComDiaOrigem.length === 0) {
+        console.log('⚠️ Nenhuma disciplina encontrada no dia origem, retornando 0')
+        return {
+          disciplinasCriadas: 0,
+          mensagem: 'Nenhuma disciplina encontrada no dia origem'
+        }
+      }
+
+      // 3. Para cada disciplina do dia origem, adicionar o dia destino
+      const disciplinasAtualizadas = []
+
+      for (const discOrigem of disciplinasComDiaOrigem) {
+        const diaOrigemData = discOrigem.dias[0] // Já filtrado pelo where acima
+
+        console.log(`\n📖 Processando disciplina: ${discOrigem.disciplina.nome}`)
+        console.log(`  - ID: ${discOrigem.id}`)
+        console.log(`  - diasEstudo atual: "${discOrigem.diasEstudo}"`)
+        console.log(`  - Horas planejadas no dia origem: ${diaOrigemData.horasPlanejadas}`)
+        console.log(`  - Questões planejadas no dia origem: ${diaOrigemData.questoesPlanejadas}`)
+
+        // Verificar se o dia destino já está no diasEstudo
+        const diasAtuais = discOrigem.diasEstudo?.split(',').map(d => d.trim()).filter(d => d) || []
+
+        if (diasAtuais.includes(data.diaDestino)) {
+          console.log('  ⚠️ Dia destino já existe no diasEstudo, pulando...')
+          continue
+        }
+
+        // Adicionar o dia destino ao diasEstudo
+        const novosDias = [...diasAtuais, data.diaDestino].sort()
+        console.log(`  📝 Adicionando dia destino aos dias de estudo`)
+        console.log(`     Dias atuais: [${diasAtuais.join(', ')}]`)
+        console.log(`     Novos dias: [${novosDias.join(', ')}]`)
+
+        // Atualizar o campo diasEstudo
+        await prisma.disciplinaSemana.update({
+          where: { id: discOrigem.id },
+          data: {
+            diasEstudo: novosDias.join(',')
+          }
+        })
+
+        // Verificar se já existe DisciplinaDia para o dia destino (pode ter sido criado antes)
+        const disciplinaDiaExistente = await prisma.disciplinaDia.findUnique({
+          where: {
+            disciplinaSemanaId_dia: {
+              disciplinaSemanaId: discOrigem.id,
+              dia: data.diaDestino
+            }
+          }
+        })
+
+        if (disciplinaDiaExistente) {
+          console.log(`  ℹ️ DisciplinaDia já existe, atualizando...`)
+          // Atualizar com os valores do dia origem
+          await prisma.disciplinaDia.update({
+            where: { id: disciplinaDiaExistente.id },
+            data: {
+              horasPlanejadas: diaOrigemData.horasPlanejadas,
+              questoesPlanejadas: diaOrigemData.questoesPlanejadas,
+              observacoes: diaOrigemData.observacoes
+            }
+          })
+          console.log(`  ✅ DisciplinaDia atualizado: ${disciplinaDiaExistente.id}`)
+        } else {
+          // Criar novo DisciplinaDia para o dia destino com os dados do dia origem
+          const novoDisciplinaDia = await prisma.disciplinaDia.create({
+            data: {
+              disciplinaSemanaId: discOrigem.id,
+              dia: data.diaDestino,
+              horasPlanejadas: diaOrigemData.horasPlanejadas,
+              horasRealizadas: 0,
+              questoesPlanejadas: diaOrigemData.questoesPlanejadas,
+              questoesRealizadas: 0,
+              observacoes: diaOrigemData.observacoes,
+              concluida: false
+            }
+          })
+          console.log(`  ✅ Novo DisciplinaDia criado: ${novoDisciplinaDia.id}`)
+        }
+
+        console.log(`  ✅ DisciplinaSemana atualizada: ${discOrigem.id}`)
+
+        disciplinasAtualizadas.push(discOrigem)
+      }
+
+      console.log(`✅ SERVICE: ${disciplinasAtualizadas.length} disciplinas copiadas com sucesso`)
+
+      return {
+        disciplinasCriadas: disciplinasAtualizadas.length,
+        disciplinas: disciplinasAtualizadas
+      }
+    } catch (error) {
+      console.error('❌ SERVICE: Erro ao copiar disciplinas entre dias:', error)
+      throw new Error(formatPrismaError(error))
+    }
+  }
 }

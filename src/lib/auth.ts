@@ -105,8 +105,17 @@ export const authOptions: NextAuthOptions = {
   jwt: {
     maxAge: 24 * 60 * 60, // 24 horas
   },
-  // Usar configuração padrão de cookies do NextAuth
-  // Em desenvolvimento/localhost não usa secure, o Nginx cuida do HTTPS
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: false, // false para desenvolvimento local (Nginx cuida do HTTPS em produção)
+      },
+    },
+  },
   secret: process.env.NEXTAUTH_SECRET,
   trustHost: true, // Necessário em produção com proxy reverso (Nginx)
   debug: true, // Habilita logs detalhados do NextAuth

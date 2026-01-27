@@ -10,19 +10,26 @@ interface AdicionarDisciplinaData {
   horasPlanejadas?: number
   questoesPlanejadas?: number
   diasEstudo?: string
+  tipoVeiculo?: string
+  materialNome?: string
+  tempoVideoPlanejado?: number
+  parametro?: string
 }
 
 export async function adicionarDisciplinaSemana(data: AdicionarDisciplinaData) {
   try {
     const { userId } = await requireAuth()
-    console.log('🔄 ACTION: Adicionando nova disciplina à semana:', data)
 
     const resultado = await PlanoEstudoService.adicionarDisciplinaSemana(userId, {
       semanaId: data.semanaId,
       disciplinaId: data.disciplinaId,
       horasPlanejadas: data.horasPlanejadas || 1,
       questoesPlanejadas: data.questoesPlanejadas || 0,
-      diasEstudo: data.diasEstudo || ''
+      diasEstudo: data.diasEstudo || '',
+      tipoVeiculo: data.tipoVeiculo,
+      materialNome: data.materialNome,
+      tempoVideoPlanejado: data.tempoVideoPlanejado,
+      parametro: data.parametro
     })
 
     console.log('✅ ACTION: Disciplina adicionada com sucesso:', resultado)

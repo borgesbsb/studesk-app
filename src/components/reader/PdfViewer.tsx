@@ -224,40 +224,65 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
 
   const handleMarkProgress = async () => {
     setIsSaving(true)
+    console.log('\n🔵 ===== MARCAR PROGRESSO - INÍCIO =====')
+    console.log('📄 Material ID:', materialId)
+    console.log('⏱️  Tempo decorrido (segundos):', elapsedTime)
+    console.log('⏱️  Tempo decorrido (horas):', (elapsedTime / 3600).toFixed(4))
+
     try {
       // Obter página atual do viewer
       const paginaAtual = viewerRef.current?.currentPageNumber || 1
+      console.log('📖 Página atual:', paginaAtual)
+
+      const payload = {
+        paginaAtual,
+        tempoLeituraSegundos: elapsedTime,
+      }
+      console.log('📤 Enviando payload:', payload)
 
       const response = await fetch(`/api/material/${materialId}/historico-leitura`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          paginaAtual,
-          tempoLeituraSegundos: elapsedTime,
-        }),
+        body: JSON.stringify(payload),
       })
+
+      console.log('📥 Response status:', response.status)
 
       if (response.ok) {
         const data = await response.json()
+        console.log('✅ Response data:', data)
+
+        console.log('\n🎯 VERIFICANDO ATUALIZAÇÃO DO PLANO:')
+        console.log('   planoAtualizado:', data.planoAtualizado)
+        console.log('   horasAdicionadas:', data.horasAdicionadas)
+        console.log('   disciplinasAtualizadas:', data.disciplinasAtualizadas)
+
         toast.success(data.message || 'Progresso salvo com sucesso!')
         setElapsedTime(0)
 
         // Notificar outras páginas que o progresso foi atualizado
         if (data.planoAtualizado && data.horasAdicionadas > 0) {
-          localStorage.setItem('progressoAtualizado', Date.now().toString())
-          console.log('✅ Progresso atualizado notificado:', {
-            horasAdicionadas: data.horasAdicionadas,
-            disciplinas: data.disciplinasAtualizadas
-          })
+          const timestamp = Date.now().toString()
+          localStorage.setItem('progressoAtualizado', timestamp)
+          console.log('🔔 Notificação enviada via localStorage!')
+          console.log('   Timestamp:', timestamp)
+          console.log('   Horas adicionadas:', data.horasAdicionadas)
+          console.log('   Disciplinas:', data.disciplinasAtualizadas)
+        } else {
+          console.warn('⚠️  NOTIFICAÇÃO NÃO ENVIADA!')
+          console.warn('   Motivo: planoAtualizado =', data.planoAtualizado, '|| horasAdicionadas =', data.horasAdicionadas)
         }
+
+        console.log('🔵 ===== MARCAR PROGRESSO - FIM =====\n')
       } else {
         const errorData = await response.json()
+        console.error('❌ Erro na response:', errorData)
         toast.error(errorData.error || 'Erro ao salvar progresso')
       }
     } catch (error) {
-      console.error('Erro ao marcar progresso:', error)
+      console.error('❌ Erro ao marcar progresso:', error)
       toast.error('Erro ao salvar progresso')
     } finally {
       setIsSaving(false)

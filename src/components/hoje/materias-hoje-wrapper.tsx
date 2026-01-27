@@ -47,23 +47,31 @@ export function MateriasHojeWrapper() {
   // Listener para atualizar automaticamente quando progresso for salvo no PDF viewer
   useEffect(() => {
     let ultimoTimestamp = localStorage.getItem('progressoAtualizado') || '0';
+    console.log('🎧 [LISTENER] Iniciado! Timestamp inicial:', ultimoTimestamp);
 
     const checkProgressoAtualizado = () => {
       const novoTimestamp = localStorage.getItem('progressoAtualizado') || '0';
 
       if (novoTimestamp !== ultimoTimestamp && novoTimestamp !== '0') {
-        console.log('🔄 [LISTENER] Progresso atualizado detectado, recarregando matérias...');
+        console.log('\n🔔 ===== ATUALIZAÇÃO DETECTADA =====');
+        console.log('   Timestamp anterior:', ultimoTimestamp);
+        console.log('   Timestamp novo:', novoTimestamp);
+        console.log('   Diferença (ms):', parseInt(novoTimestamp) - parseInt(ultimoTimestamp));
+
         ultimoTimestamp = novoTimestamp;
 
+        console.log('🔄 Recarregando matérias do dia...');
         // Recarregar matérias
         handleTempoAdicionado();
       }
     };
 
     // Verificar a cada 2 segundos
+    console.log('⏰ Polling configurado para verificar a cada 2 segundos');
     const interval = setInterval(checkProgressoAtualizado, 2000);
 
     return () => {
+      console.log('🛑 [LISTENER] Desativado');
       clearInterval(interval);
     };
   }, [handleTempoAdicionado]); // Dependência de handleTempoAdicionado

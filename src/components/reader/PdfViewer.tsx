@@ -262,20 +262,8 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
         toast.success(data.message || 'Progresso salvo com sucesso!')
         setElapsedTime(0)
 
-        // Notificar outras páginas que o progresso foi atualizado
-        if (data.planoAtualizado && data.horasAdicionadas > 0) {
-          const timestamp = Date.now().toString()
-          localStorage.setItem('progressoAtualizado', timestamp)
-          console.log('🔔 Notificação enviada via localStorage!')
-          console.log('   Timestamp:', timestamp)
-          console.log('   Horas adicionadas:', data.horasAdicionadas)
-          console.log('   Disciplinas:', data.disciplinasAtualizadas)
-        } else {
-          console.warn('⚠️  NOTIFICAÇÃO NÃO ENVIADA!')
-          console.warn('   Motivo: planoAtualizado =', data.planoAtualizado, '|| horasAdicionadas =', data.horasAdicionadas)
-        }
-
         console.log('🔵 ===== MARCAR PROGRESSO - FIM =====\n')
+        console.log('ℹ️  A página /hoje será atualizada automaticamente quando você voltar para ela')
       } else {
         const errorData = await response.json()
         console.error('❌ Erro na response:', errorData)

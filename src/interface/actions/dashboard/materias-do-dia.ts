@@ -270,6 +270,18 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
         // Buscar DisciplinaDia específico para o dia atual
         const disciplinaDia = disciplinaSemana.dias?.find(d => d.dia === diaIdAtual)
 
+        console.log(`\n🔍 DEBUG - DISCIPLINA DIA ENCONTRADO:`)
+        console.log(`   Disciplina: ${disciplinaSemana.disciplina.nome}`)
+        console.log(`   Dia procurado: ${diaIdAtual}`)
+        console.log(`   DisciplinaDia encontrado:`, disciplinaDia ? 'SIM' : 'NÃO')
+        if (disciplinaDia) {
+          console.log(`   ID: ${disciplinaDia.id}`)
+          console.log(`   Horas planejadas: ${disciplinaDia.horasPlanejadas}`)
+          console.log(`   Horas realizadas: ${disciplinaDia.horasRealizadas}`)
+          console.log(`   Questões planejadas: ${disciplinaDia.questoesPlanejadas}`)
+          console.log(`   Questões realizadas: ${disciplinaDia.questoesRealizadas}`)
+        }
+
         // Calcular horas planejadas por dia
         let horasPorDia: number
         let questoesPorDia: number
@@ -314,16 +326,25 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
           proporcao: `${Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100}h / ${horasPorDia}h`
         })
 
+        // IMPORTANTE: Usar horasRealizadas do DisciplinaDia (já em horas) como tempoRealEstudo
+        const horasRealizadasDia = disciplinaDia
+          ? Math.round(disciplinaDia.horasRealizadas * 100) / 100 // DisciplinaDia já está em horas
+          : Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100 // Fallback: converter minutos para horas
+
+        console.log(`\n📊 VALORES FINAIS RETORNADOS:`)
+        console.log(`   Disciplina: ${disciplinaSemana.disciplina.nome}`)
+        console.log(`   horasRealizadas (do DisciplinaDia): ${horasRealizadasDia}h`)
+        console.log(`   tempoRealEstudo (será igual a horasRealizadas): ${horasRealizadasDia}h`)
+        console.log(`   tempoSessoesPdf: ${tempoSessoesPdf}h`)
+
         return {
           id: disciplinaSemana.id,
           disciplinaId: disciplinaSemana.disciplina.id,
           disciplinaNome: disciplinaSemana.disciplina.nome,
           disciplinaCor: disciplinaSemana.disciplina.cor || undefined,
           horasPlanejadas: horasPorDia, // Horas planejadas para o dia específico
-          horasRealizadas: disciplinaDia
-            ? Math.round(disciplinaDia.horasRealizadas * 100) / 100 // DisciplinaDia já está em horas
-            : Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100, // Fallback: converter minutos para horas
-          tempoRealEstudo,
+          horasRealizadas: horasRealizadasDia,
+          tempoRealEstudo: horasRealizadasDia, // USAR O MESMO VALOR DE horasRealizadas
           tempoSessoesPdf,
           concluida: disciplinaSemana.concluida,
           materialNome: disciplinaSemana.materialNome || undefined,

@@ -44,37 +44,21 @@ export function MateriasHojeWrapper() {
     carregarMaterias();
   }, [selectedDate]);
 
-  // Listener para atualizar automaticamente quando progresso for salvo no PDF viewer
+  // Recarregar dados quando a página ganhar foco (igual ao mobile)
   useEffect(() => {
-    let ultimoTimestamp = localStorage.getItem('progressoAtualizado') || '0';
-    console.log('🎧 [LISTENER] Iniciado! Timestamp inicial:', ultimoTimestamp);
-
-    const checkProgressoAtualizado = () => {
-      const novoTimestamp = localStorage.getItem('progressoAtualizado') || '0';
-
-      if (novoTimestamp !== ultimoTimestamp && novoTimestamp !== '0') {
-        console.log('\n🔔 ===== ATUALIZAÇÃO DETECTADA =====');
-        console.log('   Timestamp anterior:', ultimoTimestamp);
-        console.log('   Timestamp novo:', novoTimestamp);
-        console.log('   Diferença (ms):', parseInt(novoTimestamp) - parseInt(ultimoTimestamp));
-
-        ultimoTimestamp = novoTimestamp;
-
-        console.log('🔄 Recarregando matérias do dia...');
-        // Recarregar matérias
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('🔄 Página ganhou foco - recarregando matérias...');
         handleTempoAdicionado();
       }
     };
 
-    // Verificar a cada 2 segundos
-    console.log('⏰ Polling configurado para verificar a cada 2 segundos');
-    const interval = setInterval(checkProgressoAtualizado, 2000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      console.log('🛑 [LISTENER] Desativado');
-      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [handleTempoAdicionado]); // Dependência de handleTempoAdicionado
+  }, [handleTempoAdicionado]);
 
   if (isLoading) {
     return (

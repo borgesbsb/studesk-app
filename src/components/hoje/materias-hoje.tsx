@@ -136,9 +136,19 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex-shrink-0">
-        <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" />
-          Matérias para Estudar
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Matérias para Estudar
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onTempoAdicionado}
+            className="h-8"
+          >
+            🔄 Atualizar
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0">

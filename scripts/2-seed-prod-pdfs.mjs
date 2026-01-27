@@ -157,7 +157,8 @@ async function main() {
         await execAsync(`rclone copy "${sourcePath}" "${uploadsDir}/" --progress`)
 
         // Cadastrar no banco
-        const fileUrl = `/api/uploads/${user.id}/${destFileName}`
+        // IMPORTANTE: Usar /uploads (caminho estático) e não /api/uploads
+        const fileUrl = `/uploads/${user.id}/${destFileName}`
 
         const material = await prisma.materialEstudo.create({
           data: {

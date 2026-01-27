@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { MateriasHoje } from "./materias-hoje";
 import { useDashboard } from "@/contexts/dashboard-context";
 import { getMateriasDoDia, MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
@@ -9,6 +9,23 @@ export function MateriasHojeWrapper() {
   const { selectedDate } = useDashboard();
   const [materias, setMaterias] = useState<MateriaDoDia[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleTempoAdicionado = useCallback(async () => {
+    // Recarregar matérias quando tempo for adicionado
+    console.log('🔄 [WRAPPER] handleTempoAdicionado chamado');
+    setIsLoading(true);
+    try {
+      console.log('🔄 [WRAPPER] Recarregando dados do dia:', selectedDate.toISOString());
+      const materiasData = await getMateriasDoDia(selectedDate);
+      console.log('🔄 [WRAPPER] Dados recarregados:', materiasData.length, 'matérias');
+      setMaterias(materiasData);
+    } catch (error) {
+      console.error('❌ [WRAPPER] Erro ao recarregar matérias:', error);
+    } finally {
+      setIsLoading(false);
+      console.log('✅ [WRAPPER] Refresh concluído');
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     async function carregarMaterias() {
@@ -27,6 +44,30 @@ export function MateriasHojeWrapper() {
     carregarMaterias();
   }, [selectedDate]);
 
+  // Listener para atualizar automaticamente quando progresso for salvo no PDF viewer
+  useEffect(() => {
+    let ultimoTimestamp = localStorage.getItem('progressoAtualizado') || '0';
+
+    const checkProgressoAtualizado = () => {
+      const novoTimestamp = localStorage.getItem('progressoAtualizado') || '0';
+
+      if (novoTimestamp !== ultimoTimestamp && novoTimestamp !== '0') {
+        console.log('🔄 [LISTENER] Progresso atualizado detectado, recarregando matérias...');
+        ultimoTimestamp = novoTimestamp;
+
+        // Recarregar matérias
+        handleTempoAdicionado();
+      }
+    };
+
+    // Verificar a cada 2 segundos
+    const interval = setInterval(checkProgressoAtualizado, 2000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [handleTempoAdicionado]); // Dependência de handleTempoAdicionado
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -34,23 +75,6 @@ export function MateriasHojeWrapper() {
       </div>
     );
   }
-
-  const handleTempoAdicionado = async () => {
-    // Recarregar matérias quando tempo for adicionado
-    console.log('🔄 [WRAPPER] handleTempoAdicionado chamado');
-    setIsLoading(true);
-    try {
-      console.log('🔄 [WRAPPER] Recarregando dados do dia:', selectedDate.toISOString());
-      const materiasData = await getMateriasDoDia(selectedDate);
-      console.log('🔄 [WRAPPER] Dados recarregados:', materiasData.length, 'matérias');
-      setMaterias(materiasData);
-    } catch (error) {
-      console.error('❌ [WRAPPER] Erro ao recarregar matérias:', error);
-    } finally {
-      setIsLoading(false);
-      console.log('✅ [WRAPPER] Refresh concluído');
-    }
-  };
 
   return <MateriasHoje materias={materias} onTempoAdicionado={handleTempoAdicionado} />;
 }

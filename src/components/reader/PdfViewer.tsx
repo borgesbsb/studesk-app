@@ -243,6 +243,15 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
         const data = await response.json()
         toast.success(data.message || 'Progresso salvo com sucesso!')
         setElapsedTime(0)
+
+        // Notificar outras páginas que o progresso foi atualizado
+        if (data.planoAtualizado && data.horasAdicionadas > 0) {
+          localStorage.setItem('progressoAtualizado', Date.now().toString())
+          console.log('✅ Progresso atualizado notificado:', {
+            horasAdicionadas: data.horasAdicionadas,
+            disciplinas: data.disciplinasAtualizadas
+          })
+        }
       } else {
         const errorData = await response.json()
         toast.error(errorData.error || 'Erro ao salvar progresso')

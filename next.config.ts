@@ -99,22 +99,42 @@ const nextConfig: NextConfig = {
     });
 
     // Prevenir minificação de SyncFusion para preservar qualidade do PDF viewer
-    if (!isServer && config.optimization) {
-      config.optimization.minimizer = config.optimization.minimizer || [];
-
-      // Encontrar e configurar TerserPlugin para excluir SyncFusion
-      config.optimization.minimizer = config.optimization.minimizer.map((plugin: any) => {
-        if (plugin && plugin.constructor && plugin.constructor.name === 'TerserPlugin') {
-          return new plugin.constructor({
-            ...plugin.options,
-            exclude: [
-              /node_modules\/@syncfusion/,
-              /ej2-pdfviewer/
-            ],
-          });
-        }
-        return plugin;
+    if (!isServer) {
+      // Adicionar regra para não processar arquivos do SyncFusion
+      config.module.rules.push({
+        test: /node_modules\/@syncfusion/,
+        sideEffects: false,
+        parser: {
+          amd: false,
+        },
       });
+
+      // Configurar otimização para excluir SyncFusion da minificação
+      if (config.optimization) {
+        // Desabilitar minimização para módulos específicos
+        config.optimization.minimizer = config.optimization.minimizer?.map((plugin: any) => {
+          if (plugin?.constructor?.name === 'TerserPlugin') {
+            plugin.options = {
+              ...plugin.options,
+              terserOptions: {
+                ...plugin.options?.terserOptions,
+                compress: {
+                  ...plugin.options?.terserOptions?.compress,
+                  // Não comprimir código do SyncFusion
+                  pure_funcs: [],
+                },
+                mangle: {
+                  ...plugin.options?.terserOptions?.mangle,
+                  // Adicionar exceção para SyncFusion
+                  reserved: ['$', 'exports', 'require'],
+                },
+              },
+              exclude: [/node_modules\/@syncfusion/, /ej2-pdfviewer/],
+            };
+          }
+          return plugin;
+        });
+      }
     }
 
     return config;

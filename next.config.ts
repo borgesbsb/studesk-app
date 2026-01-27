@@ -98,43 +98,10 @@ const nextConfig: NextConfig = {
       use: "ignore-loader",
     });
 
-    // Prevenir minificação de SyncFusion para preservar qualidade do PDF viewer
-    if (!isServer) {
-      // Adicionar regra para não processar arquivos do SyncFusion
-      config.module.rules.push({
-        test: /node_modules\/@syncfusion/,
-        sideEffects: false,
-        parser: {
-          amd: false,
-        },
-      });
-
-      // Configurar otimização para excluir SyncFusion da minificação
-      if (config.optimization) {
-        // Desabilitar minimização para módulos específicos
-        config.optimization.minimizer = config.optimization.minimizer?.map((plugin: any) => {
-          if (plugin?.constructor?.name === 'TerserPlugin') {
-            plugin.options = {
-              ...plugin.options,
-              terserOptions: {
-                ...plugin.options?.terserOptions,
-                compress: {
-                  ...plugin.options?.terserOptions?.compress,
-                  // Não comprimir código do SyncFusion
-                  pure_funcs: [],
-                },
-                mangle: {
-                  ...plugin.options?.terserOptions?.mangle,
-                  // Adicionar exceção para SyncFusion
-                  reserved: ['$', 'exports', 'require'],
-                },
-              },
-              exclude: [/node_modules\/@syncfusion/, /ej2-pdfviewer/],
-            };
-          }
-          return plugin;
-        });
-      }
+    // Desabilitar minificação em produção para preservar funcionalidade do Syncfusion PDF Viewer
+    // A minificação quebra propriedades internas do SyncFusion (highlights, anotações, texto embaçado)
+    if (!isServer && config.optimization) {
+      config.optimization.minimize = false;
     }
 
     return config;

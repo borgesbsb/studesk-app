@@ -6,6 +6,7 @@ import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp } from 
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
 import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
+import { EscolherAcaoDisciplinaModal } from "./escolher-acao-disciplina-modal";
 import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual";
 import { adicionarQuestoes } from "@/interface/actions/dashboard/adicionar-questoes";
 import { useDashboard } from "@/contexts/dashboard-context";
@@ -39,6 +40,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     return initial;
   });
 
+  const [modalEscolhaAberto, setModalEscolhaAberto] = useState(false);
   const [modalTempoAberto, setModalTempoAberto] = useState(false);
   const [modalQuestoesAberto, setModalQuestoesAberto] = useState(false);
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<MateriaDoDia | null>(null);
@@ -168,8 +170,13 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     );
   };
 
-  const handleAdicionarTempo = (materia: MateriaDoDia) => {
+  const handleAbrirEscolha = (materia: MateriaDoDia) => {
     setDisciplinaSelecionada(materia);
+    setModalEscolhaAberto(true);
+  };
+
+  const handleAdicionarTempo = () => {
+    setModalEscolhaAberto(false);
     setModalTempoAberto(true);
   };
 
@@ -368,7 +375,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleAdicionarTempo(materia);
+                      handleAbrirEscolha(materia);
                     }}
                     className="transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
                   >
@@ -409,6 +416,17 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
       {/* Modais */}
       {disciplinaSelecionada && (
         <>
+          <EscolherAcaoDisciplinaModal
+            isOpen={modalEscolhaAberto}
+            onClose={() => {
+              setModalEscolhaAberto(false);
+              // Não limpar disciplinaSelecionada aqui pois pode ser usado pelo modal de tempo
+            }}
+            onEscolherAdicionarTempo={handleAdicionarTempo}
+            disciplinaNome={disciplinaSelecionada.disciplinaNome}
+            disciplinaId={disciplinaSelecionada.disciplinaId}
+          />
+
           <AdicionarTempoModal
             isOpen={modalTempoAberto}
             onClose={() => {
@@ -417,6 +435,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
             }}
             onSave={handleSalvarTempo}
             disciplinaNome={disciplinaSelecionada.disciplinaNome}
+            disciplinaId={disciplinaSelecionada.disciplinaId}
           />
 
           <AdicionarQuestoesModal

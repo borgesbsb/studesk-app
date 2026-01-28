@@ -521,16 +521,15 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         </div>
 
         {/* Desktop: Tabela */}
-        <div className="hidden md:block rounded-md border">
+        <div className="hidden md:block rounded-md border overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-[30%]">Nome</TableHead>
-              <TableHead className="w-[12%]">Progresso</TableHead>
-              <TableHead className="w-[12%]">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</TableHead>
-              <TableHead className="w-[12%]">Tempo Estudado</TableHead>
-              {tipo === 'PDF' && <TableHead className="w-[14%]">Formatação IA</TableHead>}
-              <TableHead className="w-[20%] text-right">Ações</TableHead>
+            <TableRow className="text-xs">
+              <TableHead className="w-[35%] py-2 text-xs">Nome</TableHead>
+              <TableHead className="w-[15%] py-2 text-xs">Progresso</TableHead>
+              <TableHead className="w-[15%] py-2 text-xs">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</TableHead>
+              {tipo === 'PDF' && <TableHead className="w-[15%] py-2 text-xs">Formatação IA</TableHead>}
+              <TableHead className="w-[20%] py-2 text-xs text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -545,27 +544,27 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
 
               return (
                 <TableRow key={material.id} className="group hover:bg-muted/50">
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
+                  <TableCell className="py-2 text-xs font-medium">
+                    <div className="flex items-center gap-1.5">
                       {tipo === 'VIDEO' ? (
-                        <Video className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                        <Video className="h-3 w-3 text-purple-600 flex-shrink-0" />
                       ) : (
-                        <FileText className="h-4 w-4 text-red-600 flex-shrink-0" />
+                        <FileText className="h-3 w-3 text-red-600 flex-shrink-0" />
                       )}
                       <span className="truncate" title={material.nome}>
                         {material.nome}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={progresso} className="h-2 flex-1" />
-                      <span className="text-sm font-medium text-muted-foreground min-w-[45px] text-right">
+                  <TableCell className="py-2">
+                    <div className="flex items-center gap-1.5">
+                      <Progress value={progresso} className="h-1.5 flex-1" />
+                      <span className="text-xs font-medium text-muted-foreground min-w-[35px] text-right">
                         {Math.round(progresso)}%
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="py-2 text-xs text-muted-foreground">
                     {tipo === 'VIDEO' ? (
                       <span>
                         {Math.floor(tempoVideoAssistido / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
@@ -576,11 +575,8 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm font-medium">
-                    {formatarTempo(tempoEstudadoSegundos)}
-                  </TableCell>
                   {tipo === 'PDF' && (
-                    <TableCell className="text-xs">
+                    <TableCell className="py-2 text-[10px]">
                       {processingStatus ? (
                         <span className={`${
                           processingStatus.status === 'complete' ? 'text-green-600' :
@@ -588,12 +584,12 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                           processingStatus.status === 'error' ? 'text-red-600' : 'text-gray-500'
                         }`}>
                           {processingStatus.status === 'complete'
-                            ? `✅ ${processingStatus.totalPages} pág. (100%)`
+                            ? `✅ ${processingStatus.totalPages}p`
                             : processingStatus.status === 'processing' || processingStatus.status === 'partial'
-                            ? `⏳ ${processingStatus.processedPages}/${processingStatus.totalPages} (${processingStatus.progress}%)`
+                            ? `⏳ ${processingStatus.processedPages}/${processingStatus.totalPages}`
                             : processingStatus.status === 'error'
-                            ? `❌ Erro`
-                            : `⏸️ Aguardando`
+                            ? `❌`
+                            : `⏸️`
                           }
                         </span>
                       ) : (
@@ -601,8 +597,8 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                       )}
                     </TableCell>
                   )}
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
+                  <TableCell className="py-2 text-right">
+                    <div className="flex items-center justify-end gap-0.5">
                       {tipo === 'PDF' ? (
                         <>
                           <Button
@@ -610,19 +606,19 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                             size="sm"
                             onClick={() => handleOpenTexto(material)}
                             disabled={!materiaisComTextoProcessado[material.id]}
-                            className="h-8 px-2 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="h-6 px-1.5 text-xs hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
                           >
-                            <BookOpen className="h-4 w-4 mr-1" />
+                            <BookOpen className="h-3 w-3 mr-0.5" />
                             Texto
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleOpenPdfOriginal(material)}
-                            className="h-8 px-2 hover:bg-purple-50 hover:text-purple-600"
+                            className="h-6 px-1.5 text-xs hover:bg-purple-50 hover:text-purple-600"
                           >
-                            <FileImage className="h-4 w-4 mr-1" />
+                            <FileImage className="h-3 w-3 mr-0.5" />
                             PDF
                           </Button>
                         </>
@@ -631,9 +627,9 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenPdf(material)}
-                          className="h-8 px-2 hover:bg-blue-50 hover:text-blue-600"
+                          className="h-6 px-1.5 text-xs hover:bg-blue-50 hover:text-blue-600"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-3 w-3 mr-0.5" />
                           Abrir
                         </Button>
                       )}
@@ -645,9 +641,9 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                             handleDelete(material.id)
                           }
                         }}
-                        className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
+                        className="h-6 w-6 hover:bg-red-50 hover:text-red-600"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </TableCell>
@@ -662,24 +658,24 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div>
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'pdf' | 'video')} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="pdf" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
+          <TabsTrigger value="pdf" className="flex items-center gap-2 text-xs">
+            <FileText className="h-3 w-3" />
             PDFs ({materiaisPdf.length})
           </TabsTrigger>
-          <TabsTrigger value="video" className="flex items-center gap-2">
-            <Video className="h-4 w-4" />
+          <TabsTrigger value="video" className="flex items-center gap-2 text-xs">
+            <Video className="h-3 w-3" />
             Vídeos ({materiaisVideo.length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pdf" className="mt-4">
+        <TabsContent value="pdf" className="mt-2">
           {renderTable(materiaisPdf, 'PDF')}
         </TabsContent>
 
-        <TabsContent value="video" className="mt-4">
+        <TabsContent value="video" className="mt-2">
           {renderTable(materiaisVideo, 'VIDEO')}
         </TabsContent>
       </Tabs>

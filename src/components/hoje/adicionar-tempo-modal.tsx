@@ -5,16 +5,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Timer, Clock } from "lucide-react";
+import { Timer } from "lucide-react";
 
 interface AdicionarTempoModalProps {
   disciplinaNome: string;
+  disciplinaId: string;
   isOpen: boolean;
   onClose: () => void;
   onSave: (horas: number, minutos: number) => void;
 }
 
-export function AdicionarTempoModal({ disciplinaNome, isOpen, onClose, onSave }: AdicionarTempoModalProps) {
+export function AdicionarTempoModal({ disciplinaNome, disciplinaId, isOpen, onClose, onSave }: AdicionarTempoModalProps) {
   const [horas, setHoras] = useState("");
   const [minutos, setMinutos] = useState("");
   const [isLoading, setIsLoading] = useState(false);

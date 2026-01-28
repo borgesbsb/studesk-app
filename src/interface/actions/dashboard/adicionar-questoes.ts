@@ -4,15 +4,17 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { requireAuth } from '@/lib/auth-helpers';
 
-export async function adicionarQuestoes(disciplinaId: string, quantidade: number, data?: Date) {
+interface AdicionarQuestoesParams {
+  disciplinaId: string;
+  quantidade: number;
+  data?: Date;
+}
+
+export async function adicionarQuestoes(params: AdicionarQuestoesParams) {
   try {
     const { userId } = await requireAuth();
+    const { disciplinaId, quantidade, data } = params;
     const diaConsultado = data || new Date();
-    console.log('📝 Adicionando questões:', {
-      disciplinaId,
-      quantidade,
-      data: diaConsultado.toISOString()
-    });
 
     // Buscar a semana de estudo ativa para a disciplina do usuário
     const planoAtivo = await prisma.planoEstudo.findFirst({
@@ -33,16 +35,25 @@ export async function adicionarQuestoes(disciplinaId: string, quantidade: number
     }
 
     // Buscar a semana de estudo
-    const semanaEstudo = await prisma.semanaEstudo.findFirst({
+    // Normalizar a data para comparação (apenas data, sem horas)
+    const diaParaComparacao = new Date(diaConsultado);
+    diaParaComparacao.setHours(0, 0, 0, 0);
+
+    // Buscar todas as semanas do plano
+    const todasSemanas = await prisma.semanaEstudo.findMany({
       where: {
-        planoId: planoAtivo.id,
-        dataInicio: {
-          lte: diaConsultado
-        },
-        dataFim: {
-          gte: diaConsultado
-        }
+        planoId: planoAtivo.id
       }
+    });
+
+    // Encontrar a semana que contém o dia consultado
+    const semanaEstudo = todasSemanas.find(semana => {
+      const inicio = new Date(semana.dataInicio);
+      inicio.setHours(0, 0, 0, 0);
+      const fim = new Date(semana.dataFim);
+      fim.setHours(23, 59, 59, 999);
+
+      return diaParaComparacao >= inicio && diaParaComparacao <= fim;
     });
 
     if (!semanaEstudo) {
@@ -61,38 +72,49 @@ export async function adicionarQuestoes(disciplinaId: string, quantidade: number
       throw new Error('Disciplina não encontrada na semana de estudo');
     }
 
-    // Adicionar questões ao total já realizado
-    const questoesAnteriores = disciplinaSemana.questoesRealizadas || 0;
-    const novoTotalQuestoes = questoesAnteriores + quantidade;
+    // Calcular qual é o diaId atual (dia1, dia2, etc)
+    const inicioNormalizado = new Date(semanaEstudo.dataInicio);
+    inicioNormalizado.setHours(0, 0, 0, 0);
+    const consultadaNormalizada = new Date(diaConsultado);
+    consultadaNormalizada.setHours(0, 0, 0, 0);
+    const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    const diaIdAtual = `dia${diffDays + 1}`;
 
-    console.log('🔍 [DEBUG - QUESTÕES]:', {
-      quantidade,
-      questoesAnteriores,
-      novoTotalQuestoes,
-      diferencaCalculada: novoTotalQuestoes - questoesAnteriores
+    // Buscar ou criar DisciplinaDia para o dia específico
+    let disciplinaDia = await prisma.disciplinaDia.findFirst({
+      where: {
+        disciplinaSemanaId: disciplinaSemana.id,
+        dia: diaIdAtual
+      }
     });
 
-    await prisma.disciplinaSemana.update({
+    if (!disciplinaDia) {
+      // Criar DisciplinaDia se não existir
+      disciplinaDia = await prisma.disciplinaDia.create({
+        data: {
+          disciplinaSemanaId: disciplinaSemana.id,
+          dia: diaIdAtual,
+          horasPlanejadas: 0,
+          horasRealizadas: 0,
+          questoesPlanejadas: 0,
+          questoesRealizadas: 0
+        }
+      });
+    }
+
+    // Adicionar questões ao total já realizado
+    const questoesAnteriores = disciplinaDia.questoesRealizadas || 0;
+    const novoTotalQuestoes = questoesAnteriores + quantidade;
+
+    // Atualizar DisciplinaDia
+    await prisma.disciplinaDia.update({
       where: {
-        id: disciplinaSemana.id
+        id: disciplinaDia.id
       },
       data: {
         questoesRealizadas: novoTotalQuestoes
       }
-    });
-
-    // Verificar o que foi realmente salvo no banco
-    const disciplinaAtualizada = await prisma.disciplinaSemana.findUnique({
-      where: { id: disciplinaSemana.id },
-      select: { questoesRealizadas: true }
-    });
-
-    console.log('✅ Questões realizadas atualizadas:', {
-      disciplinaSemanaId: disciplinaSemana.id,
-      questoesAdicionadas: quantidade,
-      questoesAnteriores,
-      novoTotalCalculado: novoTotalQuestoes,
-      questoesSalvasNoBanco: disciplinaAtualizada?.questoesRealizadas
     });
 
     // Revalidar o cache das páginas do dashboard

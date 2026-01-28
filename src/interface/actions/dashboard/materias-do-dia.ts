@@ -331,11 +331,17 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
           ? Math.round(disciplinaDia.horasRealizadas * 100) / 100 // DisciplinaDia já está em horas
           : Math.round((disciplinaSemana.horasRealizadas / 60) * 100) / 100 // Fallback: converter minutos para horas
 
+        // IMPORTANTE: Usar questoesRealizadas do DisciplinaDia
+        const questoesRealizadasDia = disciplinaDia
+          ? disciplinaDia.questoesRealizadas // DisciplinaDia tem o valor correto do dia
+          : disciplinaSemana.questoesRealizadas // Fallback: usar da semana
+
         console.log(`\n📊 VALORES FINAIS RETORNADOS:`)
         console.log(`   Disciplina: ${disciplinaSemana.disciplina.nome}`)
         console.log(`   horasRealizadas (do DisciplinaDia): ${horasRealizadasDia}h`)
         console.log(`   tempoRealEstudo (será igual a horasRealizadas): ${horasRealizadasDia}h`)
         console.log(`   tempoSessoesPdf: ${tempoSessoesPdf}h`)
+        console.log(`   questoesRealizadas (do DisciplinaDia): ${questoesRealizadasDia}`)
 
         return {
           id: disciplinaSemana.id,
@@ -349,7 +355,7 @@ export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
           concluida: disciplinaSemana.concluida,
           materialNome: disciplinaSemana.materialNome || undefined,
           questoesPlanejadas: questoesPorDia, // Questões planejadas para o dia específico
-          questoesRealizadas: disciplinaSemana.questoesRealizadas,
+          questoesRealizadas: questoesRealizadasDia, // USAR DO DisciplinaDia
           prioridade: disciplinaSemana.prioridade,
           observacoes: disciplinaSemana.observacoes || undefined
         }

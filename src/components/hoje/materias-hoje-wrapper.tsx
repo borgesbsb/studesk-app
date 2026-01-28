@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { MateriasHoje } from "./materias-hoje";
+import { MateriasHojeCardStyle } from "./materias-hoje-card-style";
 import { useDashboard } from "@/contexts/dashboard-context";
 import { getMateriasDoDia, MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 
@@ -68,5 +68,5 @@ export function MateriasHojeWrapper() {
     );
   }
 
-  return <MateriasHoje materias={materias} onTempoAdicionado={handleTempoAdicionado} />;
+  return <MateriasHojeCardStyle materias={materias} onTempoAdicionado={handleTempoAdicionado} />;
 }

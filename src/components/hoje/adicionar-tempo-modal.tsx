@@ -9,40 +9,38 @@ import { Timer, Clock } from "lucide-react";
 
 interface AdicionarTempoModalProps {
   disciplinaNome: string;
-  onAdicionarTempo: (minutos: number) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (horas: number, minutos: number) => void;
 }
 
-export function AdicionarTempoModal({ disciplinaNome, onAdicionarTempo }: AdicionarTempoModalProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function AdicionarTempoModal({ disciplinaNome, isOpen, onClose, onSave }: AdicionarTempoModalProps) {
+  const [horas, setHoras] = useState("");
   const [minutos, setMinutos] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleOpenModal = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsOpen(true);
-  };
-
   const handleCloseModal = () => {
-    setIsOpen(false);
+    setHoras("");
     setMinutos("");
     setIsLoading(false);
+    onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    const horasNum = parseInt(horas) || 0;
     const minutosNum = parseInt(minutos) || 0;
-    
-    if (minutosNum === 0) {
+
+    if (horasNum === 0 && minutosNum === 0) {
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
-      await onAdicionarTempo(minutosNum);
+      await onSave(horasNum, minutosNum);
       handleCloseModal();
     } catch (error) {
       console.error("Erro ao adicionar tempo:", error);
@@ -51,22 +49,15 @@ export function AdicionarTempoModal({ disciplinaNome, onAdicionarTempo }: Adicio
     }
   };
 
-  const totalMinutos = parseInt(minutos) || 0;
-  const tempoFormatado = totalMinutos > 0 ? `${totalMinutos} minutos` : "";
+  const horasNum = parseInt(horas) || 0;
+  const minutosNum = parseInt(minutos) || 0;
+  const totalMinutos = horasNum * 60 + minutosNum;
+  const tempoFormatado = totalMinutos > 0
+    ? `${horasNum > 0 ? horasNum + 'h' : ''} ${minutosNum > 0 ? minutosNum + 'min' : ''}`.trim()
+    : "";
 
   return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleOpenModal}
-        className="h-8 w-8 p-0 hover:bg-blue-50 hover:border-blue-400 dark:hover:bg-blue-950/20"
-        title="⏱️ Adicionar tempo de estudo"
-      >
-        <Timer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-      </Button>
-
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleCloseModal()}>
         <DialogContent 
           className="max-w-sm w-[340px] p-6"
           onInteractOutside={(e) => e.preventDefault()}
@@ -82,20 +73,30 @@ export function AdicionarTempoModal({ disciplinaNome, onAdicionarTempo }: Adicio
           </DialogHeader>
           
           <div className="space-y-6">
-            <div className="flex flex-col items-center justify-center gap-4">
-              <div className="space-y-3 w-full max-w-xs">
-                <Label className="text-sm font-medium text-center block">
-                  Minutos de estudo
-                </Label>
+            <div className="flex gap-4">
+              <div className="flex-1 space-y-2">
+                <Label className="text-sm font-medium">Horas</Label>
                 <Input
                   type="number"
-                  min="1"
-                  max="999"
+                  min="0"
+                  max="23"
+                  value={horas}
+                  onChange={(e) => setHoras(e.target.value)}
+                  placeholder="0"
+                  className="text-center text-xl font-bold h-12"
+                  autoFocus
+                />
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label className="text-sm font-medium">Minutos</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="59"
                   value={minutos}
                   onChange={(e) => setMinutos(e.target.value)}
                   placeholder="0"
-                  className="text-center text-2xl font-bold h-16 border-2"
-                  autoFocus
+                  className="text-center text-xl font-bold h-12"
                 />
               </div>
             </div>
@@ -127,6 +128,5 @@ export function AdicionarTempoModal({ disciplinaNome, onAdicionarTempo }: Adicio
           </div>
         </DialogContent>
       </Dialog>
-    </>
   );
 }

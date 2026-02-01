@@ -33,6 +33,7 @@ model User {
   disciplinas      Disciplina[]
   materiaisEstudo  MaterialEstudo[]
   planosEstudo     PlanoEstudo[]
+  simulados        Simulado[]
 
   @@index([hash])
   @@index([email])
@@ -92,6 +93,7 @@ model Disciplina {
   user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   materiais     DisciplinaMaterial[]
   semanasEstudo DisciplinaSemana[]
+  simulados     SimuladoDisciplina[]
 
   @@index([userId])
   @@index([nome])
@@ -239,6 +241,7 @@ model SemanaEstudo {
   updatedAt       DateTime           @updatedAt
   disciplinas     DisciplinaSemana[]
   plano           PlanoEstudo        @relation(fields: [planoId], references: [id], onDelete: Cascade)
+  simulados       Simulado[]
 
   @@unique([planoId, numeroSemana])
   @@index([planoId])
@@ -294,4 +297,111 @@ model DisciplinaDia {
   @@unique([disciplinaSemanaId, dia])
   @@index([disciplinaSemanaId])
   @@index([dia])
+}
+
+// ============================================
+// MÓDULO DE SIMULADOS
+// ============================================
+
+model Simulado {
+  id                    String              @id @default(cuid())
+  userId                String
+  semanaEstudoId        String?             // Referência à semana de estudos (SemanaEstudo)
+  nome                  String
+  descricao             String?
+  dataRealizacao        DateTime            @default(now())
+  status                String              @default("em_andamento") // em_andamento, finalizado, cancelado
+  tempoTotalSegundos    Int?                // Tempo total gasto no simulado
+
+  // Gabaritos
+  gabaritoOficialUrl    String?             // URL do arquivo do gabarito oficial
+  gabaritoUsuarioUrl    String?             // URL do arquivo do gabarito do usuário
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  // Relações
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  semanaEstudo          SemanaEstudo?       @relation(fields: [semanaEstudoId], references: [id], onDelete: SetNull)
+  disciplinas           SimuladoDisciplina[] // Disciplinas do simulado com seus status
+  questoes              QuestaoSimulado[]   // Questões do simulado
+
+  @@index([userId])
+  @@index([semanaEstudoId])
+  @@index([dataRealizacao])
+  @@index([status])
+}
+
+model SimuladoDisciplina {
+  id                    String      @id @default(cuid())
+  simuladoId            String
+  disciplinaId          String
+
+  // Intervalo de questões da disciplina no simulado
+  questaoInicio         Int?        // Primeira questão da disciplina (ex: 1)
+  questaoFim            Int?        // Última questão da disciplina (ex: 20)
+
+  // Critérios configuráveis para definição do status (semáforo)
+  limiteVermelho        Float       @default(50.0)  // < 50% = vermelho
+  limiteAmarelo         Float       @default(70.0)  // >= 50% e < 70% = amarelo, >= 70% = verde
+
+  // Evolução da disciplina
+  simuladoAnteriorId    String?     // ID do SimuladoDisciplina anterior para comparar evolução
+
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  // Relações
+  simulado              Simulado    @relation(fields: [simuladoId], references: [id], onDelete: Cascade)
+  disciplina            Disciplina  @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  questoes              QuestaoSimulado[] // Questões específicas desta disciplina
+
+  @@unique([simuladoId, disciplinaId])
+  @@index([simuladoId])
+  @@index([disciplinaId])
+}
+
+model QuestaoSimulado {
+  id                    String              @id @default(cuid())
+  simuladoId            String
+  simuladoDisciplinaId  String
+
+  // Dados da questão
+  enunciado             String              @db.Text
+  alternativaA          String
+  alternativaB          String
+  alternativaC          String
+  alternativaD          String
+  alternativaE          String?
+  respostaCorreta       String              // A, B, C, D ou E
+
+  // Resposta do usuário
+  respostaUsuario       String?             // A, B, C, D, E ou null (não respondida)
+  acertou               Boolean?            // true, false ou null
+
+  // Metadados
+  nivel                 String?             @default("medio") // facil, medio, dificil
+  assunto               String?             // Tópico específico da disciplina
+  tempoRespostaSegundos Int?                // Tempo gasto nesta questão
+  explicacao            String?             @db.Text // Explicação da resposta
+
+  // Origem da questão
+  bancaOrigem           String?             // Ex: CESPE, FCC, FGV
+  anoProva              Int?
+  orgaoProva            String?
+
+  ordem                 Int                 @default(0) // Ordem no simulado
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  // Relações
+  simulado              Simulado            @relation(fields: [simuladoId], references: [id], onDelete: Cascade)
+  simuladoDisciplina    SimuladoDisciplina  @relation(fields: [simuladoDisciplinaId], references: [id], onDelete: Cascade)
+
+  @@index([simuladoId])
+  @@index([simuladoDisciplinaId])
+  @@index([acertou])
+  @@index([nivel])
+  @@index([ordem])
 }

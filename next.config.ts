@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Aumentar limite de body size para Server Actions (necessário para upload de gabaritos)
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb', // Aumentado de 1mb para 10mb
+    },
+  },
   // Configuração para servir arquivos estáticos do PDF.js e WebViewer
   async headers() {
     return [

@@ -310,7 +310,8 @@ export class PlanoEstudoService {
           include: {
             plano: true
           }
-        }
+        },
+        dias: true // Incluir dias atuais para comparação
       }
     })
 
@@ -330,6 +331,52 @@ export class PlanoEstudoService {
     if (data.diasEstudo !== undefined) updateData.diasEstudo = data.diasEstudo
 
     console.log('🔄 Atualizando no banco:', { disciplinaSemanaId: data.disciplinaSemanaId, updateData }) // Debug
+
+    // ====== SINCRONIZAR DisciplinaDia quando diasEstudo mudar ======
+    if (data.diasEstudo !== undefined) {
+      const diasNovos = data.diasEstudo.split(',').map(d => d.trim()).filter(d => d)
+      const diasAtuais = disciplinaSemanaExistente.dias.map(d => d.dia)
+
+      console.log('📅 Sincronizando DisciplinaDia:')
+      console.log('   Dias atuais:', diasAtuais)
+      console.log('   Dias novos:', diasNovos)
+
+      // Dias para adicionar (estão nos novos mas não nos atuais)
+      const diasParaAdicionar = diasNovos.filter(d => !diasAtuais.includes(d))
+      // Dias para remover (estão nos atuais mas não nos novos)
+      const diasParaRemover = diasAtuais.filter(d => !diasNovos.includes(d))
+
+      console.log('   ➕ Adicionar:', diasParaAdicionar)
+      console.log('   ➖ Remover:', diasParaRemover)
+
+      // Criar novos registros DisciplinaDia
+      if (diasParaAdicionar.length > 0) {
+        await prisma.disciplinaDia.createMany({
+          data: diasParaAdicionar.map(dia => ({
+            disciplinaSemanaId: data.disciplinaSemanaId,
+            dia,
+            horasPlanejadas: 1, // Valor padrão
+            horasRealizadas: 0,
+            questoesPlanejadas: 0,
+            questoesRealizadas: 0
+          })),
+          skipDuplicates: true
+        })
+        console.log(`   ✅ Criados ${diasParaAdicionar.length} novos registros DisciplinaDia`)
+      }
+
+      // Remover registros DisciplinaDia que não estão mais nos dias
+      if (diasParaRemover.length > 0) {
+        await prisma.disciplinaDia.deleteMany({
+          where: {
+            disciplinaSemanaId: data.disciplinaSemanaId,
+            dia: { in: diasParaRemover }
+          }
+        })
+        console.log(`   ✅ Removidos ${diasParaRemover.length} registros DisciplinaDia`)
+      }
+    }
+    // ================================================================
 
     const disciplinaSemana = await prisma.disciplinaSemana.update({
       where: { id: data.disciplinaSemanaId },

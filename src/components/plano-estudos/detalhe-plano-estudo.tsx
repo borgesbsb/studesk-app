@@ -2067,6 +2067,21 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
       console.log('📚 Semana:', semanaParaAdicionar.id)
       console.log('📊 Disciplinas na semana:', semanaParaAdicionar.disciplinas?.length || 0)
 
+      // Debug detalhado: verificar estrutura das disciplinas
+      console.log('🔍 DEBUG - Estrutura das disciplinas:')
+      semanaParaAdicionar.disciplinas?.forEach((disc, idx) => {
+        console.log(`  [${idx}] ${disc.disciplina?.nome || 'SEM NOME'}`)
+        console.log(`      - ID: ${disc.id}`)
+        console.log(`      - diasEstudo: "${disc.diasEstudo}"`)
+        console.log(`      - dias array:`, disc.dias)
+        console.log(`      - dias.length:`, disc.dias?.length || 0)
+        if (disc.dias && disc.dias.length > 0) {
+          disc.dias.forEach(d => {
+            console.log(`        → dia: "${d.dia}", horas: ${d.horasPlanejadas}, questões: ${d.questoesPlanejadas}`)
+          })
+        }
+      })
+
       // Debug: mostrar quais disciplinas têm o dia origem
       const disciplinasComDiaOrigem = semanaParaAdicionar.disciplinas?.filter(disc =>
         disc.dias?.some(d => d.dia === diaOrigemSelecionado)

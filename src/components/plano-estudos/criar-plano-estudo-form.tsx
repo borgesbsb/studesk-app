@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createPlanoEstudoSimples } from '@/interface/actions/plano-estudo/create'
-import { Save, ArrowLeft } from 'lucide-react'
+import { Save, ArrowLeft, Calendar, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useUserHash } from '@/contexts/user-hash-context'
@@ -46,32 +46,33 @@ export function CriarPlanoEstudoForm() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header com botão voltar */}
-      <div className="flex items-center gap-4">
-        <Link href={`/${hash}/plano-estudos`}>
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Criar Plano de Estudos</h1>
-          <p className="text-muted-foreground">
-            Crie um plano básico com nome
-          </p>
+    <Card className="border border-gray-200 shadow-sm bg-white">
+      <CardHeader className="pb-5 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Calendar className="h-4 w-4 text-gray-600" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold text-gray-900">
+                Criar Plano de Estudos
+              </CardTitle>
+              <p className="text-gray-500 text-sm mt-1">
+                Crie um plano básico com nome
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
+            <BookOpen className="h-4 w-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">
+              Novo Plano
+            </span>
+          </div>
         </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Informações do Plano</CardTitle>
-            <CardDescription>
-              Configure apenas as informações essenciais do seu plano de estudos
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      </CardHeader>
+      <CardContent className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="nome">Nome do Plano *</Label>
@@ -84,11 +85,12 @@ export function CriarPlanoEstudoForm() {
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-4 justify-end pt-4">
               <Link href={`/${hash}/plano-estudos`}>
                 <Button type="button" variant="outline">
-                  Cancelar
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Voltar
                 </Button>
               </Link>
               <Button type="submit" disabled={loading || !formData.nome}>
@@ -96,9 +98,9 @@ export function CriarPlanoEstudoForm() {
                 {loading ? 'Salvando...' : 'Criar Plano'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      </form>
-    </div>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }

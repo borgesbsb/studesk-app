@@ -97,22 +97,25 @@ export default function AgendaPage() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">Agenda</h1>
+      <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+        <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-6 w-6" />
+            <h1 className="text-2xl font-bold">Agenda</h1>
+          </div>
+          <Card>
+            <CardContent className="p-8 text-center">
+              Carregando agenda...
+            </CardContent>
+          </Card>
         </div>
-        <Card>
-          <CardContent className="p-8 text-center">
-            Carregando agenda...
-          </CardContent>
-        </Card>
       </div>
     )
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+      <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Calendar className="h-6 w-6" />
@@ -215,6 +218,7 @@ export default function AgendaPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

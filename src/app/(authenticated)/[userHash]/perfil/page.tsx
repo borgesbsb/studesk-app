@@ -20,7 +20,8 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+      <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Meu Perfil</h1>
@@ -79,6 +80,7 @@ export default function PerfilPage() {
           <GoogleDriveConfig />
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

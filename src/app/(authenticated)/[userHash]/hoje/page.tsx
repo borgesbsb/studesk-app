@@ -16,8 +16,9 @@ export default function DashboardPage() {
 
   return (
     <DashboardProvider>
-      <div className="p-4 overflow-auto overflow-x-hidden">
-        <div className="flex flex-col gap-4 max-w-full min-w-0">
+      <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+        <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6">
+          <div className="flex flex-col gap-4 max-w-full min-w-0">
           {/* Linha superior - 2 colunas lado a lado */}
           <div className="flex gap-4 max-w-full overflow-hidden">
             {/* Coluna 1 - Matérias - 50% */}
@@ -35,6 +36,7 @@ export default function DashboardPage() {
           <div className="w-full">
             <CalendarioSemanal />
           </div>
+        </div>
         </div>
       </div>
     </DashboardProvider>

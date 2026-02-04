@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 // Rotas públicas que não precisam de autenticação
-const publicRoutes = ['/login', '/register', '/api/auth']
+const publicRoutes = ['/login', '/register', '/api/auth', '/admin']
 
 // Verifica se a rota é pública
 function isPublicRoute(pathname: string): boolean {

@@ -10,7 +10,8 @@ interface PlanoEstudoDetalhePage {
 export default async function PlanoEstudoDetalhePage({ params }: PlanoEstudoDetalhePage) {
   const { id, userHash } = await params
   return (
-    <div className="space-y-6">
+    <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+      <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -35,8 +36,9 @@ export default async function PlanoEstudoDetalhePage({ params }: PlanoEstudoDeta
           </Link>
         </div>
 
-      {/* Detalhes do plano */}
-      <DetalhePlanoEstudo planoId={id} />
+        {/* Detalhes do plano */}
+        <DetalhePlanoEstudo planoId={id} />
+      </div>
     </div>
   )
 }

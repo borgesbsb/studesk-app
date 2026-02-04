@@ -94,7 +94,7 @@ export default function DisciplinasPage() {
 
   return (
     <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
-      <div className="space-y-6 pb-6 md:pb-0">
+      <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6">
         {/* Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total de Disciplinas */}

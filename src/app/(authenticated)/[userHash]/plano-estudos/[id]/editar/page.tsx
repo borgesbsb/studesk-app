@@ -11,25 +11,27 @@ export default async function EditarPlanoEstudoPage({ params }: EditarPlanoEstud
   const { id } = await params
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href={`/plano-estudos/${id}`}>
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Editar Plano de Estudos</h1>
-          <p className="text-muted-foreground">
-            Atualize as informações do seu plano
-          </p>
+    <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
+      <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Link href={`/plano-estudos/${id}`}>
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Editar Plano de Estudos</h1>
+            <p className="text-muted-foreground">
+              Atualize as informações do seu plano
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Formulário */}
-      <EditarPlanoEstudoForm planoId={id} />
+        {/* Formulário */}
+        <EditarPlanoEstudoForm planoId={id} />
+      </div>
     </div>
   )
 }

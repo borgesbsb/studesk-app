@@ -456,7 +456,10 @@ export default function VideoViewerPage({ params }: PageProps) {
             const response = await fetch(`/api/video/google-drive-download/${materialId}`)
 
             if (!response.ok) {
-                throw new Error(`Erro ao baixar: ${response.statusText}`)
+                const errorData = await response.json().catch(() => null)
+                const errorMsg = errorData?.googleError || errorData?.details || response.statusText
+                console.error('Detalhes do erro da API:', errorData)
+                throw new Error(`Erro ao baixar: ${errorMsg}`)
             }
 
             const blob = await response.blob()
@@ -601,7 +604,9 @@ export default function VideoViewerPage({ params }: PageProps) {
     }
 
     // Usar a URL do blob (que pode vir do cache ou do servidor)
-    const videoUrl = videoBlobUrl || material.arquivoVideoUrl || ''
+    // Filtrar URLs gdrive:// que o browser não suporta diretamente
+    const rawUrl = material.arquivoVideoUrl || ''
+    const videoUrl = videoBlobUrl || (rawUrl.startsWith('gdrive://') ? '' : rawUrl)
 
     return (
         <>

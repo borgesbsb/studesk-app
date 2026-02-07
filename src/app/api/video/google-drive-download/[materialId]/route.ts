@@ -146,13 +146,19 @@ export async function GET(
       },
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao baixar vídeo do Google Drive:', error)
+    console.error('Error stack:', error?.stack)
+    console.error('Error response data:', error?.response?.data)
+
+    const details = error instanceof Error ? error.message : 'Erro desconhecido'
+    const googleError = error?.response?.data?.error?.message || error?.errors?.[0]?.message || null
 
     return NextResponse.json(
       {
         error: 'Erro ao baixar vídeo',
-        details: error instanceof Error ? error.message : 'Erro desconhecido'
+        details,
+        googleError,
       },
       { status: 500 }
     )

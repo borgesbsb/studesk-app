@@ -122,7 +122,13 @@ export function AdicionarTempoCicloDialog({
 
     setSalvando(true)
     try {
-      const resultado = await adicionarTempoManual(disciplinaSelecionada, tempoDecorridoMinutos)
+      const horas = Math.floor(tempoDecorridoMinutos / 60)
+      const minutos = tempoDecorridoMinutos % 60
+      const resultado = await adicionarTempoManual({
+        disciplinaId: disciplinaSelecionada,
+        horas,
+        minutos,
+      })
 
       console.log('🔍 [DIALOG] Resultado de adicionarTempoManual:', resultado)
 

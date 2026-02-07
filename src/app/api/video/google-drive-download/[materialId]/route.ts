@@ -75,12 +75,11 @@ export async function GET(
       refresh_token: material.user.googleDriveRefreshToken,
     })
 
-    // Verificar se token expirou e renovar se necessário
-    if (material.user.googleDriveTokenExpiry && material.user.googleDriveTokenExpiry < new Date()) {
-      console.log('Token expirado, renovando...')
+    // Sempre tentar renovar o token para garantir que está válido
+    try {
+      console.log('Renovando token do Google Drive...')
       const { credentials } = await oauth2Client.refreshAccessToken()
 
-      // Atualizar tokens no banco
       await prisma.user.update({
         where: { id: material.user.id },
         data: {
@@ -90,6 +89,30 @@ export async function GET(
       })
 
       oauth2Client.setCredentials(credentials)
+    } catch (refreshError: any) {
+      console.error('Falha ao renovar token:', refreshError?.message)
+
+      // Se o refresh token é inválido, limpar tokens do banco
+      if (refreshError?.message?.includes('invalid_grant') || refreshError?.response?.data?.error === 'invalid_grant') {
+        await prisma.user.update({
+          where: { id: material.user.id },
+          data: {
+            googleDriveAccessToken: null,
+            googleDriveRefreshToken: null,
+            googleDriveTokenExpiry: null,
+          }
+        })
+
+        return NextResponse.json(
+          {
+            error: 'Token do Google Drive expirado. Reconecte o Google Drive nas configurações.',
+            code: 'GOOGLE_DRIVE_RECONNECT',
+          },
+          { status: 401 }
+        )
+      }
+
+      throw refreshError
     }
 
     // 5. Obter metadados do arquivo

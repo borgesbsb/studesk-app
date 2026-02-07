@@ -457,8 +457,14 @@ export default function VideoViewerPage({ params }: PageProps) {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => null)
-                const errorMsg = errorData?.googleError || errorData?.details || response.statusText
                 console.error('Detalhes do erro da API:', errorData)
+
+                if (errorData?.code === 'GOOGLE_DRIVE_RECONNECT') {
+                    toast.error('Token do Google Drive expirado. Reconecte nas configurações do perfil.')
+                    return
+                }
+
+                const errorMsg = errorData?.googleError || errorData?.details || response.statusText
                 throw new Error(`Erro ao baixar: ${errorMsg}`)
             }
 

@@ -43,6 +43,9 @@ export default function VideoViewerPage({ params }: PageProps) {
     const [isGoogleDriveVideo, setIsGoogleDriveVideo] = useState<boolean>(false)
     const [showVideoOptions, setShowVideoOptions] = useState<boolean>(false)
     const [loadingVideo, setLoadingVideo] = useState<boolean>(false)
+    const [downloadProgress, setDownloadProgress] = useState<number>(0) // 0 a 100
+    const [downloadedMB, setDownloadedMB] = useState<number>(0)
+    const [totalMB, setTotalMB] = useState<number>(0)
 
     // Estados do cronômetro
     const [elapsedTime, setElapsedTime] = useState(0) // em segundos
@@ -447,12 +450,13 @@ export default function VideoViewerPage({ params }: PageProps) {
 
         setLoadingVideo(true)
         setShowVideoOptions(false)
+        setDownloadProgress(0)
+        setDownloadedMB(0)
+        setTotalMB(0)
 
         try {
             console.log('⬇️ Baixando vídeo do Google Drive...')
-            toast.info('Baixando vídeo... Isso pode levar alguns minutos')
 
-            // Fazer download usando fetch
             const response = await fetch(`/api/video/google-drive-download/${materialId}`)
 
             if (!response.ok) {
@@ -468,7 +472,34 @@ export default function VideoViewerPage({ params }: PageProps) {
                 throw new Error(`Erro ao baixar: ${errorMsg}`)
             }
 
-            const blob = await response.blob()
+            // Ler o stream com progresso
+            const contentLength = parseInt(response.headers.get('Content-Length') || '0')
+            const totalSizeMB = contentLength / (1024 * 1024)
+            setTotalMB(totalSizeMB)
+
+            const reader = response.body?.getReader()
+            if (!reader) throw new Error('Stream não disponível')
+
+            const chunks: Uint8Array[] = []
+            let receivedLength = 0
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                chunks.push(value)
+                receivedLength += value.length
+
+                const currentMB = receivedLength / (1024 * 1024)
+                setDownloadedMB(currentMB)
+
+                if (contentLength > 0) {
+                    setDownloadProgress(Math.round((receivedLength / contentLength) * 100))
+                }
+            }
+
+            // Montar blob a partir dos chunks
+            const blob = new Blob(chunks, { type: response.headers.get('Content-Type') || 'video/mp4' })
             console.log('✅ Vídeo baixado, salvando no cache...')
 
             // Salvar no cache IndexedDB
@@ -618,7 +649,40 @@ export default function VideoViewerPage({ params }: PageProps) {
         <>
             <div style={{ height: 'calc(100vh - 4rem)', width: '100%' }}>
                 {/* Opções de vídeo do Google Drive */}
-                {showVideoOptions && isGoogleDriveVideo ? (
+                {loadingVideo && isGoogleDriveVideo ? (
+                    <div className="h-full w-full flex items-center justify-center bg-gray-50">
+                        <div className="max-w-md w-full mx-4 bg-white rounded-lg shadow-lg p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Download className="h-6 w-6 text-blue-600 animate-bounce" />
+                                <h2 className="text-lg font-semibold text-gray-900">
+                                    Baixando vídeo...
+                                </h2>
+                            </div>
+
+                            {/* Barra de progresso */}
+                            <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
+                                <div
+                                    className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                                    style={{ width: `${downloadProgress}%` }}
+                                />
+                            </div>
+
+                            <div className="flex justify-between text-sm text-gray-600">
+                                <span>
+                                    {totalMB > 0
+                                        ? `${downloadedMB.toFixed(1)} MB / ${totalMB.toFixed(1)} MB`
+                                        : `${downloadedMB.toFixed(1)} MB baixados`
+                                    }
+                                </span>
+                                <span className="font-medium">{downloadProgress}%</span>
+                            </div>
+
+                            <p className="text-xs text-gray-400 mt-3 text-center">
+                                Não feche esta página durante o download
+                            </p>
+                        </div>
+                    </div>
+                ) : showVideoOptions && isGoogleDriveVideo ? (
                     <div className="h-full w-full flex items-center justify-center bg-gray-50">
                         <div className="max-w-md w-full mx-4 bg-white rounded-lg shadow-lg p-6">
                             <h2 className="text-xl font-semibold mb-2 text-gray-900">
@@ -665,13 +729,6 @@ export default function VideoViewerPage({ params }: PageProps) {
                                     </div>
                                 </button>
                             </div>
-
-                            {loadingVideo && (
-                                <div className="mt-4 flex items-center justify-center gap-2 text-blue-600">
-                                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-sm">Preparando vídeo...</span>
-                                </div>
-                            )}
                         </div>
                     </div>
                 ) : videoUrl ? (

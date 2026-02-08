@@ -49,37 +49,37 @@ const MateriaisPage = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
       {/* Header Card - altura fixa */}
-      <Card className="border border-gray-200 shadow-sm bg-white rounded-none border-b-0 flex-shrink-0">
-        <CardHeader className="pb-5 border-b border-gray-100">
+      <Card className="border border-border shadow-sm rounded-none border-b-0 flex-shrink-0">
+        <CardHeader className="pb-5 border-b border-border">
           {/* Desktop: flex-row | Mobile: flex-col */}
           <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => router.back()}
-              className="h-10 w-10 hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+              className="h-10 w-10 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors duration-200"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
 
             {loading ? (
               <div className="space-y-2 flex-1">
-                <Skeleton className="h-7 w-full md:w-64 bg-gray-200" />
-                <Skeleton className="h-4 w-full md:w-40 bg-gray-200" />
+                <Skeleton className="h-7 w-full md:w-64 bg-muted" />
+                <Skeleton className="h-4 w-full md:w-40 bg-muted" />
               </div>
             ) : (
               <div className="flex-1 w-full md:w-auto">
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 mb-1">
-                  <div className="p-2 bg-gray-100 rounded-lg w-fit">
-                    <GraduationCap className="h-5 w-5 text-gray-600" />
+                  <div className="p-2 bg-muted rounded-lg w-fit">
+                    <GraduationCap className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <h1 className="text-xl md:text-2xl font-semibold text-gray-900">
+                  <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {disciplina?.nome || "Disciplina não encontrada"}
                   </h1>
                 </div>
-                <p className="text-gray-600 text-sm flex items-center gap-2">
+                <p className="text-muted-foreground text-sm flex items-center gap-2">
                   <Book className="h-4 w-4" />
                   Materiais de estudo e recursos de aprendizagem
                 </p>
@@ -93,49 +93,30 @@ const MateriaisPage = () => {
                 onSuccess={() => {
                   window.location.reload()
                 }}
-                className="bg-gray-900 hover:bg-gray-800 text-white border-0 shadow-sm hover:shadow-md transition-all duration-200 w-full md:w-auto"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground border-0 shadow-sm hover:shadow-md transition-all duration-200 w-full md:w-auto"
               />
             </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Layout de 2 cards lado a lado - ocupa o resto da altura */}
-      <div className="grid grid-cols-1 md:grid-cols-2 flex-1 overflow-hidden">
-        {/* Coluna Esquerda: Últimos Materiais Acessados */}
-        <Card className="border border-gray-200 shadow-sm bg-white rounded-none md:border-r-0 flex flex-col h-full overflow-hidden">
-          <CardHeader className="pb-5 border-b border-gray-100 flex-shrink-0">
+      {/* Layout: Materiais (3 colunas) + Últimos Acessados (1 coluna) */}
+      <div
+        className="flex-1 grid gap-4 overflow-hidden p-4"
+        style={{ gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 1fr)' }}
+      >
+        {/* Coluna Esquerda: Materiais da Disciplina (75%) */}
+        <Card className="border border-border shadow-sm flex flex-col min-h-0 overflow-hidden">
+          <CardHeader className="pb-5 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="h-4 w-4 text-blue-600" />
+              <div className="p-2 bg-muted rounded-lg">
+                <FileText className="h-4 w-4 text-muted-foreground" />
               </div>
               <div>
-                <CardTitle className="text-lg font-semibold text-gray-900">
-                  Últimos Materiais Acessados
-                </CardTitle>
-                <p className="text-gray-500 text-sm mt-1">
-                  Continue de onde você parou
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 flex-1 overflow-y-auto">
-            <UltimosMateriaisCard disciplinaId={disciplinaId} />
-          </CardContent>
-        </Card>
-
-        {/* Coluna Direita: Materiais da Disciplina */}
-        <Card className="border border-gray-200 shadow-sm bg-white rounded-none flex flex-col h-full overflow-hidden">
-          <CardHeader className="pb-5 border-b border-gray-100 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-100 rounded-lg">
-                <FileText className="h-4 w-4 text-gray-600" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-semibold text-gray-900">
+                <CardTitle className="text-lg font-semibold">
                   Materiais da Disciplina
                 </CardTitle>
-                <p className="text-gray-500 text-sm mt-1">
+                <p className="text-muted-foreground text-sm mt-1">
                   Gerencie os materiais de estudo desta disciplina
                 </p>
               </div>
@@ -143,6 +124,28 @@ const MateriaisPage = () => {
           </CardHeader>
           <CardContent className="p-3 flex-1 overflow-y-auto">
             <MateriaisTable disciplinaId={disciplinaId} />
+          </CardContent>
+        </Card>
+
+        {/* Coluna Direita: Últimos Materiais Acessados (25%) */}
+        <Card className="border border-border shadow-sm flex flex-col min-h-0 overflow-hidden">
+          <CardHeader className="pb-5 border-b border-border flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold">
+                  Últimos Materiais Acessados
+                </CardTitle>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Continue de onde você parou
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 flex-1 overflow-y-auto">
+            <UltimosMateriaisCard disciplinaId={disciplinaId} />
           </CardContent>
         </Card>
       </div>

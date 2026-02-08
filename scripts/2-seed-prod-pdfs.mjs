@@ -32,16 +32,17 @@ const MODE = 'test' // Mude para 'full' quando estiver pronto
 
 // Mapeamento de disciplinas para pastas no Google Drive
 const DISCIPLINAS_MAP = {
-  'Auditoria': 'Auditoria',
+  'Auditoria Governamental e Controle': 'Auditoria',
+  'Auditoria Privada': 'Auditoria',
   'Contabilidade Geral': 'Contabilidade Geral',
   'Direito Administrativo': 'Direito Administrativo',
   'Direito Constitucional': 'Direito Constitucional',
-  'Direito Previdenciário': 'Direito Previdenciario',
+  'Direito Constitucional ': 'Direito Constitucional',
   'Direito Tributário': 'Direito Tributário',
   'Economia e Finanças Públicas': 'Economia e Finanças Públicas',
   'Estatística': 'Estatística',
-  'Língua Portuguesa': 'Lingua Portuguesa',
-  'Raciocínio Lógico Matemático': 'Raciocínio Lógico Matemático'
+  'Portugues': 'Lingua Portuguesa',
+  'RLM': 'Raciocínio Lógico Matemático'
 }
 
 async function main() {

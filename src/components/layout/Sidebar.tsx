@@ -18,7 +18,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         // Desktop: sidebar fixa (mantém comportamento original)
         "hidden md:block",
         "fixed h-full z-30",
-        "bg-background shadow-xl",
+        "bg-card",
         "border-r",
         "transition-all duration-300 ease-in-out",
         isOpen ? "w-72" : "w-20"

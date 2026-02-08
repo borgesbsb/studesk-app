@@ -82,7 +82,7 @@ export async function getUltimosMaterialAcessados(disciplinaId?: string, limit: 
           0
         );
 
-        const tipo = material.arquivoVideoUrl || material.googleDriveFileId ? 'VIDEO' : 'PDF';
+        const tipo: 'PDF' | 'VIDEO' = material.tipo === 'VIDEO' ? 'VIDEO' : 'PDF';
 
         let percentualProgresso = 0;
         if (tipo === 'PDF' && material.totalPaginas > 0) {

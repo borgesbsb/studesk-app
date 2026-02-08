@@ -42,6 +42,12 @@ const LayoutDashboardIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
+const BarChartIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 20V10M12 20V4M6 20v-6" />
+  </svg>
+)
+
 const CalendarIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2} />
@@ -64,6 +70,7 @@ const ClipboardListIcon = ({ className }: { className?: string }) => (
 )
 
 const sidebarLinksBase = [
+  { path: "/dashboard", label: "Dashboard", icon: BarChartIcon },
   { path: "/hoje", label: "Hoje", icon: LayoutDashboardIcon },
   { path: "/agenda", label: "Agenda", icon: CalendarIcon },
   { path: "/disciplinas", label: "Disciplinas", icon: BookOpenIcon },

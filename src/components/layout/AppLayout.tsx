@@ -50,7 +50,7 @@ function AppLayoutContent({ children }: { children: ReactNode }) {
         />
 
         <main className={cn(
-          "bg-background/95",
+          "bg-background",
           "flex-1 overflow-y-auto",
           "p-0"
         )}>

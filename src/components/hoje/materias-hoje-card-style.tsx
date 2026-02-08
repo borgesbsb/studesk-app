@@ -6,12 +6,12 @@ import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp } from 
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
 import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
-import { EscolherAcaoDisciplinaModal } from "./escolher-acao-disciplina-modal";
 import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual";
 import { adicionarQuestoes } from "@/interface/actions/dashboard/adicionar-questoes";
 import { useDashboard } from "@/contexts/dashboard-context";
 import { useSaveStatus } from "@/contexts/save-status-context";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useUserHash } from "@/contexts/user-hash-context";
 import { useState, useEffect } from "react";
 import { Label, PolarGrid, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
@@ -28,6 +28,7 @@ interface MateriasState {
 
 export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasHojeCardStyleProps) {
   const { hash } = useUserHash();
+  const router = useRouter();
   const { selectedDate, triggerRefresh } = useDashboard();
   const { setSuccess, setError } = useSaveStatus();
 
@@ -40,7 +41,6 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     return initial;
   });
 
-  const [modalEscolhaAberto, setModalEscolhaAberto] = useState(false);
   const [modalTempoAberto, setModalTempoAberto] = useState(false);
   const [modalQuestoesAberto, setModalQuestoesAberto] = useState(false);
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<MateriaDoDia | null>(null);
@@ -170,13 +170,49 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     );
   };
 
-  const handleAbrirEscolha = (materia: MateriaDoDia) => {
-    setDisciplinaSelecionada(materia);
-    setModalEscolhaAberto(true);
+  const renderRadialChartOnly = (progresso: number, titulo: string) => {
+    const porcentagem = Math.min(Math.round(progresso), 100);
+    const cor = getCorProgresso(progresso);
+
+    const chartConfig = {
+      progress: { label: titulo, color: cor },
+    } satisfies ChartConfig;
+
+    return (
+      <ChartContainer
+        config={chartConfig}
+        className="mx-auto aspect-square w-full max-w-[140px] pointer-events-none"
+      >
+        <RadialBarChart
+          data={[{ progress: porcentagem, fill: cor }]}
+          startAngle={0}
+          endAngle={(porcentagem / 100) * 360}
+          innerRadius={50}
+          outerRadius={70}
+        >
+          <PolarGrid gridType="circle" radialLines={false} stroke="none" className="first:fill-muted last:fill-background" polarRadius={[54, 46]} />
+          <RadialBar dataKey="progress" background cornerRadius={10} fill={cor} />
+          <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+            <Label
+              content={({ viewBox }) => {
+                if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                  return (
+                    <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                      <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 5} className="fill-foreground text-3xl font-bold">{porcentagem}%</tspan>
+                      <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 15} className="fill-muted-foreground text-xs">{titulo}</tspan>
+                    </text>
+                  );
+                }
+              }}
+            />
+          </PolarRadiusAxis>
+        </RadialBarChart>
+      </ChartContainer>
+    );
   };
 
-  const handleAdicionarTempo = () => {
-    setModalEscolhaAberto(false);
+  const handleAbrirTempo = (materia: MateriaDoDia) => {
+    setDisciplinaSelecionada(materia);
     setModalTempoAberto(true);
   };
 
@@ -314,22 +350,14 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
 
   return (
     <>
-      <Card className="h-full flex flex-col">
+      <Card className="h-full flex flex-col border-0">
         <CardHeader className="flex-shrink-0 pb-4">
           <CardTitle className="flex items-center justify-between text-lg">
             <div className="flex items-center gap-2">
               <BookOpen className="h-6 w-6" />
               Matérias para Estudar
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onTempoAdicionado}
-              className="h-9"
-            >
-              🔄 Atualizar
-            </Button>
-          </CardTitle>
+           </CardTitle>
         </CardHeader>
 
         <CardContent className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto">
@@ -347,7 +375,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                 className="flex flex-col gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
               >
                 {/* Nome da Disciplina + Link Material */}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <div
                       className="w-1.5 h-6 rounded-full"
@@ -369,42 +397,75 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
 
                 {/* Radial Charts */}
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Chart Tempo */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleAbrirEscolha(materia);
-                    }}
-                    className="transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
-                  >
-                    {renderRadialChart(
-                      progressoTempo,
-                      <Timer className="h-4 w-4" />,
-                      `${formatarTempo(materia.horasRealizadas)} / ${formatarTempo(materia.horasPlanejadas)}`,
-                      "Tempo"
-                    )}
-                  </button>
+                  {/* Card Tempo com ações */}
+                  <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
+                    {/* Coluna esquerda: label + gráfico */}
+                    <div className="flex flex-col items-center">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Timer className="h-4 w-4" />
+                        <span className="text-xs font-semibold">Tempo</span>
+                      </div>
+                      {renderRadialChartOnly(progressoTempo, "Tempo")}
+                      <div className="text-[10px] font-medium text-muted-foreground -mt-1">
+                        {formatarTempo(materia.horasRealizadas)} / {formatarTempo(materia.horasPlanejadas)}
+                      </div>
+                    </div>
+                    {/* Coluna direita: botões */}
+                    <div className="flex flex-col gap-2 justify-center">
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAbrirTempo(materia);
+                        }}
+                        className="w-full h-auto py-1.5 px-2 text-[10px]"
+                      >
+                        <Timer className="h-3 w-3 mr-1" />
+                        Add Tempo
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/${hash}/disciplina/${materia.disciplinaId}/materiais`);
+                        }}
+                        className="w-full h-auto py-1.5 px-2 text-[10px]"
+                      >
+                        <BookOpen className="h-3 w-3 mr-1" />
+                        Estudar
+                      </Button>
+                    </div>
+                  </div>
 
-                  {/* Chart Questões */}
+                  {/* Card Questões com ação */}
                   {materia.questoesPlanejadas > 0 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleAdicionarQuestoes(materia);
-                      }}
-                      className="transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-green-500 rounded-lg"
-                    >
-                      {renderRadialChart(
-                        progressoQuestoes,
-                        <ClipboardList className="h-4 w-4" />,
-                        `${materia.questoesRealizadas} / ${materia.questoesPlanejadas}`,
-                        "Questões"
-                      )}
-                    </button>
+                    <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
+                      {/* Coluna esquerda: label + gráfico */}
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ClipboardList className="h-4 w-4" />
+                          <span className="text-xs font-semibold">Questões</span>
+                        </div>
+                        {renderRadialChartOnly(progressoQuestoes, "Questões")}
+                        <div className="text-[10px] font-medium text-muted-foreground -mt-1">
+                          {materia.questoesRealizadas} / {materia.questoesPlanejadas}
+                        </div>
+                      </div>
+                      {/* Coluna direita: botão */}
+                      <div className="flex flex-col gap-2 justify-center">
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAdicionarQuestoes(materia);
+                          }}
+                          className="w-full h-auto py-1.5 px-2 text-[10px]"
+                        >
+                          <ClipboardList className="h-3 w-3 mr-1" />
+                          Add Questões
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -416,17 +477,6 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
       {/* Modais */}
       {disciplinaSelecionada && (
         <>
-          <EscolherAcaoDisciplinaModal
-            isOpen={modalEscolhaAberto}
-            onClose={() => {
-              setModalEscolhaAberto(false);
-              // Não limpar disciplinaSelecionada aqui pois pode ser usado pelo modal de tempo
-            }}
-            onEscolherAdicionarTempo={handleAdicionarTempo}
-            disciplinaNome={disciplinaSelecionada.disciplinaNome}
-            disciplinaId={disciplinaSelecionada.disciplinaId}
-          />
-
           <AdicionarTempoModal
             isOpen={modalTempoAberto}
             onClose={() => {

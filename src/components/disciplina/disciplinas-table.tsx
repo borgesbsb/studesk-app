@@ -84,6 +84,7 @@ interface DisciplinaComMateriais {
   disciplina: {
     id: string
     nome: string
+    cor?: string
   }
   materiais: MaterialEstudo[]
   progresso: number
@@ -93,6 +94,10 @@ interface DisciplinaComMateriais {
   progressoVideo: number
   totalDuracaoSegundos: number
   totalTempoAssistido: number
+  totalPdfs: number
+  pdfsConcluidos: number
+  totalVideos: number
+  videosConcluidos: number
 }
 
 export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
@@ -141,11 +146,15 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
               const totalPaginas = materiaisPdf.reduce((total, mat) => total + mat.totalPaginas, 0)
               const paginasLidas = materiaisPdf.reduce((total, mat) => total + mat.paginasLidas, 0)
               const progressoPdf = totalPaginas > 0 ? (paginasLidas / totalPaginas) * 100 : 0
+              const totalPdfs = materiaisPdf.length
+              const pdfsConcluidos = materiaisPdf.filter(m => m.totalPaginas > 0 && m.paginasLidas >= m.totalPaginas).length
 
               // Calcular progresso de Vídeos
               const totalDuracaoSegundos = materiaisVideo.reduce((total, mat) => total + (mat.duracaoSegundos || 0), 0)
               const totalTempoAssistido = materiaisVideo.reduce((total, mat) => total + (mat.tempoAssistido || 0), 0)
               const progressoVideo = totalDuracaoSegundos > 0 ? (totalTempoAssistido / totalDuracaoSegundos) * 100 : 0
+              const totalVideos = materiaisVideo.length
+              const videosConcluidos = materiaisVideo.filter(m => (m.duracaoSegundos || 0) > 0 && (m.tempoAssistido || 0) >= (m.duracaoSegundos || 0)).length
 
               // Progresso geral (média ponderada se houver ambos os tipos)
               let progresso = 0
@@ -167,6 +176,10 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                 progressoVideo,
                 totalDuracaoSegundos,
                 totalTempoAssistido,
+                totalPdfs,
+                pdfsConcluidos,
+                totalVideos,
+                videosConcluidos,
               }
             })
           )
@@ -229,8 +242,8 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
               <TableHead>Disciplina</TableHead>
               <TableHead>Cor</TableHead>
               <TableHead>Materiais</TableHead>
-              <TableHead>PDFs (Páginas)</TableHead>
-              <TableHead>Vídeos (Tempo)</TableHead>
+              <TableHead>PDFs</TableHead>
+              <TableHead>Vídeos</TableHead>
               <TableHead>Progresso Geral</TableHead>
               <TableHead className="text-center">Ações</TableHead>
             </TableRow>
@@ -307,12 +320,12 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                 {/* PDFs */}
                 <div className="border border-gray-200 rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-2">PDFs</p>
-                  {disciplina.totalPaginas > 0 ? (
+                  {disciplina.totalPdfs > 0 ? (
                     <div className="flex items-center gap-2">
-                      <CircularProgress value={disciplina.progressoPdf} size={40} strokeWidth={4} />
+                      <CircularProgress value={(disciplina.pdfsConcluidos / disciplina.totalPdfs) * 100} size={40} strokeWidth={4} />
                       <div className="text-xs text-gray-600">
-                        <div>{disciplina.paginasLidas}</div>
-                        <div className="text-gray-400">/ {disciplina.totalPaginas}</div>
+                        <div>{disciplina.pdfsConcluidos}</div>
+                        <div className="text-gray-400">/ {disciplina.totalPdfs}</div>
                       </div>
                     </div>
                   ) : (
@@ -323,12 +336,12 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                 {/* Vídeos */}
                 <div className="border border-gray-200 rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-2">Vídeos</p>
-                  {disciplina.totalDuracaoSegundos > 0 ? (
+                  {disciplina.totalVideos > 0 ? (
                     <div className="flex items-center gap-2">
-                      <CircularProgress value={disciplina.progressoVideo} size={40} strokeWidth={4} />
+                      <CircularProgress value={(disciplina.videosConcluidos / disciplina.totalVideos) * 100} size={40} strokeWidth={4} />
                       <div className="text-xs text-gray-600">
-                        <div>{formatarTempo(disciplina.totalTempoAssistido)}</div>
-                        <div className="text-gray-400">/ {formatarTempo(disciplina.totalDuracaoSegundos)}</div>
+                        <div>{disciplina.videosConcluidos}</div>
+                        <div className="text-gray-400">/ {disciplina.totalVideos}</div>
                       </div>
                     </div>
                   ) : (
@@ -387,8 +400,8 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
             <TableHead>Disciplina</TableHead>
             <TableHead>Cor</TableHead>
             <TableHead>Materiais</TableHead>
-            <TableHead>PDFs (Páginas)</TableHead>
-            <TableHead>Vídeos (Tempo)</TableHead>
+            <TableHead>PDFs</TableHead>
+            <TableHead>Vídeos</TableHead>
             <TableHead>Progresso Geral</TableHead>
             <TableHead className="text-center">Ações</TableHead>
           </TableRow>
@@ -413,11 +426,11 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                 <TableCell>{materiaisCount}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    {disciplina.totalPaginas > 0 ? (
+                    {disciplina.totalPdfs > 0 ? (
                       <>
-                        <CircularProgress value={disciplina.progressoPdf} size={52} strokeWidth={5} />
+                        <CircularProgress value={(disciplina.pdfsConcluidos / disciplina.totalPdfs) * 100} size={52} strokeWidth={5} />
                         <div className="text-sm text-gray-600">
-                          {disciplina.paginasLidas} / {disciplina.totalPaginas}
+                          {disciplina.pdfsConcluidos} / {disciplina.totalPdfs}
                         </div>
                       </>
                     ) : (
@@ -427,11 +440,11 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    {disciplina.totalDuracaoSegundos > 0 ? (
+                    {disciplina.totalVideos > 0 ? (
                       <>
-                        <CircularProgress value={disciplina.progressoVideo} size={52} strokeWidth={5} />
+                        <CircularProgress value={(disciplina.videosConcluidos / disciplina.totalVideos) * 100} size={52} strokeWidth={5} />
                         <div className="text-sm text-gray-600">
-                          {formatarTempo(disciplina.totalTempoAssistido)} / {formatarTempo(disciplina.totalDuracaoSegundos)}
+                          {disciplina.videosConcluidos} / {disciplina.totalVideos}
                         </div>
                       </>
                     ) : (

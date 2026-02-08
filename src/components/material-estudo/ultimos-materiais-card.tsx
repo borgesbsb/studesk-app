@@ -1,14 +1,6 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
 import { FileText, Video, Eye, FileImage, BookOpen, Clock } from "lucide-react"
 import { useState, useEffect } from "react"
@@ -166,186 +158,80 @@ export function UltimosMateriaisCard({ disciplinaId }: UltimosMateriaisCardProps
   }
 
   return (
-    <div>
-      {/* Mobile: Cards */}
-      <div className="md:hidden space-y-3">
-        {materiais.map((material) => {
-          const progresso = material.percentualProgresso
+    <div className="space-y-2">
+      {materiais.map((material) => {
+        const progresso = material.percentualProgresso
 
-          return (
-            <div key={material.id} className="border rounded-lg p-4 bg-white">
-              {/* Header do Card */}
-              <div className="flex items-start gap-2 mb-3">
-                {material.tipo === 'VIDEO' ? (
-                  <Video className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <FileText className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm truncate">{material.nome}</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {formatDistanceToNow(new Date(material.ultimoAcesso), {
-                      addSuffix: true,
-                      locale: ptBR
-                    })}
-                  </p>
-                </div>
-              </div>
-
-              {/* Progresso */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                  <span>Progresso</span>
-                  <span className="font-medium">{Math.round(progresso)}%</span>
-                </div>
-                <Progress value={progresso} className="h-2" />
-              </div>
-
-              {/* Estatísticas */}
-              <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
-                {material.tipo === 'PDF' && (
-                  <div className="bg-gray-50 rounded p-2">
-                    <p className="text-xs text-gray-500 mb-1">Páginas</p>
-                    <p className="font-medium">
-                      {material.ultimaPagina} / {material.totalPaginas}
-                    </p>
-                  </div>
-                )}
-                <div className="bg-gray-50 rounded p-2">
-                  <p className="text-xs text-gray-500 mb-1">Tempo Estudado</p>
-                  <p className="font-medium">{formatarTempo(material.tempoTotalSegundos)}</p>
-                </div>
-              </div>
-
-              {/* Ações */}
-              <div className="flex gap-2">
-                {material.tipo === 'PDF' ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenTexto(material)}
-                      disabled={!materiaisComTextoProcessado[material.id]}
-                      className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
-                    >
-                      <BookOpen className="h-4 w-4 mr-1" />
-                      Texto
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenPdfOriginal(material)}
-                      className="flex-1 border-purple-200 text-purple-600 hover:bg-purple-50"
-                    >
-                      <FileImage className="h-4 w-4 mr-1" />
-                      PDF
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenVideo(material)}
-                    className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Abrir
-                  </Button>
-                )}
+        return (
+          <div key={material.id} className="border border-border rounded-lg p-3 bg-card hover:bg-muted transition-colors">
+            {/* Header */}
+            <div className="flex items-start gap-2 mb-2">
+              {material.tipo === 'VIDEO' ? (
+                <Video className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+              ) : (
+                <FileText className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-xs truncate text-card-foreground" title={material.nome}>{material.nome}</h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {formatDistanceToNow(new Date(material.ultimoAcesso), {
+                    addSuffix: true,
+                    locale: ptBR
+                  })}
+                </p>
               </div>
             </div>
-          )
-        })}
-      </div>
 
-      {/* Desktop: Tabela */}
-      <div className="hidden md:block rounded-md border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="text-xs">
-              <TableHead className="w-[50%] py-2 text-xs">Nome</TableHead>
-              <TableHead className="w-[20%] py-2 text-xs">Último Acesso</TableHead>
-              <TableHead className="w-[15%] py-2 text-xs">Progresso</TableHead>
-              <TableHead className="w-[15%] py-2 text-xs text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {materiais.map((material) => {
-              const progresso = material.percentualProgresso
+            {/* Progresso */}
+            <div className="mb-2">
+              <div className="flex items-center gap-1.5">
+                <Progress value={progresso} className="h-1.5 flex-1" />
+                <span className="text-[10px] font-medium text-muted-foreground min-w-[28px] text-right">
+                  {Math.round(progresso)}%
+                </span>
+              </div>
+            </div>
 
-              return (
-                <TableRow key={material.id} className="group hover:bg-muted/50">
-                  <TableCell className="py-2 text-xs font-medium">
-                    <div className="flex items-center gap-1.5">
-                      {material.tipo === 'VIDEO' ? (
-                        <Video className="h-3 w-3 text-purple-600 flex-shrink-0" />
-                      ) : (
-                        <FileText className="h-3 w-3 text-red-600 flex-shrink-0" />
-                      )}
-                      <span className="truncate" title={material.nome}>
-                        {material.nome}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-2 text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(material.ultimoAcesso), {
-                      addSuffix: true,
-                      locale: ptBR
-                    })}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <div className="flex items-center gap-1.5">
-                      <Progress value={progresso} className="h-1.5 flex-1" />
-                      <span className="text-xs font-medium text-muted-foreground min-w-[35px] text-right">
-                        {Math.round(progresso)}%
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-2 text-right">
-                    <div className="flex items-center justify-end gap-0.5">
-                      {material.tipo === 'PDF' ? (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenTexto(material)}
-                            disabled={!materiaisComTextoProcessado[material.id]}
-                            className="h-6 px-1.5 text-xs hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
-                          >
-                            <BookOpen className="h-3 w-3 mr-0.5" />
-                            Texto
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenPdfOriginal(material)}
-                            className="h-6 px-1.5 text-xs hover:bg-purple-50 hover:text-purple-600"
-                          >
-                            <FileImage className="h-3 w-3 mr-0.5" />
-                            PDF
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenVideo(material)}
-                          className="h-6 px-1.5 text-xs hover:bg-blue-50 hover:text-blue-600"
-                        >
-                          <Eye className="h-3 w-3 mr-0.5" />
-                          Abrir
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+            {/* Ações */}
+            <div className="flex gap-1">
+              {material.tipo === 'PDF' ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenTexto(material)}
+                    disabled={!materiaisComTextoProcessado[material.id]}
+                    className="h-6 px-2 text-[10px] flex-1 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50"
+                    title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
+                  >
+                    <BookOpen className="h-3 w-3 mr-1" />
+                    Texto
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenPdfOriginal(material)}
+                    className="h-6 px-2 text-[10px] flex-1 hover:bg-purple-50 dark:hover:bg-purple-950 hover:text-purple-600 dark:hover:text-purple-400"
+                  >
+                    <FileImage className="h-3 w-3 mr-1" />
+                    PDF
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleOpenVideo(material)}
+                  className="h-6 px-2 text-[10px] flex-1 hover:bg-blue-50 dark:hover:bg-blue-950 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Abrir
+                </Button>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

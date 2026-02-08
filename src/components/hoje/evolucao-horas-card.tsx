@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { TrendingUp, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { EvolucaoCiclo } from "@/interface/actions/dashboard/get-evolucao-ciclo";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
@@ -54,18 +54,18 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
   } satisfies ChartConfig;
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Clock className="h-6 w-6" />
+    <Card className="h-full flex flex-col bg-card border-primary/15">
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="flex items-center gap-2 text-xs">
+          <Clock className="h-3.5 w-3.5" />
           Evolução de Horas - {evolucao.nomeCiclo}
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-[10px]">
           {new Date(evolucao.dataInicio).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - {new Date(evolucao.dataFim).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="flex-1 pb-4">
+      <CardContent className="flex-1 pb-3 px-3">
         <ChartContainer config={chartConfig} className="h-full w-full">
           <AreaChart
             data={chartData}

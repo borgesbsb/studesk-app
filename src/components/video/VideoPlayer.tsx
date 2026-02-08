@@ -1,16 +1,18 @@
 "use client"
 
 import * as React from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Settings } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Settings, PictureInPicture2, Save } from 'lucide-react';
 
 interface VideoPlayerProps {
     videoUrl: string;
     tempoProgressoSegundos?: number;
     onTimeUpdate?: (currentTime: number) => void;
     onDurationLoad?: (duration: number) => void;
+    onSave?: () => void;
+    savingProgress?: boolean;
 }
 
-export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTimeUpdate, onDurationLoad }: VideoPlayerProps) {
+export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTimeUpdate, onDurationLoad, onSave, savingProgress }: VideoPlayerProps) {
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const containerRef = React.useRef<HTMLDivElement>(null);
     const progressBarRef = React.useRef<HTMLDivElement>(null);
@@ -25,6 +27,7 @@ export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTi
     const [playbackRate, setPlaybackRate] = React.useState(1);
     const [showSpeedMenu, setShowSpeedMenu] = React.useState(false);
     const [isBuffering, setIsBuffering] = React.useState(false);
+    const [isPiP, setIsPiP] = React.useState(false);
     const [mounted, setMounted] = React.useState(false);
     const [videoWidth, setVideoWidth] = React.useState(0);
     const controlsTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -162,6 +165,37 @@ export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTi
             setIsFullscreen(false);
         }
     };
+
+    // Picture-in-Picture
+    const togglePiP = async () => {
+        if (!videoRef.current) return;
+        try {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else {
+                await videoRef.current.requestPictureInPicture();
+            }
+        } catch (error) {
+            console.error('Erro ao alternar Picture-in-Picture:', error);
+        }
+    };
+
+    // Escutar eventos de PiP
+    React.useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const handleEnterPiP = () => setIsPiP(true);
+        const handleLeavePiP = () => setIsPiP(false);
+
+        video.addEventListener('enterpictureinpicture', handleEnterPiP);
+        video.addEventListener('leavepictureinpicture', handleLeavePiP);
+
+        return () => {
+            video.removeEventListener('enterpictureinpicture', handleEnterPiP);
+            video.removeEventListener('leavepictureinpicture', handleLeavePiP);
+        };
+    }, []);
 
     // Seek
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -421,6 +455,32 @@ export default function VideoPlayer({ videoUrl, tempoProgressoSegundos = 0, onTi
                                     </div>
                                 )}
                             </div>
+
+                            {/* Salvar Progresso */}
+                            {onSave && (
+                                <button
+                                    onClick={onSave}
+                                    disabled={savingProgress}
+                                    className="px-2.5 py-1.5 rounded-md hover:bg-white/10 active:scale-95 transition-all text-xs font-medium text-white/80 hover:text-white flex items-center gap-1 disabled:opacity-50"
+                                    title="Salvar progresso"
+                                >
+                                    {savingProgress ? (
+                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <Save className="h-4 w-4" />
+                                    )}
+                                    <span>Salvar</span>
+                                </button>
+                            )}
+
+                            {/* Picture-in-Picture */}
+                            <button
+                                onClick={togglePiP}
+                                className={`p-2 rounded-full hover:bg-white/10 active:scale-95 transition-all ${isPiP ? 'text-blue-400' : 'text-white/80 hover:text-white'}`}
+                                title={isPiP ? 'Sair do Picture-in-Picture' : 'Picture-in-Picture'}
+                            >
+                                <PictureInPicture2 className="h-5 w-5" />
+                            </button>
 
                             {/* Fullscreen */}
                             <button

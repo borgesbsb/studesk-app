@@ -44,6 +44,13 @@ export function MateriasHojeWrapper() {
     carregarMaterias();
   }, [selectedDate]);
 
+  // Recarregar quando cronômetro salvar
+  useEffect(() => {
+    const handler = () => handleTempoAdicionado();
+    window.addEventListener('cronometro-saved', handler);
+    return () => window.removeEventListener('cronometro-saved', handler);
+  }, [handleTempoAdicionado]);
+
   // Recarregar dados quando a página ganhar foco (igual ao mobile)
   useEffect(() => {
     const handleVisibilityChange = () => {

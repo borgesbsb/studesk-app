@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import { EvolucaoCiclo } from "@/interface/actions/dashboard/get-evolucao-ciclo";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 
 interface EvolucaoHorasCardProps {
@@ -27,29 +27,20 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
     );
   }
 
-  // Preparar dados para o gráfico com valores acumulados
-  let horasPlanejadasAcum = 0;
-  let horasRealizadasAcum = 0;
-
-  const chartData = evolucao.dias.map((dia, index) => {
-    horasPlanejadasAcum += dia.horasPlanejadas;
-    horasRealizadasAcum += dia.horasRealizadas;
-
-    return {
-      dia: `Dia ${index + 1}`,
-      planejadas: Math.round(horasPlanejadasAcum * 100) / 100,
-      realizadas: Math.round(horasRealizadasAcum * 100) / 100,
-    };
-  });
+  const chartData = evolucao.dias.map((dia, index) => ({
+    dia: `Dia ${index + 1}`,
+    realizadas: Math.round(dia.horasRealizadas * 100) / 100,
+    planejadas: Math.round(dia.horasPlanejadas * 100) / 100,
+  }));
 
   const chartConfig = {
     planejadas: {
       label: "Planejadas",
-      color: "hsl(var(--chart-1))",
+      color: "#ef4444",
     },
     realizadas: {
       label: "Realizadas",
-      color: "hsl(var(--chart-2))",
+      color: "#22c55e",
     },
   } satisfies ChartConfig;
 
@@ -67,7 +58,7 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
 
       <CardContent className="flex-1 pb-3 px-3">
         <ChartContainer config={chartConfig} className="h-full w-full">
-          <AreaChart
+          <BarChart
             data={chartData}
             margin={{
               left: 12,
@@ -82,7 +73,6 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => value}
             />
             <YAxis
               tickLine={false}
@@ -92,26 +82,20 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
             />
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent indicator="line" />}
+              content={<ChartTooltipContent />}
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Area
+            <Bar
               dataKey="planejadas"
-              type="basis"
               fill="var(--color-planejadas)"
-              fillOpacity={0.4}
-              stroke="var(--color-planejadas)"
-              strokeWidth={2}
+              radius={[4, 4, 0, 0]}
             />
-            <Area
+            <Bar
               dataKey="realizadas"
-              type="basis"
               fill="var(--color-realizadas)"
-              fillOpacity={0.4}
-              stroke="var(--color-realizadas)"
-              strokeWidth={2}
+              radius={[4, 4, 0, 0]}
             />
-          </AreaChart>
+          </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>

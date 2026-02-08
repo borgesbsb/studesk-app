@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ClipboardList } from "lucide-react";
 import { EvolucaoCiclo } from "@/interface/actions/dashboard/get-evolucao-ciclo";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 
 interface EvolucaoQuestoesCardProps {
@@ -27,29 +27,20 @@ export function EvolucaoQuestoesCard({ evolucao }: EvolucaoQuestoesCardProps) {
     );
   }
 
-  // Preparar dados para o gráfico com valores acumulados
-  let questoesPlanejadasAcum = 0;
-  let questoesRealizadasAcum = 0;
-
-  const chartData = evolucao.dias.map((dia, index) => {
-    questoesPlanejadasAcum += dia.questoesPlanejadas;
-    questoesRealizadasAcum += dia.questoesRealizadas;
-
-    return {
-      dia: `Dia ${index + 1}`,
-      planejadas: questoesPlanejadasAcum,
-      realizadas: questoesRealizadasAcum,
-    };
-  });
+  const chartData = evolucao.dias.map((dia, index) => ({
+    dia: `Dia ${index + 1}`,
+    realizadas: dia.questoesRealizadas,
+    planejadas: dia.questoesPlanejadas,
+  }));
 
   const chartConfig = {
     planejadas: {
       label: "Planejadas",
-      color: "hsl(var(--chart-3))",
+      color: "#ef4444",
     },
     realizadas: {
       label: "Realizadas",
-      color: "hsl(var(--chart-4))",
+      color: "#22c55e",
     },
   } satisfies ChartConfig;
 
@@ -67,7 +58,7 @@ export function EvolucaoQuestoesCard({ evolucao }: EvolucaoQuestoesCardProps) {
 
       <CardContent className="flex-1 pb-3 px-3">
         <ChartContainer config={chartConfig} className="h-full w-full">
-          <AreaChart
+          <BarChart
             data={chartData}
             margin={{
               left: 12,
@@ -82,36 +73,28 @@ export function EvolucaoQuestoesCard({ evolucao }: EvolucaoQuestoesCardProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => value}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => value.toString()}
             />
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent indicator="line" />}
+              content={<ChartTooltipContent />}
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Area
+            <Bar
               dataKey="planejadas"
-              type="basis"
               fill="var(--color-planejadas)"
-              fillOpacity={0.4}
-              stroke="var(--color-planejadas)"
-              strokeWidth={2}
+              radius={[4, 4, 0, 0]}
             />
-            <Area
+            <Bar
               dataKey="realizadas"
-              type="basis"
               fill="var(--color-realizadas)"
-              fillOpacity={0.4}
-              stroke="var(--color-realizadas)"
-              strokeWidth={2}
+              radius={[4, 4, 0, 0]}
             />
-          </AreaChart>
+          </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>

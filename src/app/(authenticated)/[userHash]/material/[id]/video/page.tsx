@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import { buscarMaterialEstudoPorId } from "@/interface/actions/material-estudo/list"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, AlertCircle, Save, Download, Wifi, WifiOff } from "lucide-react"
+import { ArrowLeft, AlertCircle, Download, Wifi } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { AdicionarTempoCicloDialog } from "@/components/material-estudo/adicionar-tempo-ciclo-dialog"
 import { videoCacheService } from "@/services/video-cache.service"
@@ -419,6 +419,65 @@ export default function VideoViewerPage({ params }: PageProps) {
         }
     }
 
+    // Função para reconectar Google Drive via popup (sem sair da página)
+    const reconnectGoogleDrive = (): Promise<boolean> => {
+        return new Promise(async (resolve) => {
+            try {
+                toast.info('Token expirado. Abrindo janela para reconectar ao Google Drive...')
+
+                // Buscar URL de autenticação
+                const authResponse = await fetch('/api/google-drive/auth')
+                const authData = await authResponse.json()
+
+                if (!authData.authUrl) {
+                    toast.error('Erro ao obter URL de autenticação')
+                    resolve(false)
+                    return
+                }
+
+                // Abrir popup de autenticação
+                const width = 600
+                const height = 700
+                const left = window.screenX + (window.outerWidth - width) / 2
+                const top = window.screenY + (window.outerHeight - height) / 2
+                const popup = window.open(
+                    authData.authUrl,
+                    'google-drive-auth',
+                    `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
+                )
+
+                // Escutar mensagem de sucesso/erro do popup
+                const handleMessage = (event: MessageEvent) => {
+                    if (event.data?.type === 'GOOGLE_DRIVE_AUTH_SUCCESS') {
+                        window.removeEventListener('message', handleMessage)
+                        toast.success('Google Drive reconectado! Retomando...')
+                        resolve(true)
+                    } else if (event.data?.type === 'GOOGLE_DRIVE_AUTH_ERROR') {
+                        window.removeEventListener('message', handleMessage)
+                        toast.error('Falha ao reconectar Google Drive')
+                        resolve(false)
+                    }
+                }
+
+                window.addEventListener('message', handleMessage)
+
+                // Verificar se popup foi fechado sem autenticar
+                const checkClosed = setInterval(() => {
+                    if (popup && popup.closed) {
+                        clearInterval(checkClosed)
+                        window.removeEventListener('message', handleMessage)
+                        // Dar tempo para a mensagem chegar antes de resolver como falso
+                        setTimeout(() => resolve(false), 500)
+                    }
+                }, 500)
+            } catch (error) {
+                console.error('Erro ao reconectar Google Drive:', error)
+                toast.error('Erro ao iniciar reconexão')
+                resolve(false)
+            }
+        })
+    }
+
     // Função para fazer streaming direto do Google Drive
     const handleStreamOnline = async () => {
         if (!materialId) return
@@ -428,6 +487,25 @@ export default function VideoViewerPage({ params }: PageProps) {
 
         try {
             console.log('📡 Fazendo streaming do Google Drive...')
+
+            // Verificar se o token é válido antes de iniciar streaming
+            const checkResponse = await fetch(`/api/video/google-drive-stream/${materialId}`, { method: 'HEAD' })
+
+            if (!checkResponse.ok) {
+                const errorData = await checkResponse.json().catch(() => null)
+                if (errorData?.code === 'GOOGLE_DRIVE_RECONNECT' || checkResponse.status === 401) {
+                    const reconnected = await reconnectGoogleDrive()
+                    if (reconnected) {
+                        setLoadingVideo(false)
+                        handleStreamOnline()
+                        return
+                    }
+                    toast.error('Não foi possível reconectar ao Google Drive.')
+                    setShowVideoOptions(true)
+                    setLoadingVideo(false)
+                    return
+                }
+            }
 
             // Usar endpoint de streaming (com suporte a range requests)
             const streamUrl = `/api/video/google-drive-stream/${materialId}`
@@ -464,7 +542,17 @@ export default function VideoViewerPage({ params }: PageProps) {
                 console.error('Detalhes do erro da API:', errorData)
 
                 if (errorData?.code === 'GOOGLE_DRIVE_RECONNECT') {
-                    toast.error('Token do Google Drive expirado. Reconecte nas configurações do perfil.')
+                    // Abrir popup de reconexão automática
+                    const reconnected = await reconnectGoogleDrive()
+                    if (reconnected) {
+                        // Tentar baixar novamente após reconexão
+                        setLoadingVideo(false)
+                        handleDownloadAndCache()
+                        return
+                    }
+                    toast.error('Não foi possível reconectar ao Google Drive.')
+                    setShowVideoOptions(true)
+                    setLoadingVideo(false)
                     return
                 }
 
@@ -545,12 +633,7 @@ export default function VideoViewerPage({ params }: PageProps) {
     }
 
     const handleBack = () => {
-        const backUrl = getBackUrl()
-        if (backUrl) {
-            router.push(backUrl)
-        } else {
-            router.back()
-        }
+        router.back()
     }
 
     // Verificar se há uma URL temporária nos parâmetros
@@ -580,41 +663,18 @@ export default function VideoViewerPage({ params }: PageProps) {
         )
         setBackButton(backBtn)
 
-        // Criar conteúdo customizado para o header
-        const headerContent = (
-            <>
-                {/* Badge de visualização temporária (se aplicável) */}
-                {tempUrl && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-md border border-amber-200">
-                        <AlertCircle className="h-3 w-3" />
-                        Visualização temporária
-                    </span>
-                )}
-
-                {/* Botão Salvar Progresso - Design Discreto */}
-                <Button
-                    onClick={handleSaveProgress}
-                    disabled={savingProgress}
-                    variant="ghost"
-                    size="sm"
-                    className="h-9 px-3 hover:bg-accent disabled:opacity-50"
-                >
-                    {savingProgress ? (
-                        <>
-                            <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                            <span className="text-sm">Salvando...</span>
-                        </>
-                    ) : (
-                        <>
-                            <Save className="h-4 w-4 mr-2" />
-                            <span className="text-sm">Salvar</span>
-                        </>
-                    )}
-                </Button>
-            </>
-        )
-
-        setCustomContent(headerContent)
+        // Criar conteúdo customizado para o header (apenas badge temporário se aplicável)
+        if (tempUrl) {
+            const headerContent = (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-md border border-amber-200">
+                    <AlertCircle className="h-3 w-3" />
+                    Visualização temporária
+                </span>
+            )
+            setCustomContent(headerContent)
+        } else {
+            setCustomContent(null)
+        }
 
         // Cleanup: remover conteúdo customizado quando desmontar
         return () => {
@@ -623,7 +683,7 @@ export default function VideoViewerPage({ params }: PageProps) {
             setTitle("Dashboard")
             setFullWidth(false)
         }
-    }, [material, fromCache, tempUrl, savingProgress, setCustomContent, setTitle, setBackButton, setFullWidth])
+    }, [material, fromCache, tempUrl, setCustomContent, setTitle, setBackButton, setFullWidth])
 
     if (loading) {
         return (
@@ -738,6 +798,8 @@ export default function VideoViewerPage({ params }: PageProps) {
                         tempoProgressoSegundos={material.tempoAssistido || 0}
                         onTimeUpdate={handleVideoTimeUpdate}
                         onDurationLoad={handleVideoDurationLoad}
+                        onSave={handleSaveProgress}
+                        savingProgress={savingProgress}
                     />
                 ) : (
                     <div className="h-full w-full flex items-center justify-center">
@@ -752,6 +814,7 @@ export default function VideoViewerPage({ params }: PageProps) {
                     open={dialogTempoCicloOpen}
                     onOpenChange={setDialogTempoCicloOpen}
                     materialId={materialId}
+                    disciplinaIdFromUrl={disciplinaIdFromUrl}
                     tempoDecorridoMinutos={Math.floor((elapsedTime - lastSavedElapsedSeconds) / 60)}
                     onConfirm={executarSalvarProgresso}
                 />

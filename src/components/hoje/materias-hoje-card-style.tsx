@@ -2,11 +2,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp } from "lucide-react";
+import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp, Play } from "lucide-react";
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
 import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
 import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual";
+import { useCronometro } from "@/contexts/cronometro-context";
 import { adicionarQuestoes } from "@/interface/actions/dashboard/adicionar-questoes";
 import { useDashboard } from "@/contexts/dashboard-context";
 import { useSaveStatus } from "@/contexts/save-status-context";
@@ -44,6 +45,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
   const [modalTempoAberto, setModalTempoAberto] = useState(false);
   const [modalQuestoesAberto, setModalQuestoesAberto] = useState(false);
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<MateriaDoDia | null>(null);
+  const { iniciar: iniciarCronometro } = useCronometro();
 
   // Sincronizar estado local quando props mudam
   useEffect(() => {
@@ -53,6 +55,16 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     });
     setMateriasState(newState);
   }, [materias]);
+
+  // Atualizar quando cronômetro salvar tempo
+  useEffect(() => {
+    const handler = () => {
+      triggerRefresh();
+      onTempoAdicionado?.();
+    };
+    window.addEventListener('cronometro-saved', handler);
+    return () => window.removeEventListener('cronometro-saved', handler);
+  }, [triggerRefresh, onTempoAdicionado]);
 
   const calcularProgressoHoras = (realizadas: number, planejadas: number) => {
     if (planejadas === 0) return 0;
@@ -214,6 +226,10 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
   const handleAbrirTempo = (materia: MateriaDoDia) => {
     setDisciplinaSelecionada(materia);
     setModalTempoAberto(true);
+  };
+
+  const handleAbrirCronometro = (materia: MateriaDoDia) => {
+    iniciarCronometro(materia.disciplinaId, materia.disciplinaNome);
   };
 
   const handleAdicionarQuestoes = (materia: MateriaDoDia) => {
@@ -427,6 +443,17 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
+                          handleAbrirCronometro(materia);
+                        }}
+                        className="w-full h-auto py-1.5 px-2 text-[10px]"
+                      >
+                        <Play className="h-3 w-3 mr-1" />
+                        Cronômetro
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           router.push(`/${hash}/disciplina/${materia.disciplinaId}/materiais`);
                         }}
                         className="w-full h-auto py-1.5 px-2 text-[10px]"
@@ -497,6 +524,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
             onSave={handleSalvarQuestoes}
             disciplinaNome={disciplinaSelecionada.disciplinaNome}
           />
+
         </>
       )}
     </>

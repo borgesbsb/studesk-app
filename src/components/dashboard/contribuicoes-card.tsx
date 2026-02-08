@@ -195,7 +195,7 @@ export function ContribuicoesCard({
                     )}
                     :{" "}
                     {dia.horas > 0
-                      ? `${dia.horas.toFixed(1)}h de estudo`
+                      ? `${formatarHoras(dia.horas)} de estudo`
                       : "Sem estudo"}
                   </title>
                 </rect>

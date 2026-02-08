@@ -7,6 +7,9 @@ import { Sidebar } from "./Sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SaveStatusProvider } from "@/contexts/save-status-context"
 import { HeaderProvider, useHeader } from "@/contexts/header-context"
+import { CronometroProvider } from "@/contexts/cronometro-context"
+import { CronometroModal } from "@/components/hoje/cronometro-modal"
+import { CronometroFlutuante } from "@/components/hoje/cronometro-flutuante"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { SidebarContent } from "./SidebarContent"
 import { useUserHash } from "@/contexts/user-hash-context"
@@ -65,9 +68,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SaveStatusProvider>
       <HeaderProvider>
-        <TooltipProvider delayDuration={0}>
-          <AppLayoutContent>{children}</AppLayoutContent>
-        </TooltipProvider>
+        <CronometroProvider>
+          <TooltipProvider delayDuration={0}>
+            <AppLayoutContent>{children}</AppLayoutContent>
+            <CronometroModal />
+            <CronometroFlutuante />
+          </TooltipProvider>
+        </CronometroProvider>
       </HeaderProvider>
     </SaveStatusProvider>
   )

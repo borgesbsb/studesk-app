@@ -12,6 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen } from "lucide-react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
@@ -525,11 +526,10 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="text-xs">
-              <TableHead className="w-[35%] py-2 text-xs">Nome</TableHead>
-              <TableHead className="w-[15%] py-2 text-xs">Progresso</TableHead>
-              <TableHead className="w-[15%] py-2 text-xs">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</TableHead>
-              {tipo === 'PDF' && <TableHead className="w-[15%] py-2 text-xs">Formatação IA</TableHead>}
-              <TableHead className="w-[20%] py-2 text-xs text-right">Ações</TableHead>
+              <TableHead className={`${tipo === 'PDF' ? 'w-[50%]' : 'w-[35%]'} py-2 text-xs`}>Nome</TableHead>
+              <TableHead className={`${tipo === 'PDF' ? 'w-[25%]' : 'w-[15%]'} py-2 text-xs`}>Progresso</TableHead>
+              {tipo === 'VIDEO' && <TableHead className="w-[15%] py-2 text-xs">Duração</TableHead>}
+              <TableHead className={`${tipo === 'PDF' ? 'w-[25%]' : 'w-[20%]'} py-2 text-xs text-right`}>Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -564,54 +564,42 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="py-2 text-xs text-muted-foreground">
-                    {tipo === 'VIDEO' ? (
+                  {tipo === 'VIDEO' && (
+                    <TableCell className="py-2 text-xs text-muted-foreground">
                       <span>
                         {Math.floor(tempoVideoAssistido / 60)}m / {Math.floor((material.duracaoSegundos || 0) / 60)}m
                       </span>
-                    ) : (
-                      <span>
-                        {material.paginasLidas} / {material.totalPaginas}
-                      </span>
-                    )}
-                  </TableCell>
-                  {tipo === 'PDF' && (
-                    <TableCell className="py-2 text-[10px]">
-                      {processingStatus ? (
-                        <span className={`${
-                          processingStatus.status === 'complete' ? 'text-green-600' :
-                          processingStatus.status === 'processing' || processingStatus.status === 'partial' ? 'text-blue-600' :
-                          processingStatus.status === 'error' ? 'text-red-600' : 'text-gray-500'
-                        }`}>
-                          {processingStatus.status === 'complete'
-                            ? `✅ ${processingStatus.totalPages}p`
-                            : processingStatus.status === 'processing' || processingStatus.status === 'partial'
-                            ? `⏳ ${processingStatus.processedPages}/${processingStatus.totalPages}`
-                            : processingStatus.status === 'error'
-                            ? `❌`
-                            : `⏸️`
-                          }
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
                     </TableCell>
                   )}
                   <TableCell className="py-2 text-right">
                     <div className="flex items-center justify-end gap-0.5">
                       {tipo === 'PDF' ? (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenTexto(material)}
-                            disabled={!materiaisComTextoProcessado[material.id]}
-                            className="h-6 px-1.5 text-xs hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
-                          >
-                            <BookOpen className="h-3 w-3 mr-0.5" />
-                            Texto
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenTexto(material)}
+                                disabled={!materiaisComTextoProcessado[material.id]}
+                                className="h-6 px-1.5 text-xs hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <BookOpen className="h-3 w-3 mr-0.5" />
+                                Texto
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {processingStatus ? (
+                                processingStatus.status === 'complete'
+                                  ? `Formatação IA: ${processingStatus.totalPages} páginas (100%)`
+                                  : processingStatus.status === 'processing' || processingStatus.status === 'partial'
+                                  ? `Formatação IA: ${processingStatus.processedPages}/${processingStatus.totalPages} páginas (${processingStatus.progress}%)`
+                                  : processingStatus.status === 'error'
+                                  ? 'Erro na formatação IA'
+                                  : 'Aguardando processamento IA'
+                              ) : 'Texto ainda não processado'}
+                            </TooltipContent>
+                          </Tooltip>
                           <Button
                             variant="ghost"
                             size="sm"

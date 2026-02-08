@@ -36,6 +36,7 @@ interface AdicionarTempoCicloDialogProps {
   materialId: string
   tempoDecorridoMinutos: number
   onConfirm: () => void
+  disciplinaIdFromUrl?: string
 }
 
 export function AdicionarTempoCicloDialog({
@@ -43,7 +44,8 @@ export function AdicionarTempoCicloDialog({
   onOpenChange,
   materialId,
   tempoDecorridoMinutos,
-  onConfirm
+  onConfirm,
+  disciplinaIdFromUrl
 }: AdicionarTempoCicloDialogProps) {
   const [disciplinas, setDisciplinas] = useState<Disciplina[]>([])
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<string | null>(null)
@@ -52,28 +54,31 @@ export function AdicionarTempoCicloDialog({
   const [loadingDisciplinas, setLoadingDisciplinas] = useState(true)
   const [salvando, setSalvando] = useState(false)
 
-  // Carregar disciplinas do material
+  // Carregar disciplinas do material (usa disciplinaId da URL se disponível)
   useEffect(() => {
     if (open && materialId) {
-      setLoadingDisciplinas(true)
-      fetch(`/api/material/${materialId}/disciplinas`)
-        .then(res => res.json())
-        .then(data => {
-          setDisciplinas(data)
-          // Se houver apenas uma disciplina, selecionar automaticamente
-          if (data.length === 1) {
-            setDisciplinaSelecionada(data[0].id)
-          }
-        })
-        .catch(error => {
-          console.error('Erro ao carregar disciplinas:', error)
-          toast.error('Erro ao carregar disciplinas')
-        })
-        .finally(() => {
-          setLoadingDisciplinas(false)
-        })
+      if (disciplinaIdFromUrl) {
+        // Se já temos a disciplinaId da rota, selecionar direto sem fetch
+        setDisciplinaSelecionada(disciplinaIdFromUrl)
+        setLoadingDisciplinas(false)
+      } else {
+        setLoadingDisciplinas(true)
+        fetch(`/api/material/${materialId}/disciplinas`)
+          .then(res => res.json())
+          .then(data => {
+            setDisciplinas(data)
+            if (data.length === 1) {
+              setDisciplinaSelecionada(data[0].id)
+            }
+          })
+          .catch(error => {
+            console.error('Erro ao carregar disciplinas:', error)
+            toast.error('Erro ao carregar disciplinas')
+          })
+          .finally(() => setLoadingDisciplinas(false))
+      }
     }
-  }, [open, materialId])
+  }, [open, materialId, disciplinaIdFromUrl])
 
   // Carregar ciclo atual quando disciplina for selecionada
   useEffect(() => {
@@ -90,6 +95,10 @@ export function AdicionarTempoCicloDialog({
         .then(data => {
           if (data) {
             setCicloAtual(data)
+            // Se veio da URL, popular disciplinas com o nome retornado pelo ciclo
+            if (disciplinaIdFromUrl && data.disciplinaNome) {
+              setDisciplinas([{ id: disciplinaIdFromUrl, nome: data.disciplinaNome }])
+            }
           } else {
             setCicloAtual(null)
             toast.error('Esta disciplina não está no ciclo de estudos atual')
@@ -156,9 +165,20 @@ export function AdicionarTempoCicloDialog({
     const horas = Math.floor(minutos / 60)
     const mins = minutos % 60
     if (horas > 0) {
-      return `${horas}h ${mins}min`
+      return mins > 0 ? `${horas}h${mins}m` : `${horas}h`
     }
     return `${mins}min`
+  }
+
+  const formatarHoras = (horas: number) => {
+    if (horas < 1) {
+      const minutos = Math.round(horas * 60)
+      return `${minutos}min`
+    }
+    const horasInt = Math.floor(horas)
+    const minutos = Math.round((horas - horasInt) * 60)
+    if (minutos === 0) return `${horasInt}h`
+    return `${horasInt}h${minutos}m`
   }
 
   const formatarData = (dataStr: string) => {
@@ -185,6 +205,11 @@ export function AdicionarTempoCicloDialog({
                 <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
                 Carregando disciplinas...
               </div>
+            ) : disciplinaIdFromUrl && disciplinas.length === 0 ? (
+              // Veio da URL, nome será populado pelo ciclo-atual
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <Badge variant="secondary">{cicloAtual?.disciplinaNome || 'Carregando...'}</Badge>
+              </div>
             ) : disciplinas.length === 0 ? (
               <div className="text-sm text-gray-500">
                 Este material não está associado a nenhuma disciplina
@@ -192,7 +217,6 @@ export function AdicionarTempoCicloDialog({
             ) : disciplinas.length === 1 ? (
               <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
                 <Badge variant="secondary">{disciplinas[0].nome}</Badge>
-                <span className="text-xs text-gray-500">(Selecionada automaticamente)</span>
               </div>
             ) : (
               <div className="grid gap-2">
@@ -238,7 +262,7 @@ export function AdicionarTempoCicloDialog({
                   <div>
                     <div className="text-xs text-gray-600">Planejado</div>
                     <div className="text-sm font-semibold text-gray-900">
-                      {cicloAtual.horasPlanejadas}h
+                      {formatarHoras(cicloAtual.horasPlanejadas)}
                     </div>
                   </div>
                 </div>
@@ -248,7 +272,7 @@ export function AdicionarTempoCicloDialog({
                   <div>
                     <div className="text-xs text-gray-600">Realizado</div>
                     <div className="text-sm font-semibold text-gray-900">
-                      {Math.round((cicloAtual.horasRealizadas / 60) * 100) / 100}h
+                      {formatarTempo(cicloAtual.horasRealizadas)}
                     </div>
                   </div>
                 </div>
@@ -258,7 +282,7 @@ export function AdicionarTempoCicloDialog({
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-600">Após adicionar:</span>
                   <span className="font-semibold text-green-700">
-                    {Math.round(((cicloAtual.horasRealizadas + tempoDecorridoMinutos) / 60) * 100) / 100}h
+                    {formatarTempo(cicloAtual.horasRealizadas + tempoDecorridoMinutos)}
                   </span>
                 </div>
               </div>

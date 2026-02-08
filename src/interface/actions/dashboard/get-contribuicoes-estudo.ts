@@ -34,6 +34,7 @@ export async function getContribuicoesEstudo(): Promise<ContribuicaoDia[]> {
     // Agregar horas realizadas por data real
     const mapaHoras = new Map<string, number>();
 
+    // 1. Horas do plano de estudo
     for (const semana of planoAtivo.semanas) {
       const inicio = new Date(semana.dataInicio);
       inicio.setHours(0, 0, 0, 0);
@@ -50,6 +51,24 @@ export async function getContribuicoesEstudo(): Promise<ContribuicaoDia[]> {
           mapaHoras.set(chave, atual + dia.horasRealizadas);
         }
       }
+    }
+
+    // 2. Adicionar tempo de leitura de PDFs (HistoricoLeitura)
+    const historicoLeitura = await prisma.historicoLeitura.findMany({
+      where: {
+        material: { userId },
+      },
+      select: {
+        dataLeitura: true,
+        tempoLeituraSegundos: true,
+      },
+    });
+
+    for (const leitura of historicoLeitura) {
+      const chave = new Date(leitura.dataLeitura).toISOString().split("T")[0];
+      const horasLeitura = leitura.tempoLeituraSegundos / 3600; // Converter segundos para horas
+      const atual = mapaHoras.get(chave) || 0;
+      mapaHoras.set(chave, atual + horasLeitura);
     }
 
     // Converter para array

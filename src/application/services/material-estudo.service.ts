@@ -227,6 +227,34 @@ export class MaterialEstudoService {
     }
   }
 
+  static async deletarMateriaisEmMassa(userId: string, ids: string[]) {
+    try {
+      // Verificar ownership de todos os materiais
+      const materiais = await prisma.materialEstudo.findMany({
+        where: { id: { in: ids }, userId }
+      })
+
+      if (materiais.length !== ids.length) {
+        throw new Error('Alguns materiais não foram encontrados ou sem permissão')
+      }
+
+      // Usar transação para atomicidade
+      await prisma.$transaction([
+        prisma.disciplinaMaterial.deleteMany({
+          where: { materialId: { in: ids } }
+        }),
+        prisma.materialEstudo.deleteMany({
+          where: { id: { in: ids }, userId }
+        })
+      ])
+
+      return { count: ids.length }
+    } catch (error) {
+      const errorLog = logError(error, 'deletarMateriaisEmMassa')
+      throw new Error(formatPrismaError(error))
+    }
+  }
+
   // Métodos específicos para o relacionamento many-to-many
   static async adicionarMaterialADisciplina(disciplinaId: string, materialId: string) {
     try {

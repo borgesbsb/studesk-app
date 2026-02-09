@@ -11,13 +11,14 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen } from "lucide-react"
+import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen, X } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
-import { deletarMaterialEstudo } from "@/interface/actions/material-estudo/delete"
+import { deletarMaterialEstudo, deletarMateriaisEmMassa } from "@/interface/actions/material-estudo/delete"
 import { atualizarProgressoLeitura } from "@/interface/actions/material-estudo/update"
 import { toast } from "sonner"
 import { MaterialEstudo } from "@/domain/entities/MaterialEstudo"
@@ -45,6 +46,8 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [pendingMaterial, setPendingMaterial] = useState<MaterialEstudo | null>(null)
   const [activeTab, setActiveTab] = useState<'pdf' | 'video'>('pdf')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deletingBulk, setDeletingBulk] = useState(false)
 
   const userHash = session?.user?.hash
 
@@ -280,6 +283,56 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   }
 
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = (materiaisList: MaterialEstudo[]) => {
+    const allIds = materiaisList.map(m => m.id)
+    const allSelected = allIds.every(id => selectedIds.has(id))
+    if (allSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        allIds.forEach(id => next.delete(id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        allIds.forEach(id => next.add(id))
+        return next
+      })
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const count = selectedIds.size
+    if (!count) return
+    if (!confirm(`Deseja realmente excluir ${count} material(is) selecionado(s)?`)) return
+
+    setDeletingBulk(true)
+    try {
+      const response = await deletarMateriaisEmMassa(Array.from(selectedIds))
+      if (response.success) {
+        toast.success(`${count} material(is) excluído(s) com sucesso!`)
+        setSelectedIds(new Set())
+        await carregarMateriais()
+      } else {
+        toast.error(response.error || 'Erro ao excluir materiais')
+      }
+    } catch (error) {
+      console.error('Erro ao excluir materiais em massa:', error)
+      toast.error('Erro ao excluir materiais')
+    } finally {
+      setDeletingBulk(false)
+    }
+  }
+
   const handleOpenPdf = (material: MaterialEstudo) => {
     if (!userHash) {
       toast.error('Sessão não encontrada')
@@ -394,10 +447,23 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       )
     }
 
+    const allIds = materiais.map(m => m.id)
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+    const someSelected = allIds.some(id => selectedIds.has(id))
+
     return (
       <>
         {/* Mobile: Cards */}
         <div className="md:hidden space-y-3">
+          {/* Selecionar todos - mobile */}
+          <div className="flex items-center gap-2 px-1">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={() => toggleSelectAll(materiais)}
+              className="h-4 w-4"
+            />
+            <span className="text-xs text-muted-foreground">Selecionar todos</span>
+          </div>
           {materiais.map((material) => {
             const tempoEstudadoSegundos = horasPorMaterialSegundos[material.id] ?? 0
             // Para vídeos: usar tempoAssistido (posição atual) ao invés de tempo total estudado
@@ -408,9 +474,14 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
             const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
 
             return (
-              <div key={material.id} className="border rounded-lg p-4 bg-white">
+              <div key={material.id} className={`border rounded-lg p-4 bg-white ${selectedIds.has(material.id) ? 'ring-2 ring-blue-500 border-blue-300' : ''}`}>
                 {/* Header do Card */}
                 <div className="flex items-start gap-2 mb-3">
+                  <Checkbox
+                    checked={selectedIds.has(material.id)}
+                    onCheckedChange={() => toggleSelect(material.id)}
+                    className="h-4 w-4 mt-0.5 flex-shrink-0"
+                  />
                   {tipo === 'VIDEO' ? (
                     <Video className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
                   ) : (
@@ -526,7 +597,17 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="text-xs">
-              <TableHead className={`${tipo === 'PDF' ? 'w-[50%]' : 'w-[35%]'} py-2 text-xs`}>Nome</TableHead>
+              <TableHead className="w-[40px] py-2">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={() => toggleSelectAll(materiais)}
+                  className="h-3.5 w-3.5"
+                  ref={(el) => {
+                    if (el) (el as HTMLInputElement).indeterminate = someSelected && !allSelected
+                  }}
+                />
+              </TableHead>
+              <TableHead className={`${tipo === 'PDF' ? 'w-[45%]' : 'w-[30%]'} py-2 text-xs`}>Nome</TableHead>
               <TableHead className={`${tipo === 'PDF' ? 'w-[25%]' : 'w-[15%]'} py-2 text-xs`}>Progresso</TableHead>
               {tipo === 'VIDEO' && <TableHead className="w-[15%] py-2 text-xs">Duração</TableHead>}
               <TableHead className={`${tipo === 'PDF' ? 'w-[25%]' : 'w-[20%]'} py-2 text-xs text-right`}>Ações</TableHead>
@@ -543,7 +624,14 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
               const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
 
               return (
-                <TableRow key={material.id} className="group hover:bg-muted/50">
+                <TableRow key={material.id} className={`group hover:bg-muted/50 ${selectedIds.has(material.id) ? 'bg-blue-50' : ''}`}>
+                  <TableCell className="py-2">
+                    <Checkbox
+                      checked={selectedIds.has(material.id)}
+                      onCheckedChange={() => toggleSelect(material.id)}
+                      className="h-3.5 w-3.5"
+                    />
+                  </TableCell>
                   <TableCell className="py-2 text-xs font-medium">
                     <div className="flex items-center gap-1.5">
                       {tipo === 'VIDEO' ? (
@@ -647,7 +735,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
 
   return (
     <div>
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'pdf' | 'video')} className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as 'pdf' | 'video'); setSelectedIds(new Set()) }} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="pdf" className="flex items-center gap-2 text-xs">
             <FileText className="h-3 w-3" />
@@ -667,6 +755,35 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
           {renderTable(materiaisVideo, 'VIDEO')}
         </TabsContent>
       </Tabs>
+
+      {/* Barra de ações em massa */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-lg shadow-lg px-4 py-2.5 flex items-center gap-3 animate-in slide-in-from-bottom-4">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+          </span>
+          <div className="w-px h-5 bg-gray-600" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBulkDelete}
+            disabled={deletingBulk}
+            className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            {deletingBulk ? 'Excluindo...' : 'Excluir'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            className="h-7 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+          >
+            <X className="h-3.5 w-3.5 mr-1" />
+            Limpar
+          </Button>
+        </div>
+      )}
 
       {/* Diálogo de upload de mídia (PDF ou Vídeo) */}
       <MediaUploadDialog

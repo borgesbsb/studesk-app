@@ -24,21 +24,53 @@ const GOOGLE_DRIVE_REMOTE = 'Google-Drive:'
 const AREA_FISCAL_PATH = 'Área Fiscal'
 
 // Modo: 'test' (5 vídeos por disciplina) ou 'full' (todos)
-const MODE = 'test' // Mude para 'full' quando estiver pronto
+const MODE = 'full' // 'test' = 5 vídeos por disciplina, 'full' = todos
 
 // Mapeamento de disciplinas para pastas do Google Drive
 const DISCIPLINAS_MAP = {
+  // Nomes do banco local
   'Auditoria Governamental e Controle': 'Auditoria',
   'Auditoria Privada': 'Auditoria',
+  'Direito Constitucional ': 'Direito Constitucional',
+  'Portugues': 'Lingua Portuguesa',
+  'RLM': 'Raciocínio Lógico Matemático',
+  // Nomes do banco de produção
+  'Auditoria': 'Auditoria',
   'Contabilidade Geral': 'Contabilidade Geral',
   'Direito Administrativo': 'Direito Administrativo',
   'Direito Constitucional': 'Direito Constitucional',
-  'Direito Constitucional ': 'Direito Constitucional',
+  'Direito Previdenciário': 'Direito Previdenciario',
   'Direito Tributário': 'Direito Tributário',
   'Economia e Finanças Públicas': 'Economia e Finanças Públicas',
   'Estatística': 'Estatística',
-  'Portugues': 'Lingua Portuguesa',
-  'RLM': 'Raciocínio Lógico Matemático'
+  'Estatistica': 'Estatística',
+  'Língua Portuguesa': 'Lingua Portuguesa',
+  'Português': 'Lingua Portuguesa',
+  'Raciocínio Lógico Matemático': 'Raciocínio Lógico Matemático',
+}
+
+/**
+ * Extrai número da aula da pasta (ex: "AULA01-Organizacao.../videos/file.mp4" => 1)
+ */
+function extractAulaNumber(path) {
+  const match = path.match(/AULA(\d+)/i)
+  return match ? parseInt(match[1]) : 999
+}
+
+/**
+ * Extrai número do vídeo do nome do arquivo (ex: "10-Autarquias.mp4" => 10)
+ */
+function extractVideoNumber(name) {
+  const match = name.match(/^(\d+)/)
+  return match ? parseInt(match[1]) : 999
+}
+
+/**
+ * Formata o número da aula com zero à esquerda (ex: 1 => "01")
+ */
+function formatAulaNumber(path) {
+  const num = extractAulaNumber(path)
+  return num === 999 ? '??' : String(num).padStart(2, '0')
 }
 
 async function listVideosWithFileId(disciplinaPath) {
@@ -53,13 +85,25 @@ async function listVideosWithFileId(disciplinaPath) {
     const files = JSON.parse(stdout)
 
     // Mapear para formato esperado
-    return files.map(file => ({
+    const videos = files.map(file => ({
       fileId: file.ID,           // Google Drive fileId
       name: file.Name,           // Nome original
       path: file.Path,           // Caminho relativo
       size: file.Size,           // Tamanho em bytes
       modTime: file.ModTime      // Data de modificação
     }))
+
+    // Ordenar por número da aula e depois por número do vídeo
+    videos.sort((a, b) => {
+      const aulaA = extractAulaNumber(a.path)
+      const aulaB = extractAulaNumber(b.path)
+      if (aulaA !== aulaB) return aulaA - aulaB
+      const videoA = extractVideoNumber(a.name)
+      const videoB = extractVideoNumber(b.name)
+      return videoA - videoB
+    })
+
+    return videos
 
   } catch (error) {
     console.error(`    ❌ Erro ao listar vídeos: ${error.message}`)
@@ -154,11 +198,16 @@ async function main() {
         // Construir fonte de origem (caminho no Google Drive)
         const sourcePath = `${AREA_FISCAL_PATH}/${folderName}/${video.path}`
 
+        // Nome com prefixo de aula para ordenação (ex: "Aula 01 - 3-Nome-do-Video")
+        const aulaPrefix = `Aula ${formatAulaNumber(video.path)}`
+        const videoName = video.name.replace('.mp4', '')
+        const materialNome = `${aulaPrefix} - ${videoName}`
+
         // Cadastrar no banco com Google Drive fileId
         const material = await prisma.materialEstudo.create({
           data: {
             userId: user.id,
-            nome: video.name.replace('.mp4', ''),
+            nome: materialNome,
             tipo: 'VIDEO',
             totalPaginas: 0,
             paginasLidas: 0,

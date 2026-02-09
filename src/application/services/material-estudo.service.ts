@@ -303,7 +303,7 @@ export class MaterialEstudoService {
           material: true
         },
         orderBy: {
-          createdAt: "desc"
+          material: { nome: "asc" }
         }
       })
     } catch (error) {

@@ -11,15 +11,14 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen, X } from "lucide-react"
+import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
-import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
+import { listarMateriaisPaginadosDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { deletarMaterialEstudo, deletarMateriaisEmMassa } from "@/interface/actions/material-estudo/delete"
-import { atualizarProgressoLeitura } from "@/interface/actions/material-estudo/update"
 import { toast } from "sonner"
 import { MaterialEstudo } from "@/domain/entities/MaterialEstudo"
 import { MediaUploadDialog } from './media-upload-dialog'
@@ -34,199 +33,122 @@ interface ProcessingStatus {
   totalPages: number
   progress: number
   status: 'pending' | 'processing' | 'partial' | 'complete' | 'error'
+  processingError?: string | null
 }
+
+// Material enriquecido com dados do server-side
+interface MaterialComTempo extends MaterialEstudo {
+  tempoEstudadoSegundos: number
+  mobileText?: {
+    processedPages: number
+    totalPages: number
+    processingStatus: string
+    processingError: string | null
+    lastProcessedPage: number
+  } | null
+}
+
+const ITEMS_PER_PAGE = 15
 
 export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const { data: session } = useSession()
-  const [materiais, setMateriais] = useState<MaterialEstudo[]>([])
   const [loading, setLoading] = useState(true)
-  const [horasPorMaterialSegundos, setHorasPorMaterialSegundos] = useState<Record<string, number>>({})
-  const [materiaisComTextoProcessado, setMateriaisComTextoProcessado] = useState<Record<string, boolean>>({})
-  const [statusProcessamento, setStatusProcessamento] = useState<Record<string, ProcessingStatus>>({})
+  const [loadingTab, setLoadingTab] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [pendingMaterial, setPendingMaterial] = useState<MaterialEstudo | null>(null)
   const [activeTab, setActiveTab] = useState<'pdf' | 'video'>('pdf')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deletingBulk, setDeletingBulk] = useState(false)
 
+  // Server-side paginated data
+  const [materiaisPdf, setMateriaisPdf] = useState<MaterialComTempo[]>([])
+  const [materiaisVideo, setMateriaisVideo] = useState<MaterialComTempo[]>([])
+  const [totalPdfs, setTotalPdfs] = useState(0)
+  const [totalVideos, setTotalVideos] = useState(0)
+  const [totalPagesPdf, setTotalPagesPdf] = useState(1)
+  const [totalPagesVideo, setTotalPagesVideo] = useState(1)
+  const [paginaPdfs, setPaginaPdfs] = useState(1)
+  const [paginaVideos, setPaginaVideos] = useState(1)
+
   const userHash = session?.user?.hash
 
-  useEffect(() => {
-    carregarMateriais()
+  const carregarPagina = useCallback(async (tipo: 'PDF' | 'VIDEO', page: number, isInitial = false) => {
+    if (!isInitial) setLoadingTab(true)
+    try {
+      const response = await listarMateriaisPaginadosDaDisciplina(disciplinaId, tipo, page, ITEMS_PER_PAGE)
+      if (response.success && response.data) {
+        const items = response.data as MaterialComTempo[]
+        if (tipo === 'PDF') {
+          setMateriaisPdf(items)
+          setTotalPdfs(response.pagination.total)
+          setTotalPagesPdf(response.pagination.pages)
+        } else {
+          setMateriaisVideo(items)
+          setTotalVideos(response.pagination.total)
+          setTotalPagesVideo(response.pagination.pages)
+        }
+      } else {
+        toast.error(response.error || 'Erro ao carregar materiais')
+      }
+    } catch (error) {
+      console.error('Erro ao carregar materiais:', error)
+      toast.error('Erro ao carregar materiais')
+    } finally {
+      if (isInitial) setLoading(false)
+      setLoadingTab(false)
+    }
   }, [disciplinaId])
 
-  // Recarregar quando a janela ganhar foco (usuário voltar do PDF)
+  // Carga inicial: ambas as abas
+  useEffect(() => {
+    const carregarInicial = async () => {
+      setLoading(true)
+      await Promise.all([
+        carregarPagina('PDF', 1, true),
+        carregarPagina('VIDEO', 1, true),
+      ])
+      setLoading(false)
+    }
+    carregarInicial()
+  }, [disciplinaId, carregarPagina])
+
+  // Recarregar quando a janela ganhar foco (usuário voltar do PDF/video)
   useEffect(() => {
     const handleFocus = () => {
-      carregarMateriais()
+      carregarPagina(activeTab === 'pdf' ? 'PDF' : 'VIDEO', activeTab === 'pdf' ? paginaPdfs : paginaVideos)
     }
-
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [disciplinaId])
+  }, [disciplinaId, activeTab, paginaPdfs, paginaVideos, carregarPagina])
 
-  // Após carregar materiais, buscar horas estudadas TOTAIS (todas as sessões, organizadas ou não)
+  // Recarregar ao mudar de página
   useEffect(() => {
-    const carregarHorasPorMaterial = async () => {
-      try {
-        const entries = await Promise.all(
-          materiais.map(async (mat) => {
-            try {
-              // Buscar TODOS os registros de histórico de leitura para calcular tempo total real
-              const res = await fetch(`/api/material/${mat.id}/tempo-total`)
-              const data = await res.json()
-              if (data?.success && typeof data.totalSegundos === 'number') {
-                return [mat.id, data.totalSegundos] as const
-              }
-            } catch (e) {
-              console.error(`Erro ao buscar tempo total do material ${mat.id}:`, e)
-            }
-            return [mat.id, 0] as const
-          })
-        )
-        setHorasPorMaterialSegundos(Object.fromEntries(entries))
-      } catch (e) {
-        console.error('Erro ao carregar horas por material:', e)
-      }
+    if (!loading) {
+      carregarPagina('PDF', paginaPdfs)
     }
-    if (materiais.length > 0) {
-      carregarHorasPorMaterial()
-    } else {
-      setHorasPorMaterialSegundos({})
-    }
-  }, [materiais])
+  }, [paginaPdfs])
 
-  // Verificar quais materiais PDF têm texto processado
   useEffect(() => {
-    const verificarTextoProcessado = async () => {
-      try {
-        console.log('\n📊 [STATUS CHECK] Verificando status de processamento dos PDFs...')
-
-        const entries = await Promise.all(
-          materiais
-            .filter(mat => mat.tipo === 'PDF')
-            .map(async (mat) => {
-              try {
-                const res = await fetch(`/api/pdf/${mat.id}/check-processed`)
-                const data = await res.json()
-
-                // Log do status individual
-                if (data.status !== 'complete') {
-                  console.log(`   📄 ${mat.nome}:`)
-                  console.log(`      Status: ${data.status}`)
-                  console.log(`      Progresso: ${data.processedPages}/${data.totalPages} páginas (${data.progress}%)`)
-
-                  if (data.status === 'processing' || data.status === 'partial') {
-                    console.log('      💡 DICA: Veja logs detalhados no TERMINAL DO SERVIDOR')
-                  }
-                }
-
-                return {
-                  id: mat.id,
-                  hasProcessedPages: data.hasProcessedPages || false,
-                  status: data
-                }
-              } catch (e) {
-                console.error(`❌ Erro ao verificar status do material ${mat.nome}:`, e)
-                return {
-                  id: mat.id,
-                  hasProcessedPages: false,
-                  status: {
-                    hasProcessedPages: false,
-                    processedPages: 0,
-                    totalPages: 0,
-                    progress: 0,
-                    status: 'pending' as const
-                  }
-                }
-              }
-            })
-        )
-
-        const processandoAtivo = entries.some(e =>
-          e.status.status === 'processing' || e.status.status === 'partial'
-        )
-
-        if (processandoAtivo) {
-          console.log('⏳ [PROCESSAMENTO ATIVO] Há PDFs sendo processados com IA')
-          console.log('🔄 [AUTO-REFRESH] Status será atualizado automaticamente a cada 3 segundos')
-        }
-
-        setMateriaisComTextoProcessado(
-          Object.fromEntries(entries.map(e => [e.id, e.hasProcessedPages]))
-        )
-        setStatusProcessamento(
-          Object.fromEntries(entries.map(e => [e.id, e.status]))
-        )
-      } catch (e) {
-        console.error('❌ Erro ao verificar textos processados:', e)
-      }
+    if (!loading) {
+      carregarPagina('VIDEO', paginaVideos)
     }
-    if (materiais.length > 0) {
-      verificarTextoProcessado()
-    } else {
-      setMateriaisComTextoProcessado({})
-      setStatusProcessamento({})
-    }
-  }, [materiais])
+  }, [paginaVideos])
 
-  // Polling para atualizar status de PDFs em processamento
+  // Polling leve para PDFs em processamento (só na página atual)
   useEffect(() => {
-    // Verificar se há algum material em processamento
-    const temProcessamento = Object.values(statusProcessamento).some(
-      status => status.status === 'processing' || status.status === 'partial'
+    if (activeTab !== 'pdf') return
+
+    const temProcessamento = materiaisPdf.some(m =>
+      m.mobileText && (m.mobileText.processingStatus === 'processing' || m.mobileText.processingStatus === 'partial')
     )
-
     if (!temProcessamento) return
 
-    console.log('🔄 [POLLING] Iniciando atualização automática do status...')
+    const interval = setInterval(() => {
+      carregarPagina('PDF', paginaPdfs)
+    }, 5000)
 
-    // Atualizar a cada 3 segundos
-    const interval = setInterval(async () => {
-      try {
-        const entries = await Promise.all(
-          materiais
-            .filter(mat => mat.tipo === 'PDF')
-            .map(async (mat) => {
-              try {
-                const res = await fetch(`/api/pdf/${mat.id}/check-processed`)
-                const data = await res.json()
-
-                // Log apenas se houver mudança significativa
-                const oldStatus = statusProcessamento[mat.id]
-                if (oldStatus && oldStatus.processedPages !== data.processedPages) {
-                  console.log(`📊 [UPDATE] ${mat.nome}: ${data.processedPages}/${data.totalPages} páginas (${data.progress}%)`)
-                }
-
-                return { id: mat.id, status: data }
-              } catch (e) {
-                return { id: mat.id, status: statusProcessamento[mat.id] }
-              }
-            })
-        )
-
-        const novoStatus = Object.fromEntries(entries.map(e => [e.id, e.status]))
-        setStatusProcessamento(novoStatus)
-
-        // Parar polling se todos completaram
-        const todosCompletos = Object.values(novoStatus).every(
-          status => status.status === 'complete' || status.status === 'error'
-        )
-
-        if (todosCompletos) {
-          console.log('✅ [POLLING] Todos os processamentos concluídos! Parando atualização automática.')
-        }
-
-      } catch (e) {
-        console.error('❌ [POLLING] Erro ao atualizar status:', e)
-      }
-    }, 3000) // 3 segundos
-
-    return () => {
-      console.log('🛑 [POLLING] Parando atualização automática')
-      clearInterval(interval)
-    }
-  }, [statusProcessamento, materiais])
+    return () => clearInterval(interval)
+  }, [activeTab, materiaisPdf, paginaPdfs, carregarPagina])
 
   const formatarTempo = (segundosTotais: number): string => {
     const horas = Math.floor(segundosTotais / 3600)
@@ -237,42 +159,17 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     return `${minutos}m`
   }
 
-
-  const carregarMateriais = async () => {
-    try {
-      const response = await listarMateriaisDaDisciplina(disciplinaId)
-      if (response.success && response.data) {
-        const materiaisData = response.data.map((dm) => ({
-          id: dm.material.id,
-          nome: dm.material.nome,
-          tipo: dm.material.tipo || 'PDF', // Fallback para PDF se não houver tipo
-          totalPaginas: dm.material.totalPaginas,
-          paginasLidas: dm.material.paginasLidas,
-          duracaoSegundos: dm.material.duracaoSegundos,
-          tempoAssistido: dm.material.tempoAssistido,
-          arquivoPdfUrl: dm.material.arquivoPdfUrl || '',
-          arquivoVideoUrl: dm.material.arquivoVideoUrl || null,
-          createdAt: new Date(dm.material.createdAt).toISOString(),
-          updatedAt: new Date(dm.material.updatedAt).toISOString()
-        })) as MaterialEstudo[]
-        setMateriais(materiaisData)
-      } else {
-        toast.error(response.error || 'Erro ao carregar materiais')
-      }
-    } catch (error) {
-      console.error('Erro ao carregar materiais:', error)
-      toast.error('Erro ao carregar materiais')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleDelete = async (id: string) => {
     try {
       const response = await deletarMaterialEstudo(id)
       if (response.success) {
         toast.success('Material excluído com sucesso!')
-        await carregarMateriais()
+        // Recarregar a aba atual
+        if (activeTab === 'pdf') {
+          await carregarPagina('PDF', paginaPdfs)
+        } else {
+          await carregarPagina('VIDEO', paginaVideos)
+        }
       } else {
         toast.error(response.error || 'Erro ao excluir material')
       }
@@ -281,7 +178,6 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       toast.error('Erro ao excluir material')
     }
   }
-
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -292,7 +188,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     })
   }
 
-  const toggleSelectAll = (materiaisList: MaterialEstudo[]) => {
+  const toggleSelectAll = (materiaisList: MaterialComTempo[]) => {
     const allIds = materiaisList.map(m => m.id)
     const allSelected = allIds.every(id => selectedIds.has(id))
     if (allSelected) {
@@ -321,7 +217,11 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       if (response.success) {
         toast.success(`${count} material(is) excluído(s) com sucesso!`)
         setSelectedIds(new Set())
-        await carregarMateriais()
+        if (activeTab === 'pdf') {
+          await carregarPagina('PDF', paginaPdfs)
+        } else {
+          await carregarPagina('VIDEO', paginaVideos)
+        }
       } else {
         toast.error(response.error || 'Erro ao excluir materiais')
       }
@@ -333,13 +233,11 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     }
   }
 
-  const handleOpenPdf = (material: MaterialEstudo) => {
+  const handleOpenPdf = (material: MaterialComTempo) => {
     if (!userHash) {
       toast.error('Sessão não encontrada')
       return
     }
-
-    // Redirecionar para o visualizador correto baseado no tipo
     if (material.tipo === 'VIDEO') {
       window.location.href = `/${userHash}/material/${material.id}/video?disciplinaId=${disciplinaId}`
     } else {
@@ -347,44 +245,35 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     }
   }
 
-  const handleOpenTexto = async (material: MaterialEstudo) => {
+  const handleOpenTexto = async (material: MaterialComTempo) => {
     if (!userHash) {
       toast.error('Sessão não encontrada')
       return
     }
 
-    // Verificar se há páginas processadas antes de abrir
-    try {
-      const response = await fetch(`/api/pdf/${material.id}/check-processed`)
-      const data = await response.json()
-
-      if (!data.hasProcessedPages) {
-        // Nenhuma página processada ainda
-        if (data.status === 'pending') {
-          toast.info('Processamento ainda não foi iniciado. Aguarde alguns instantes.')
-        } else if (data.status === 'processing') {
-          toast.info(`Processamento em andamento: ${data.processedPages} de ${data.totalPages} páginas prontas. Tente novamente em instantes.`)
-        } else if (data.status === 'error') {
-          toast.error(`Erro no processamento: ${data.processingError || 'Erro desconhecido'}`)
-        } else {
-          toast.warning('Nenhuma página disponível ainda. Tente novamente em alguns instantes.')
-        }
-        return
+    // Usar dados do mobileText que já vieram do server
+    const mt = material.mobileText
+    if (!mt || mt.processedPages === 0) {
+      if (!mt || mt.processingStatus === 'pending') {
+        toast.info('Processamento ainda não foi iniciado. Aguarde alguns instantes.')
+      } else if (mt?.processingStatus === 'processing') {
+        toast.info(`Processamento em andamento: ${mt.processedPages} de ${mt.totalPages} páginas prontas.`)
+      } else if (mt?.processingStatus === 'error') {
+        toast.error(`Erro no processamento: ${mt.processingError || 'Erro desconhecido'}`)
+      } else {
+        toast.warning('Nenhuma página disponível ainda.')
       }
-
-      // Há páginas processadas, pode abrir
-      if (data.status === 'processing' || data.status === 'partial') {
-        toast.success(`${data.processedPages} de ${data.totalPages} páginas prontas. Abrindo leitor...`)
-      }
-
-      window.location.href = `/${userHash}/material/${material.id}/ler?mode=text&disciplinaId=${disciplinaId}`
-    } catch (error) {
-      console.error('Erro ao verificar páginas processadas:', error)
-      toast.error('Erro ao verificar status do processamento')
+      return
     }
+
+    if (mt.processingStatus === 'processing' || mt.processingStatus === 'partial') {
+      toast.success(`${mt.processedPages} de ${mt.totalPages} páginas prontas. Abrindo leitor...`)
+    }
+
+    window.location.href = `/${userHash}/material/${material.id}/ler?mode=text&disciplinaId=${disciplinaId}`
   }
 
-  const handleOpenPdfOriginal = (material: MaterialEstudo) => {
+  const handleOpenPdfOriginal = (material: MaterialComTempo) => {
     if (!userHash) {
       toast.error('Sessão não encontrada')
       return
@@ -392,33 +281,17 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     window.location.href = `/${userHash}/material/${material.id}/ler?mode=pdf&disciplinaId=${disciplinaId}`
   }
 
-  const handleUploadPdf = (material: MaterialEstudo) => {
-    console.log('📤 Abrindo modal de upload para material:', {
-      id: material.id,
-      nome: material.nome,
-      tipo: material.tipo
-    })
-    setPendingMaterial(material)
-    setShowUploadDialog(true)
-  }
-
-
   const handleUploadComplete = (fileUrl: string, mediaType: 'PDF' | 'VIDEO') => {
     if (!pendingMaterial) return
-
     if (!userHash) {
       toast.error('Sessão não encontrada')
       return
     }
-
     if (mediaType === 'PDF') {
-      // Redirecionar para leitor de PDF com URL temporária e disciplinaId
       window.location.href = `/${userHash}/material/${pendingMaterial.id}/ler?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
     } else {
-      // Redirecionar para visualizador de vídeo com URL temporária e disciplinaId
       window.location.href = `/${userHash}/material/${pendingMaterial.id}/video?tempUrl=${encodeURIComponent(fileUrl)}&disciplinaId=${disciplinaId}`
     }
-
     setPendingMaterial(null)
     setShowUploadDialog(false)
   }
@@ -433,13 +306,16 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     )
   }
 
-  // Separar materiais por tipo
-  const materiaisPdf = materiais.filter(m => m.tipo === 'PDF')
-  const materiaisVideo = materiais.filter(m => m.tipo === 'VIDEO')
-
   // Componente de tabela e cards reutilizável
-  const renderTable = (materiais: MaterialEstudo[], tipo: 'PDF' | 'VIDEO') => {
-    if (materiais.length === 0) {
+  const renderTable = (
+    materiais: MaterialComTempo[],
+    tipo: 'PDF' | 'VIDEO',
+    paginaAtual: number,
+    setPaginaAtual: (p: number | ((prev: number) => number)) => void,
+    totalItems: number,
+    totalPaginas: number
+  ) => {
+    if (totalItems === 0) {
       return (
         <div className="text-center text-muted-foreground py-12">
           Nenhum {tipo === 'PDF' ? 'PDF' : 'vídeo'} cadastrado
@@ -447,14 +323,23 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       )
     }
 
+    const inicio = (paginaAtual - 1) * ITEMS_PER_PAGE
+    const fim = Math.min(inicio + materiais.length, totalItems)
+
     const allIds = materiais.map(m => m.id)
     const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
     const someSelected = allIds.some(id => selectedIds.has(id))
 
     return (
       <>
+        {loadingTab && (
+          <div className="flex items-center justify-center py-4">
+            <div className="text-sm text-muted-foreground">Carregando...</div>
+          </div>
+        )}
+
         {/* Mobile: Cards */}
-        <div className="md:hidden space-y-3">
+        <div className={`md:hidden space-y-3 ${loadingTab ? 'opacity-50 pointer-events-none' : ''}`}>
           {/* Selecionar todos - mobile */}
           <div className="flex items-center gap-2 px-1">
             <Checkbox
@@ -465,16 +350,21 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
             <span className="text-xs text-muted-foreground">Selecionar todos</span>
           </div>
           {materiais.map((material) => {
-            const tempoEstudadoSegundos = horasPorMaterialSegundos[material.id] ?? 0
-            // Para vídeos: usar tempoAssistido (posição atual) ao invés de tempo total estudado
+            const tempoEstudadoSegundos = material.tempoEstudadoSegundos ?? 0
             const tempoVideoAssistido = tipo === 'VIDEO' ? (material.tempoAssistido || 0) : 0
             const progresso = tipo === 'VIDEO'
               ? Math.min(100, (tempoVideoAssistido / (material.duracaoSegundos || 1)) * 100)
               : (material.paginasLidas / material.totalPaginas) * 100
-            const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
+            const processingStatus = tipo === 'PDF' && material.mobileText ? {
+              hasProcessedPages: (material.mobileText.processedPages || 0) > 0,
+              processedPages: material.mobileText.processedPages || 0,
+              totalPages: material.mobileText.totalPages || 0,
+              progress: material.mobileText.totalPages > 0 ? Math.round((material.mobileText.processedPages / material.mobileText.totalPages) * 100) : 0,
+              status: material.mobileText.processingStatus as ProcessingStatus['status'],
+            } as ProcessingStatus : null
 
             return (
-              <div key={material.id} className={`border rounded-lg p-4 bg-white ${selectedIds.has(material.id) ? 'ring-2 ring-blue-500 border-blue-300' : ''}`}>
+              <div key={material.id} className={`border rounded-lg p-4 bg-card ${selectedIds.has(material.id) ? 'ring-2 ring-blue-500 border-blue-300' : ''}`}>
                 {/* Header do Card */}
                 <div className="flex items-start gap-2 mb-3">
                   <Checkbox
@@ -492,7 +382,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
 
                 {/* Progresso */}
                 <div className="mb-3">
-                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span>Progresso</span>
                     <span className="font-medium">{Math.round(progresso)}%</span>
                   </div>
@@ -501,8 +391,8 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
 
                 {/* Estatísticas */}
                 <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
-                  <div className="bg-gray-50 rounded p-2">
-                    <p className="text-xs text-gray-500 mb-1">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</p>
+                  <div className="bg-muted rounded p-2">
+                    <p className="text-xs text-muted-foreground mb-1">{tipo === 'PDF' ? 'Páginas' : 'Duração'}</p>
                     <p className="font-medium">
                       {tipo === 'VIDEO' ? (
                         <span>
@@ -515,24 +405,24 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                       )}
                     </p>
                   </div>
-                  <div className="bg-gray-50 rounded p-2">
-                    <p className="text-xs text-gray-500 mb-1">Tempo Estudado</p>
+                  <div className="bg-muted rounded p-2">
+                    <p className="text-xs text-muted-foreground mb-1">Tempo Estudado</p>
                     <p className="font-medium">{formatarTempo(tempoEstudadoSegundos)}</p>
                   </div>
                 </div>
 
                 {/* Status de Processamento IA (apenas para PDF) */}
                 {tipo === 'PDF' && processingStatus && (
-                  <div className="mb-3 bg-blue-50 border border-blue-200 rounded p-2">
-                    <p className="text-xs text-blue-700 font-medium mb-1">Formatação com IA</p>
-                    <p className="text-xs text-blue-600">
+                  <div className="mb-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-2">
+                    <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Formatação com IA</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
                       {processingStatus.status === 'complete'
-                        ? `✅ Concluído - ${processingStatus.totalPages} páginas formatadas (100%)`
+                        ? `Concluído - ${processingStatus.totalPages} páginas formatadas (100%)`
                         : processingStatus.status === 'processing' || processingStatus.status === 'partial'
-                        ? `⏳ Processando - ${processingStatus.processedPages}/${processingStatus.totalPages} páginas (${processingStatus.progress}%)`
+                        ? `Processando - ${processingStatus.processedPages}/${processingStatus.totalPages} páginas (${processingStatus.progress}%)`
                         : processingStatus.status === 'error'
-                        ? `❌ Erro no processamento`
-                        : `⏸️ Aguardando início do processamento`
+                        ? `Erro no processamento`
+                        : `Aguardando início do processamento`
                       }
                     </p>
                   </div>
@@ -546,9 +436,9 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenTexto(material)}
-                        disabled={!materiaisComTextoProcessado[material.id]}
+                        disabled={!processingStatus?.hasProcessedPages}
                         className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={!materiaisComTextoProcessado[material.id] ? 'Texto ainda não processado' : 'Abrir texto'}
+                        title={!processingStatus?.hasProcessedPages ? 'Texto ainda não processado' : 'Abrir texto'}
                       >
                         <BookOpen className="h-4 w-4 mr-1" />
                         Texto
@@ -593,7 +483,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         </div>
 
         {/* Desktop: Tabela */}
-        <div className="hidden md:block rounded-md border overflow-hidden">
+        <div className={`hidden md:block rounded-md border overflow-hidden ${loadingTab ? 'opacity-50 pointer-events-none' : ''}`}>
         <Table>
           <TableHeader>
             <TableRow className="text-xs">
@@ -615,13 +505,18 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
           </TableHeader>
           <TableBody>
             {materiais.map((material) => {
-              const tempoEstudadoSegundos = horasPorMaterialSegundos[material.id] ?? 0
-              // Para vídeos: usar tempoAssistido (posição atual) ao invés de tempo total estudado
+              const tempoEstudadoSegundos = material.tempoEstudadoSegundos ?? 0
               const tempoVideoAssistido = tipo === 'VIDEO' ? (material.tempoAssistido || 0) : 0
               const progresso = tipo === 'VIDEO'
                 ? Math.min(100, (tempoVideoAssistido / (material.duracaoSegundos || 1)) * 100)
                 : (material.paginasLidas / material.totalPaginas) * 100
-              const processingStatus = tipo === 'PDF' ? statusProcessamento[material.id] : null
+              const processingStatus = tipo === 'PDF' && material.mobileText ? {
+                hasProcessedPages: (material.mobileText.processedPages || 0) > 0,
+                processedPages: material.mobileText.processedPages || 0,
+                totalPages: material.mobileText.totalPages || 0,
+                progress: material.mobileText.totalPages > 0 ? Math.round((material.mobileText.processedPages / material.mobileText.totalPages) * 100) : 0,
+                status: material.mobileText.processingStatus as ProcessingStatus['status'],
+              } as ProcessingStatus : null
 
               return (
                 <TableRow key={material.id} className={`group hover:bg-muted/50 ${selectedIds.has(material.id) ? 'bg-blue-50' : ''}`}>
@@ -669,7 +564,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleOpenTexto(material)}
-                                disabled={!materiaisComTextoProcessado[material.id]}
+                                disabled={!processingStatus?.hasProcessedPages}
                                 className="h-6 px-1.5 text-xs hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <BookOpen className="h-3 w-3 mr-0.5" />
@@ -729,6 +624,40 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
           </TableBody>
         </Table>
         </div>
+
+        {/* Paginação */}
+        {totalPaginas > 1 && (
+          <div className="flex flex-col items-center gap-2 mt-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPaginaAtual((prev: number) => Math.max(1, prev - 1))}
+                disabled={paginaAtual === 1 || loadingTab}
+                className="flex items-center gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <span className="text-sm px-3 py-1 bg-muted text-foreground rounded">
+                {paginaAtual} de {totalPaginas}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPaginaAtual((prev: number) => Math.min(totalPaginas, prev + 1))}
+                disabled={paginaAtual === totalPaginas || loadingTab}
+                className="flex items-center gap-1"
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Mostrando {inicio + 1}-{fim} de {totalItems}
+            </span>
+          </div>
+        )}
       </>
     )
   }
@@ -739,20 +668,20 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="pdf" className="flex items-center gap-2 text-xs">
             <FileText className="h-3 w-3" />
-            PDFs ({materiaisPdf.length})
+            PDFs ({totalPdfs})
           </TabsTrigger>
           <TabsTrigger value="video" className="flex items-center gap-2 text-xs">
             <Video className="h-3 w-3" />
-            Vídeos ({materiaisVideo.length})
+            Vídeos ({totalVideos})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pdf" className="mt-2">
-          {renderTable(materiaisPdf, 'PDF')}
+          {renderTable(materiaisPdf, 'PDF', paginaPdfs, setPaginaPdfs, totalPdfs, totalPagesPdf)}
         </TabsContent>
 
         <TabsContent value="video" className="mt-2">
-          {renderTable(materiaisVideo, 'VIDEO')}
+          {renderTable(materiaisVideo, 'VIDEO', paginaVideos, setPaginaVideos, totalVideos, totalPagesVideo)}
         </TabsContent>
       </Tabs>
 
@@ -796,4 +725,4 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       />
     </div>
   )
-} 
+}

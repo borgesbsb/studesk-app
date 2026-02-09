@@ -156,9 +156,9 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
 
   const getStatusCorBadge = (statusCor: 'vermelho' | 'amarelo' | 'verde') => {
     const configs = {
-      vermelho: { bg: 'bg-red-100', text: 'text-red-800', label: 'Crítico' },
-      amarelo: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Atenção' },
-      verde: { bg: 'bg-green-100', text: 'text-green-800', label: 'Bom' }
+      vermelho: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: 'Crítico' },
+      amarelo: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', label: 'Atenção' },
+      verde: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'Bom' }
     }
 
     const config = configs[statusCor]
@@ -170,15 +170,15 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
   }
 
   const getPercentualColor = (percentual: number) => {
-    if (percentual >= 70) return "text-green-600 font-semibold"
-    if (percentual >= 50) return "text-yellow-600 font-semibold"
-    return "text-red-600 font-semibold"
+    if (percentual >= 70) return "text-green-600 dark:text-green-400 font-semibold"
+    if (percentual >= 50) return "text-yellow-600 dark:text-yellow-400 font-semibold"
+    return "text-red-600 dark:text-red-400 font-semibold"
   }
 
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
       </div>
     )
   }
@@ -186,7 +186,7 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
   if (simuladosFiltrados.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 text-sm">
+        <p className="text-muted-foreground text-sm">
           {termoPesquisa ? "Nenhum simulado encontrado com esse termo de pesquisa." : "Nenhum simulado cadastrado ainda."}
         </p>
       </div>
@@ -194,10 +194,10 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 overflow-hidden">
+    <div className="rounded-lg border border-border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50">
+          <TableRow className="bg-muted">
             <TableHead className="w-12"></TableHead>
             <TableHead className="font-semibold">Nome do Simulado</TableHead>
             <TableHead className="font-semibold">Ciclo</TableHead>
@@ -208,7 +208,7 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
         <TableBody>
           {simuladosFiltrados.map((simulado) => (
             <Fragment key={simulado.id}>
-              <TableRow className="hover:bg-gray-50 cursor-pointer">
+              <TableRow className="hover:bg-muted/50 cursor-pointer">
                 <TableCell className="text-center">
                   <Button
                     variant="ghost"
@@ -225,22 +225,22 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
                 </TableCell>
                 <TableCell className="font-medium" onClick={() => toggleRow(simulado.id)}>
                   <div>
-                    <p className="font-semibold text-gray-900">{simulado.nome}</p>
+                    <p className="font-semibold text-card-foreground">{simulado.nome}</p>
                     {simulado.descricao && (
-                      <p className="text-sm text-gray-500 mt-1">{simulado.descricao}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{simulado.descricao}</p>
                     )}
                   </div>
                 </TableCell>
                 <TableCell onClick={() => toggleRow(simulado.id)}>
                   {simulado.semanaEstudo ? (
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-foreground">
                       {simulado.semanaEstudo.plano.nome} - Ciclo {simulado.semanaEstudo.numeroSemana}
                     </span>
                   ) : (
-                    <span className="text-sm text-gray-400">-</span>
+                    <span className="text-sm text-muted-foreground">-</span>
                   )}
                 </TableCell>
-                <TableCell className="text-center text-sm text-gray-700" onClick={() => toggleRow(simulado.id)}>
+                <TableCell className="text-center text-sm text-foreground" onClick={() => toggleRow(simulado.id)}>
                   {format(new Date(simulado.dataRealizacao), "dd/MM/yyyy", { locale: ptBR })}
                 </TableCell>
                 <TableCell className="text-center">
@@ -248,7 +248,7 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDeletar(simulado.id, simulado.nome)
@@ -268,23 +268,23 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
               {/* Linha expandida com disciplinas */}
               {expandedRows.has(simulado.id) && (
                 <TableRow key={`${simulado.id}-expanded`}>
-                  <TableCell colSpan={5} className="bg-gray-50 p-0">
+                  <TableCell colSpan={5} className="bg-muted p-0">
                     {loadingDisciplinas.has(simulado.id) ? (
                       <div className="flex justify-center items-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-foreground"></div>
                       </div>
                     ) : disciplinas[simulado.id] && disciplinas[simulado.id].length > 0 ? (
                       <div className="p-6">
-                        <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
+                        <h4 className="text-sm font-semibold text-card-foreground mb-4 flex items-center gap-2">
+                          <div className="w-1 h-4 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
                           Disciplinas do Simulado
                         </h4>
 
                         <div className="space-y-4">
                           {disciplinas[simulado.id].map((disc) => (
-                            <div key={disc.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow">
+                            <div key={disc.id} className="bg-card rounded-lg border border-border overflow-hidden hover:shadow-sm transition-shadow">
                               {/* Header da Disciplina */}
-                              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                              <div className="px-4 py-3 bg-muted border-b border-border">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-3">
                                     {disc.disciplina.cor && (
@@ -293,15 +293,15 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
                                         style={{ backgroundColor: disc.disciplina.cor }}
                                       />
                                     )}
-                                    <span className="font-semibold text-gray-900 text-sm">{disc.disciplina.nome}</span>
+                                    <span className="font-semibold text-card-foreground text-sm">{disc.disciplina.nome}</span>
                                   </div>
 
                                   <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2 text-xs">
-                                      <span className="text-gray-500">Acertos:</span>
-                                      <span className="font-semibold text-green-600">{disc.acertos}</span>
-                                      <span className="text-gray-400">/</span>
-                                      <span className="font-semibold text-gray-700">{disc.totalQuestoes}</span>
+                                      <span className="text-muted-foreground">Acertos:</span>
+                                      <span className="font-semibold text-green-600 dark:text-green-400">{disc.acertos}</span>
+                                      <span className="text-muted-foreground">/</span>
+                                      <span className="font-semibold text-foreground">{disc.totalQuestoes}</span>
                                     </div>
                                     <div className={`text-sm font-bold ${getPercentualColor(disc.percentualAcerto)}`}>
                                       {disc.percentualAcerto.toFixed(1)}%
@@ -313,21 +313,21 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
 
                               {/* Grid de Questões */}
                               {disc.questoes.length > 0 && (
-                                <div className="p-4 bg-white">
+                                <div className="p-4 bg-card">
                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
                                     {disc.questoes.map((questao) => (
                                       <div
                                         key={questao.id}
                                         className={`group relative flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                                           questao.acertou === true
-                                            ? 'bg-green-50 border-green-300 hover:bg-green-100'
+                                            ? 'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30'
                                             : questao.acertou === false
-                                            ? 'bg-red-50 border-red-300 hover:bg-red-100'
-                                            : 'bg-gray-50 border-gray-300 hover:bg-gray-100'
+                                            ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/30'
+                                            : 'bg-muted border-border hover:bg-muted/80'
                                         }`}
                                       >
                                         {/* Número da questão */}
-                                        <div className="text-[10px] font-medium text-gray-500 mb-1">
+                                        <div className="text-[10px] font-medium text-muted-foreground mb-1">
                                           Q{questao.ordem}
                                         </div>
 
@@ -335,24 +335,24 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
                                         <div className="flex items-center gap-1.5">
                                           {/* Resposta Oficial */}
                                           <div className="flex flex-col items-center">
-                                            <span className="text-[9px] text-gray-500 uppercase tracking-wide">Oficial</span>
-                                            <span className="text-sm font-bold text-blue-700">
+                                            <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Oficial</span>
+                                            <span className="text-sm font-bold text-blue-700 dark:text-blue-400">
                                               {questao.respostaCorreta}
                                             </span>
                                           </div>
 
-                                          <div className="w-px h-6 bg-gray-300"></div>
+                                          <div className="w-px h-6 bg-border"></div>
 
                                           {/* Resposta do Usuário */}
                                           <div className="flex flex-col items-center">
-                                            <span className="text-[9px] text-gray-500 uppercase tracking-wide">Sua</span>
+                                            <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Sua</span>
                                             <span
                                               className={`text-sm font-bold ${
                                                 questao.acertou === true
-                                                  ? 'text-green-700'
+                                                  ? 'text-green-700 dark:text-green-400'
                                                   : questao.acertou === false
-                                                  ? 'text-red-700'
-                                                  : 'text-gray-400'
+                                                  ? 'text-red-700 dark:text-red-400'
+                                                  : 'text-muted-foreground'
                                               }`}
                                             >
                                               {questao.respostaUsuario || '-'}
@@ -370,7 +370,7 @@ export function SimuladosTable({ termoPesquisa = "" }: SimuladosTableProps) {
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-sm text-gray-500">Nenhuma disciplina cadastrada para este simulado.</p>
+                        <p className="text-sm text-muted-foreground">Nenhuma disciplina cadastrada para este simulado.</p>
                       </div>
                     )}
                   </TableCell>

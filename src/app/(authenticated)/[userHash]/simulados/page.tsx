@@ -89,68 +89,68 @@ export default function SimuladosPage() {
         {/* Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total de Simulados */}
-          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow">
+          <Card className="border border-border shadow-sm bg-card hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Total de Simulados</p>
-                  <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  <p className="text-sm font-medium text-muted-foreground">Total de Simulados</p>
+                  <h3 className="text-3xl font-bold text-card-foreground mt-2">
                     {loadingMetrics ? '-' : metrics.totalSimulados}
                   </h3>
                 </div>
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <ClipboardList className="h-6 w-6 text-blue-600" />
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <ClipboardList className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Simulados Finalizados */}
-          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow">
+          <Card className="border border-border shadow-sm bg-card hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Finalizados</p>
-                  <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  <p className="text-sm font-medium text-muted-foreground">Finalizados</p>
+                  <h3 className="text-3xl font-bold text-card-foreground mt-2">
                     {loadingMetrics ? '-' : metrics.simuladosFinalizados}
                   </h3>
                 </div>
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Target className="h-6 w-6 text-green-600" />
+                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <Target className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Média de Aproveitamento */}
-          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow">
+          <Card className="border border-border shadow-sm bg-card hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Média Geral</p>
-                  <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  <p className="text-sm font-medium text-muted-foreground">Média Geral</p>
+                  <h3 className="text-3xl font-bold text-card-foreground mt-2">
                     {loadingMetrics ? '-' : `${metrics.mediaAproveitamento.toFixed(1)}%`}
                   </h3>
                 </div>
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <TrendingUp className="h-6 w-6 text-purple-600" />
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Total de Questões */}
-          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow">
+          <Card className="border border-border shadow-sm bg-card hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Total de Questões</p>
-                  <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                  <p className="text-sm font-medium text-muted-foreground">Total de Questões</p>
+                  <h3 className="text-3xl font-bold text-card-foreground mt-2">
                     {loadingMetrics ? '-' : metrics.totalQuestoes}
                   </h3>
                 </div>
-                <div className="p-3 bg-orange-100 rounded-lg">
-                  <Award className="h-6 w-6 text-orange-600" />
+                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                  <Award className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </CardContent>
@@ -158,18 +158,18 @@ export default function SimuladosPage() {
         </div>
 
         {/* Content Card */}
-        <Card className="border border-gray-200 shadow-sm bg-white">
-          <CardHeader className="pb-5 border-b border-gray-100">
+        <Card className="border border-border shadow-sm bg-card">
+          <CardHeader className="pb-5 border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <ClipboardList className="h-4 w-4 text-gray-600" />
+                <div className="p-2 bg-muted rounded-lg">
+                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardTitle className="text-lg font-semibold text-card-foreground">
                     Todos os Simulados
                   </CardTitle>
-                  <p className="text-gray-500 text-sm mt-1">
+                  <p className="text-muted-foreground text-sm mt-1">
                     Acompanhe seu desempenho e evolução por disciplinas
                   </p>
                 </div>
@@ -186,12 +186,12 @@ export default function SimuladosPage() {
                 }}
               />
               <div className="relative w-full md:w-auto">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Pesquisar simulados..."
                   value={termoPesquisa}
                   onChange={(e) => setTermoPesquisa(e.target.value)}
-                  className="pl-10 w-full md:w-80 h-10 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg shadow-sm transition-all duration-200"
+                  className="pl-10 w-full md:w-80 h-10 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm transition-all duration-200"
                 />
               </div>
             </div>

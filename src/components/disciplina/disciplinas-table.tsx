@@ -37,7 +37,7 @@ function CircularProgress({ value, size = 48, strokeWidth = 4, className = "" }:
           stroke="currentColor"
           strokeWidth={strokeWidth}
           fill="none"
-          className="text-gray-200"
+          className="text-muted"
         />
         {/* Círculo de progresso */}
         <circle
@@ -50,11 +50,11 @@ function CircularProgress({ value, size = 48, strokeWidth = 4, className = "" }:
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className="text-blue-600 transition-all duration-300"
+          className="text-blue-600 dark:text-blue-400 transition-all duration-300"
         />
       </svg>
       {/* Texto no centro */}
-      <span className="absolute text-xs font-semibold text-gray-700">
+      <span className="absolute text-xs font-semibold text-foreground">
         {Math.round(value)}%
       </span>
     </div>
@@ -235,7 +235,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
   if (loading) {
     return (
       <div className="w-full">
-        <div className="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+        <div className="border border-border rounded-lg overflow-hidden bg-card shadow-sm">
           <Table>
           <TableHeader>
             <TableRow>
@@ -290,25 +290,25 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           const progresso = disciplina.progresso
 
           return (
-            <div key={disciplina.id} className="border border-gray-300 rounded-lg bg-white shadow-sm p-4">
+            <div key={disciplina.id} className="border border-border rounded-lg bg-card shadow-sm p-4">
               {/* Header do Card */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 flex items-center gap-3">
                   <div
-                    className="w-8 h-8 rounded-full border-2 border-gray-300 flex-shrink-0"
+                    className="w-8 h-8 rounded-full border-2 border-border flex-shrink-0"
                     style={{ backgroundColor: disciplina.disciplina.cor || '#94a3b8' }}
                     title={disciplina.disciplina.cor || 'Sem cor definida'}
                   />
                   <div>
-                    <h3 className="font-semibold text-base">{disciplina.disciplina.nome}</h3>
-                    <p className="text-sm text-gray-500">{materiaisCount} {materiaisCount === 1 ? 'material' : 'materiais'}</p>
+                    <h3 className="font-semibold text-base text-card-foreground">{disciplina.disciplina.nome}</h3>
+                    <p className="text-sm text-muted-foreground">{materiaisCount} {materiaisCount === 1 ? 'material' : 'materiais'}</p>
                   </div>
                 </div>
               </div>
 
               {/* Progresso Geral */}
               <div className="mb-3">
-                <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                   <span>Progresso Geral</span>
                   <span className="font-medium">{Math.round(progresso)}%</span>
                 </div>
@@ -318,34 +318,34 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
               {/* Estatísticas em Grid */}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {/* PDFs */}
-                <div className="border border-gray-200 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-2">PDFs</p>
+                <div className="border border-border rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-2">PDFs</p>
                   {disciplina.totalPdfs > 0 ? (
                     <div className="flex items-center gap-2">
                       <CircularProgress value={(disciplina.pdfsConcluidos / disciplina.totalPdfs) * 100} size={40} strokeWidth={4} />
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-muted-foreground">
                         <div>{disciplina.pdfsConcluidos}</div>
-                        <div className="text-gray-400">/ {disciplina.totalPdfs}</div>
+                        <div className="opacity-60">/ {disciplina.totalPdfs}</div>
                       </div>
                     </div>
                   ) : (
-                    <span className="text-sm text-gray-400">-</span>
+                    <span className="text-sm text-muted-foreground/60">-</span>
                   )}
                 </div>
 
                 {/* Vídeos */}
-                <div className="border border-gray-200 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-2">Vídeos</p>
+                <div className="border border-border rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-2">Vídeos</p>
                   {disciplina.totalVideos > 0 ? (
                     <div className="flex items-center gap-2">
                       <CircularProgress value={(disciplina.videosConcluidos / disciplina.totalVideos) * 100} size={40} strokeWidth={4} />
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-muted-foreground">
                         <div>{disciplina.videosConcluidos}</div>
-                        <div className="text-gray-400">/ {disciplina.totalVideos}</div>
+                        <div className="opacity-60">/ {disciplina.totalVideos}</div>
                       </div>
                     </div>
                   ) : (
-                    <span className="text-sm text-gray-400">-</span>
+                    <span className="text-sm text-muted-foreground/60">-</span>
                   )}
                 </div>
               </div>
@@ -356,7 +356,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push(`/${hash}/disciplina/${disciplina.disciplinaId}/materiais`)}
-                  className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50"
+                  className="flex-1 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
                 >
                   <Book className="h-4 w-4 mr-2" />
                   Materiais
@@ -368,7 +368,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                     setDisciplinaParaEditar(disciplina.disciplina)
                     setModalEditarAberto(true)
                   }}
-                  className="border-green-200 text-green-600 hover:bg-green-50"
+                  className="border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -376,7 +376,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => setDisciplinaParaExcluir(disciplina)}
-                  className="border-red-200 text-red-600 hover:bg-red-50"
+                  className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -386,14 +386,14 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
         })}
 
         {disciplinasFiltradas.length === 0 && !loading && (
-          <div className="text-center text-gray-500 py-10 border border-gray-300 rounded-lg bg-white">
+          <div className="text-center text-muted-foreground py-10 border border-border rounded-lg bg-card">
             {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina cadastrada'}
           </div>
         )}
       </div>
 
       {/* Desktop: Tabela */}
-      <div className="hidden md:block border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+      <div className="hidden md:block border border-border rounded-lg overflow-hidden bg-card shadow-sm">
         <Table>
         <TableHeader>
           <TableRow>
@@ -417,7 +417,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div
-                      className="w-6 h-6 rounded-full border-2 border-gray-300"
+                      className="w-6 h-6 rounded-full border-2 border-border"
                       style={{ backgroundColor: disciplina.disciplina.cor || '#94a3b8' }}
                       title={disciplina.disciplina.cor || 'Sem cor definida'}
                     />
@@ -429,12 +429,12 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                     {disciplina.totalPdfs > 0 ? (
                       <>
                         <CircularProgress value={(disciplina.pdfsConcluidos / disciplina.totalPdfs) * 100} size={52} strokeWidth={5} />
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-muted-foreground">
                           {disciplina.pdfsConcluidos} / {disciplina.totalPdfs}
                         </div>
                       </>
                     ) : (
-                      <span className="text-sm text-gray-400">-</span>
+                      <span className="text-sm text-muted-foreground/60">-</span>
                     )}
                   </div>
                 </TableCell>
@@ -443,19 +443,19 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                     {disciplina.totalVideos > 0 ? (
                       <>
                         <CircularProgress value={(disciplina.videosConcluidos / disciplina.totalVideos) * 100} size={52} strokeWidth={5} />
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-muted-foreground">
                           {disciplina.videosConcluidos} / {disciplina.totalVideos}
                         </div>
                       </>
                     ) : (
-                      <span className="text-sm text-gray-400">-</span>
+                      <span className="text-sm text-muted-foreground/60">-</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell className="min-w-[220px]">
                   <div className="flex items-center gap-2">
                     <Progress value={progresso} className="h-2" />
-                    <span className="text-xs text-gray-600 w-10 text-right">{Math.round(progresso)}%</span>
+                    <span className="text-xs text-muted-foreground w-10 text-right">{Math.round(progresso)}%</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
@@ -464,7 +464,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => router.push(`/${hash}/disciplina/${disciplina.disciplinaId}/materiais`)}
-                      className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+                      className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700"
                       title="Materiais de Estudo"
                     >
                       <Book className="h-4 w-4" />
@@ -476,7 +476,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                         setDisciplinaParaEditar(disciplina.disciplina)
                         setModalEditarAberto(true)
                       }}
-                      className="border-green-200 text-green-600 hover:bg-green-50 hover:border-green-300"
+                      className="border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 hover:border-green-300 dark:hover:border-green-700"
                       title="Editar Disciplina"
                     >
                       <Pencil className="h-4 w-4" />
@@ -485,7 +485,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => setDisciplinaParaExcluir(disciplina)}
-                      className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                      className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700"
                       title="Excluir Disciplina"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -498,7 +498,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
 
           {disciplinasFiltradas.length === 0 && !loading && (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-gray-500 py-10">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                 {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina cadastrada'}
               </TableCell>
             </TableRow>
@@ -521,7 +521,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
               <ChevronLeft className="h-4 w-4" />
               Anterior
             </Button>
-            <span className="text-sm px-3 py-1 bg-gray-100 rounded">
+            <span className="text-sm px-3 py-1 bg-muted text-foreground rounded">
               {paginaAtual} de {totalPaginas}
             </span>
             <Button
@@ -552,11 +552,11 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           </DialogHeader>
           
           <div className="py-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-700 font-medium mb-2">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <p className="text-sm text-red-700 dark:text-red-300 font-medium mb-2">
                 ⚠️ Esta ação é irreversível e irá:
               </p>
-              <ul className="text-sm text-red-600 space-y-1">
+              <ul className="text-sm text-red-600 dark:text-red-400 space-y-1">
                 <li>• Excluir permanentemente a disciplina</li>
                 <li>• Excluir todos os {disciplinaParaExcluir?.materiais.length || 0} materiais associados</li>
                 <li>• Remover todo o progresso de estudos</li>

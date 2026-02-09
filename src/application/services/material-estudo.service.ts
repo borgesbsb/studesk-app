@@ -359,4 +359,76 @@ export class MaterialEstudoService {
       throw error instanceof Error ? error : new Error(formatPrismaError(error))
     }
   }
-} 
+
+  static async listarMateriaisPaginados(
+    userId: string,
+    disciplinaId: string,
+    tipo: 'PDF' | 'VIDEO',
+    page: number = 1,
+    limit: number = 15
+  ) {
+    try {
+      const where = {
+        userId,
+        tipo,
+        disciplinas: { some: { disciplinaId } }
+      }
+
+      const [materiais, total] = await Promise.all([
+        prisma.materialEstudo.findMany({
+          where,
+          orderBy: { nome: 'asc' },
+          skip: (page - 1) * limit,
+          take: limit,
+          include: {
+            disciplinas: { include: { disciplina: true } },
+            ...(tipo === 'PDF' ? {
+              mobileText: {
+                select: {
+                  processedPages: true,
+                  totalPages: true,
+                  processingStatus: true,
+                  processingError: true,
+                  lastProcessedPage: true
+                }
+              }
+            } : {}),
+          }
+        }),
+        prisma.materialEstudo.count({ where })
+      ])
+
+      // Batch: buscar tempo total de estudo para os materiais desta página
+      const materialIds = materiais.map(m => m.id)
+      const temposPorMaterial = materialIds.length > 0
+        ? await prisma.historicoLeitura.groupBy({
+            by: ['materialId'],
+            where: { materialId: { in: materialIds } },
+            _sum: { tempoLeituraSegundos: true }
+          })
+        : []
+
+      const temposMap = Object.fromEntries(
+        temposPorMaterial.map(t => [t.materialId, t._sum.tempoLeituraSegundos || 0])
+      )
+
+      const data = materiais.map(m => ({
+        ...m,
+        tempoEstudadoSegundos: temposMap[m.id] || 0,
+      }))
+
+      return {
+        data,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    } catch (error) {
+      const errorLog = logError(error, 'listarMateriaisPaginados')
+      throw new Error(formatPrismaError(error))
+    }
+  }
+}

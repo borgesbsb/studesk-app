@@ -488,7 +488,7 @@ export function AdicionarSimuladoModal({ onSuccess, ciclosEstudo = [] }: Adicion
       if (!value) resetForm()
     }}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+        <Button>
           <Plus className="h-4 w-4 mr-2" />
           Novo Simulado
         </Button>

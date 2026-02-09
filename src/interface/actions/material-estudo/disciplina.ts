@@ -43,4 +43,24 @@ export async function listarMateriaisDaDisciplina(disciplinaId: string) {
       error: error instanceof Error ? error.message : 'Erro ao listar materiais da disciplina'
     }
   }
-} 
+}
+
+export async function listarMateriaisPaginadosDaDisciplina(
+  disciplinaId: string,
+  tipo: 'PDF' | 'VIDEO',
+  page: number = 1,
+  limit: number = 15
+) {
+  try {
+    const { userId } = await requireAuth()
+    const result = await MaterialEstudoService.listarMateriaisPaginados(userId, disciplinaId, tipo, page, limit)
+    return { success: true, ...result }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro ao listar materiais paginados',
+      data: [],
+      pagination: { page, limit, total: 0, pages: 0 }
+    }
+  }
+}

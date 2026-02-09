@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { google } from 'googleapis'
 
@@ -23,11 +22,8 @@ export async function GET(
   { params }: { params: Promise<{ materialId: string }> }
 ) {
   try {
-    // 1. Autenticação
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
+    // 1. Autenticação (suporta NextAuth web e JWT mobile)
+    const auth = await requireAuth()
 
     const { materialId } = await params
 
@@ -42,7 +38,7 @@ export async function GET(
     }
 
     // Verificar se é do usuário
-    if (material.user.email !== session.user.email) {
+    if (material.userId !== auth.userId) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
     }
 

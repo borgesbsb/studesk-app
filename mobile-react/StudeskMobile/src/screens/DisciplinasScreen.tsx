@@ -53,9 +53,15 @@ export default function DisciplinasScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color="#e50914" />
       </SafeAreaView>
     );
+  }
+
+  // Split into rows of 2
+  const rows: Disciplina[][] = [];
+  for (let i = 0; i < disciplinas.length; i += 2) {
+    rows.push(disciplinas.slice(i, i + 2));
   }
 
   return (
@@ -64,64 +70,71 @@ export default function DisciplinasScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#e50914"
+            colors={['#e50914']}
+          />
         }>
-      <View style={styles.header}>
-        <Text style={styles.title}>📚 Disciplinas</Text>
-        <Text style={styles.subtitle}>
-          {disciplinas.length}{' '}
-          {disciplinas.length === 1 ? 'disciplina' : 'disciplinas'}
-        </Text>
-      </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Disciplinas</Text>
+          <Text style={styles.subtitle}>
+            {disciplinas.length}{' '}
+            {disciplinas.length === 1 ? 'disciplina' : 'disciplinas'}
+          </Text>
+        </View>
 
-      {disciplinas.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            Nenhuma disciplina cadastrada ainda.
-          </Text>
-          <Text style={styles.emptySubtext}>
-            Cadastre disciplinas no aplicativo web para vê-las aqui.
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {disciplinas.map(disciplina => (
-            <TouchableOpacity
-              key={disciplina.id}
-              style={styles.disciplinaCard}
-              activeOpacity={0.7}
-              onPress={() => {
-                console.log('🔗 Navegando para disciplina:', disciplina.id, disciplina.nome);
-                navigation.navigate('DisciplinaDetail', {
-                  disciplinaId: disciplina.id,
-                  disciplinaNome: disciplina.nome,
-                  disciplinaCor: disciplina.cor,
-                });
-              }}>
-              <View style={styles.disciplinaHeader}>
-                <View
-                  style={[
-                    styles.disciplinaCor,
-                    {backgroundColor: disciplina.cor || '#94a3b8'},
-                  ]}
-                />
-                <View style={styles.disciplinaInfo}>
-                  <Text style={styles.disciplinaNome}>{disciplina.nome}</Text>
-                  {disciplina._count && (
-                    <Text style={styles.materiaisCount}>
-                      {disciplina._count.materiais}{' '}
-                      {disciplina._count.materiais === 1
-                        ? 'material'
-                        : 'materiais'}
+        {disciplinas.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              Nenhuma disciplina cadastrada ainda.
+            </Text>
+            <Text style={styles.emptySubtext}>
+              Cadastre disciplinas no aplicativo web para vê-las aqui.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {rows.map((row, rowIdx) => (
+              <View key={rowIdx} style={styles.gridRow}>
+                {row.map(disciplina => (
+                  <TouchableOpacity
+                    key={disciplina.id}
+                    style={styles.disciplinaCard}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      navigation.navigate('DisciplinaDetail', {
+                        disciplinaId: disciplina.id,
+                        disciplinaNome: disciplina.nome,
+                        disciplinaCor: disciplina.cor,
+                      });
+                    }}>
+                    <View
+                      style={[
+                        styles.disciplinaColorTop,
+                        {backgroundColor: disciplina.cor || '#6b7280'},
+                      ]}
+                    />
+                    <Text style={styles.disciplinaNome} numberOfLines={2}>
+                      {disciplina.nome}
                     </Text>
-                  )}
-                </View>
+                    {disciplina._count && (
+                      <Text style={styles.materiaisCount}>
+                        {disciplina._count.materiais}{' '}
+                        {disciplina._count.materiais === 1
+                          ? 'material'
+                          : 'materiais'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+                {/* Placeholder if odd number */}
+                {row.length === 1 && <View style={styles.cardPlaceholder} />}
               </View>
-              <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -130,7 +143,7 @@ export default function DisciplinasScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#0f1115',
   },
   scrollView: {
     flex: 1,
@@ -142,24 +155,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#0f1115',
   },
   header: {
     padding: 24,
     paddingTop: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#1a1d24',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#fff',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#6b7280',
   },
   emptyContainer: {
     padding: 40,
@@ -168,59 +179,49 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#64748b',
+    color: '#6b7280',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#4a4d55',
     textAlign: 'center',
   },
-  list: {
-    padding: 16,
+  grid: {
+    padding: 12,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
   },
   disciplinaCard: {
-    backgroundColor: '#fff',
-    marginBottom: 12,
-    padding: 16,
+    flex: 1,
+    backgroundColor: '#1a1d24',
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#2a2d35',
+    overflow: 'hidden',
   },
-  disciplinaHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardPlaceholder: {
     flex: 1,
   },
-  disciplinaCor: {
-    width: 4,
-    height: 40,
+  disciplinaColorTop: {
+    width: 32,
+    height: 4,
     borderRadius: 2,
-    marginRight: 12,
-  },
-  disciplinaInfo: {
-    flex: 1,
+    marginBottom: 10,
   },
   disciplinaNome: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
+    color: '#d1d5db',
+    marginBottom: 6,
   },
   materiaisCount: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  arrow: {
-    fontSize: 24,
-    color: '#cbd5e1',
-    marginLeft: 8,
+    fontSize: 12,
+    color: '#6b7280',
   },
 });

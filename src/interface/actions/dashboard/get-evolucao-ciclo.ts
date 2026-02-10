@@ -12,8 +12,19 @@ export interface DiaEvolucao {
   questoesRealizadas: number;
 }
 
+export interface DisciplinaCiclo {
+  id: string;
+  nome: string;
+  cor?: string;
+  horasPlanejadas: number;
+  horasRealizadas: number;
+  questoesPlanejadas: number;
+  questoesRealizadas: number;
+}
+
 export interface EvolucaoCiclo {
   dias: DiaEvolucao[];
+  disciplinas: DisciplinaCiclo[];
   nomeCiclo: string;
   dataInicio: Date;
   dataFim: Date;
@@ -55,7 +66,8 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
       include: {
         disciplinas: {
           include: {
-            dias: true
+            dias: true,
+            disciplina: { select: { id: true, nome: true, cor: true } }
           }
         }
       }
@@ -155,8 +167,20 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
       return numA - numB;
     });
 
+    // Agregar disciplinas do ciclo
+    const disciplinas: DisciplinaCiclo[] = semanaAtual.disciplinas.map(ds => ({
+      id: ds.disciplina.id,
+      nome: ds.disciplina.nome,
+      cor: ds.disciplina.cor || undefined,
+      horasPlanejadas: ds.horasPlanejadas,
+      horasRealizadas: ds.horasRealizadas,
+      questoesPlanejadas: ds.questoesPlanejadas,
+      questoesRealizadas: ds.questoesRealizadas,
+    }));
+
     return {
       dias,
+      disciplinas,
       nomeCiclo: `Ciclo ${semanaAtual.numeroSemana || 1}`,
       dataInicio: semanaAtual.dataInicio,
       dataFim: semanaAtual.dataFim

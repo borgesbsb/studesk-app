@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const dataObj = data ? new Date(data) : undefined
-    const result = await adicionarTempoManual(disciplinaId, minutos, dataObj)
+    const result = await adicionarTempoManual({ disciplinaId, horas: 0, minutos, data: dataObj })
     const headers = handleCors(request)
 
     return NextResponse.json(

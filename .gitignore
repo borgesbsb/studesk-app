@@ -53,3 +53,7 @@ client_secret*.json
 next-env.d.ts
 
 /src/generated/prisma
+
+# uploads e thumbnails (dados do usuário)
+public/uploads/
+public/thumbnails/

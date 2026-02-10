@@ -15,15 +15,30 @@ export function HourglassCard({ progresso }: HourglassCardProps) {
 
   useEffect(() => {
     if (!progresso) return;
+    const msPerDay = 1000 * 60 * 60 * 24;
+
+    // Normalizar datas para meia-noite (mesmo cálculo que get-evolucao-ciclo)
     const inicio = new Date(progresso.dataInicio);
+    inicio.setHours(0, 0, 0, 0);
     const fim = new Date(progresso.dataFim);
+    fim.setHours(0, 0, 0, 0);
     const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
     const totalMs = fim.getTime() - inicio.getTime();
     const decorridoMs = hoje.getTime() - inicio.getTime();
-    const dias = Math.ceil(totalMs / (1000 * 60 * 60 * 24));
+
+    // Total de dias inclusivo (início e fim contam)
+    const dias = Math.round(totalMs / msPerDay) + 1;
     setTotalDias(dias);
-    setDiasDecorridos(Math.min(Math.max(Math.ceil(decorridoMs / (1000 * 60 * 60 * 24)), 0), dias));
-    setProgress(totalMs > 0 ? Math.min(Math.max((decorridoMs / totalMs) * 100, 0), 100) : 0);
+
+    // Dia atual: 1-based (Math.floor + 1, igual ao server)
+    const diaAtual = Math.floor(decorridoMs / msPerDay) + 1;
+    setDiasDecorridos(Math.min(Math.max(diaAtual, 1), dias));
+
+    // Progresso baseado no dia atual vs total
+    const pct = dias > 1 ? ((diaAtual - 1) / (dias - 1)) * 100 : 100;
+    setProgress(Math.min(Math.max(pct, 0), 100));
   }, [progresso]);
 
   const sandColor = "#c4956a";

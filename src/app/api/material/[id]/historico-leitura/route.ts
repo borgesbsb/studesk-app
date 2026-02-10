@@ -343,42 +343,40 @@ export async function POST(
           console.log(`      Dia do ciclo: ${diaKey}`)
 
           // Buscar o DisciplinaDia correspondente ao dia atual do ciclo
-          const diaHoje = disciplinaSemanaAtiva.dias.find(d => d.dia === diaKey)
+          let diaHoje = disciplinaSemanaAtiva.dias.find(d => d.dia === diaKey)
 
+          // Se não existe DisciplinaDia para hoje, criar um (o usuário estudou fora do planejado)
           if (!diaHoje) {
-            console.log(`   ❌ ${diaKey} não encontrado nos dias cadastrados`)
-            console.log(`      Dias disponíveis: ${disciplinaSemanaAtiva.dias.map(d => d.dia).join(', ')}`)
-          } else {
-            console.log(`   ✅ Encontrou ${diaKey}:`)
-            console.log(`      ID: ${diaHoje.id}`)
-            console.log(`      Horas planejadas: ${diaHoje.horasPlanejadas}`)
-            console.log(`      Horas realizadas (antes): ${diaHoje.horasRealizadas}`)
-          }
-
-          if (diaHoje) {
-            // 3. Atualizar horasRealizadas do dia atual
-            const horasAdicionar = tempoLeituraSegundos / 3600 // converter segundos para horas
-
-            console.log(`   🔄 Atualizando DisciplinaDia...`)
-            console.log(`      Incrementando: ${horasAdicionar.toFixed(4)}h`)
-
-            const updated = await prisma.disciplinaDia.update({
-              where: { id: diaHoje.id },
+            console.log(`   ⚠️ ${diaKey} não encontrado, criando DisciplinaDia...`)
+            diaHoje = await prisma.disciplinaDia.create({
               data: {
-                horasRealizadas: { increment: horasAdicionar }
+                disciplinaSemanaId: disciplinaSemanaAtiva.id,
+                dia: diaKey,
+                horasPlanejadas: 0,
+                horasRealizadas: 0,
+                questoesPlanejadas: 0,
+                questoesRealizadas: 0
               }
             })
-
-            console.log(`   ✅ DisciplinaDia atualizado!`)
-            console.log(`      Horas realizadas (depois): ${updated.horasRealizadas}`)
-
-            horasAdicionadas += horasAdicionar
-            disciplinasAtualizadas.push(disciplina.nome)
-
-            console.log(`   ✅ Tempo adicionado ao plano: ${horasAdicionar.toFixed(4)}h para ${disciplina.nome} - ${diaKey}`)
+            console.log(`   ✅ DisciplinaDia criado: ${diaHoje.id}`)
           } else {
-            console.log(`   ❌ Disciplina ${disciplina.nome} não está programada para ${diaKey}`)
+            console.log(`   ✅ Encontrou ${diaKey}: horas realizadas (antes): ${diaHoje.horasRealizadas}`)
           }
+
+          // Atualizar horasRealizadas do dia atual
+          const horasAdicionar = tempoLeituraSegundos / 3600 // converter segundos para horas
+
+          const updated = await prisma.disciplinaDia.update({
+            where: { id: diaHoje.id },
+            data: {
+              horasRealizadas: { increment: horasAdicionar }
+            }
+          })
+
+          console.log(`   ✅ +${horasAdicionar.toFixed(4)}h para ${disciplina.nome} - ${diaKey} (total: ${updated.horasRealizadas})`)
+
+          horasAdicionadas += horasAdicionar
+          disciplinasAtualizadas.push(disciplina.nome)
         }
       }
 

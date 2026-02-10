@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         hash: user.hash,
       },
       secret,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
 
     console.log('✅ [LOGIN API] Login bem-sucedido:', email);

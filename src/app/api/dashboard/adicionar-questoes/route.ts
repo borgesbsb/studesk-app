@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const dataObj = data ? new Date(data) : undefined
-    const result = await adicionarQuestoes(disciplinaId, quantidade, dataObj)
+    const result = await adicionarQuestoes({ disciplinaId, quantidade, data: dataObj })
     const headers = handleCors(request)
 
     return NextResponse.json(

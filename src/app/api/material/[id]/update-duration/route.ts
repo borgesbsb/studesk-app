@@ -1,25 +1,34 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { handleCors } from '@/lib/cors'
+import { requireAuth } from '@/lib/auth-helpers'
 
 /**
  * API Endpoint: Atualizar duração real de vídeo
  *
  * Quando um vídeo é carregado no player, a duração REAL é detectada
  * e atualizada no banco (substituindo a estimativa inicial).
+ * Suporta NextAuth (web) e JWT (mobile).
  */
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({}, { status: 200, headers: handleCors(request) })
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    // 1. Verificar autenticação
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    // 1. Verificar autenticação (suporta NextAuth e JWT)
+    let auth
+    try {
+      auth = await requireAuth()
+    } catch {
       return NextResponse.json(
         { error: 'Não autorizado' },
-        { status: 401 }
+        { status: 401, headers: handleCors(request) }
       )
     }
 
@@ -32,7 +41,7 @@ export async function POST(
     if (!duracaoSegundos || duracaoSegundos < 0) {
       return NextResponse.json(
         { error: 'duracaoSegundos inválida' },
-        { status: 400 }
+        { status: 400, headers: handleCors(request) }
       )
     }
 
@@ -40,7 +49,7 @@ export async function POST(
     const material = await prisma.materialEstudo.findUnique({
       where: {
         id: materialId,
-        userId: session.user.id
+        userId: auth.userId
       },
       select: { id: true, tipo: true, duracaoSegundos: true }
     })
@@ -48,14 +57,14 @@ export async function POST(
     if (!material) {
       return NextResponse.json(
         { error: 'Material não encontrado' },
-        { status: 404 }
+        { status: 404, headers: handleCors(request) }
       )
     }
 
     if (material.tipo !== 'VIDEO') {
       return NextResponse.json(
         { error: 'Material não é um vídeo' },
-        { status: 400 }
+        { status: 400, headers: handleCors(request) }
       )
     }
 
@@ -76,12 +85,12 @@ export async function POST(
     return NextResponse.json({
       success: true,
       duracaoSegundos
-    })
+    }, { headers: handleCors(request) })
   } catch (error) {
     console.error('❌ Erro ao atualizar duração:', error)
     return NextResponse.json(
       { error: 'Erro ao atualizar duração do vídeo' },
-      { status: 500 }
+      { status: 500, headers: handleCors(request) }
     )
   }
 }

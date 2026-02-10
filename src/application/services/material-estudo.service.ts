@@ -125,6 +125,11 @@ export class MaterialEstudoService {
             include: {
               disciplina: true
             }
+          },
+          mobileText: {
+            select: {
+              processingStatus: true,
+            }
           }
         }
       })

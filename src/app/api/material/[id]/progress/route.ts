@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { handleCors } from '@/lib/cors'
+import { requireAuth } from '@/lib/auth-helpers'
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -14,9 +13,11 @@ async function updateProgress(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 1. Verificar autenticação
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    // 1. Verificar autenticação (suporta NextAuth e JWT)
+    let auth
+    try {
+      auth = await requireAuth()
+    } catch {
       return NextResponse.json(
         { success: false, error: 'Não autorizado' },
         { status: 401, headers: handleCors(request) }
@@ -32,7 +33,7 @@ async function updateProgress(
     const material = await prisma.materialEstudo.findUnique({
       where: {
         id,
-        userId: session.user.id
+        userId: auth.userId
       }
     })
 

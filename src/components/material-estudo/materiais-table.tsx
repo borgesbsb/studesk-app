@@ -11,11 +11,11 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { FileText, Trash2, Video, Play, Eye, FileImage, BookOpen, X, Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import Link from "next/link"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { listarMateriaisPaginadosDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
 import { deletarMaterialEstudo, deletarMateriaisEmMassa } from "@/interface/actions/material-estudo/delete"
@@ -53,39 +53,44 @@ const ITEMS_PER_PAGE = 15
 export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
-  const [loadingTab, setLoadingTab] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [pendingMaterial, setPendingMaterial] = useState<MaterialEstudo | null>(null)
   const [activeTab, setActiveTab] = useState<'pdf' | 'video'>('pdf')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deletingBulk, setDeletingBulk] = useState(false)
 
-  // Server-side paginated data
+  // Infinite scroll state
   const [materiaisPdf, setMateriaisPdf] = useState<MaterialComTempo[]>([])
   const [materiaisVideo, setMateriaisVideo] = useState<MaterialComTempo[]>([])
   const [totalPdfs, setTotalPdfs] = useState(0)
   const [totalVideos, setTotalVideos] = useState(0)
-  const [totalPagesPdf, setTotalPagesPdf] = useState(1)
-  const [totalPagesVideo, setTotalPagesVideo] = useState(1)
-  const [paginaPdfs, setPaginaPdfs] = useState(1)
-  const [paginaVideos, setPaginaVideos] = useState(1)
+  const [nextPagePdf, setNextPagePdf] = useState(2)
+  const [nextPageVideo, setNextPageVideo] = useState(2)
+  const [hasMorePdf, setHasMorePdf] = useState(false)
+  const [hasMoreVideo, setHasMoreVideo] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const sentinelPdfRef = useRef<HTMLDivElement>(null)
+  const sentinelVideoRef = useRef<HTMLDivElement>(null)
 
   const userHash = session?.user?.hash
 
-  const carregarPagina = useCallback(async (tipo: 'PDF' | 'VIDEO', page: number, isInitial = false) => {
-    if (!isInitial) setLoadingTab(true)
+  // Carregar primeira página
+  const carregarInicial = useCallback(async (tipo: 'PDF' | 'VIDEO') => {
     try {
-      const response = await listarMateriaisPaginadosDaDisciplina(disciplinaId, tipo, page, ITEMS_PER_PAGE)
+      const response = await listarMateriaisPaginadosDaDisciplina(disciplinaId, tipo, 1, ITEMS_PER_PAGE)
       if (response.success && response.data) {
         const items = response.data as MaterialComTempo[]
         if (tipo === 'PDF') {
           setMateriaisPdf(items)
           setTotalPdfs(response.pagination.total)
-          setTotalPagesPdf(response.pagination.pages)
+          setHasMorePdf(response.pagination.pages > 1)
+          setNextPagePdf(2)
         } else {
           setMateriaisVideo(items)
           setTotalVideos(response.pagination.total)
-          setTotalPagesVideo(response.pagination.pages)
+          setHasMoreVideo(response.pagination.pages > 1)
+          setNextPageVideo(2)
         }
       } else {
         toast.error(response.error || 'Erro ao carregar materiais')
@@ -93,48 +98,119 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     } catch (error) {
       console.error('Erro ao carregar materiais:', error)
       toast.error('Erro ao carregar materiais')
-    } finally {
-      if (isInitial) setLoading(false)
-      setLoadingTab(false)
     }
   }, [disciplinaId])
 
+  // Carregar próxima página (append)
+  const carregarMais = useCallback(async (tipo: 'PDF' | 'VIDEO') => {
+    if (loadingMore) return
+    const page = tipo === 'PDF' ? nextPagePdf : nextPageVideo
+    const hasMore = tipo === 'PDF' ? hasMorePdf : hasMoreVideo
+    if (!hasMore) return
+
+    setLoadingMore(true)
+    try {
+      const response = await listarMateriaisPaginadosDaDisciplina(disciplinaId, tipo, page, ITEMS_PER_PAGE)
+      if (response.success && response.data) {
+        const items = response.data as MaterialComTempo[]
+        if (tipo === 'PDF') {
+          setMateriaisPdf(prev => [...prev, ...items])
+          setHasMorePdf(page < response.pagination.pages)
+          setNextPagePdf(page + 1)
+        } else {
+          setMateriaisVideo(prev => [...prev, ...items])
+          setHasMoreVideo(page < response.pagination.pages)
+          setNextPageVideo(page + 1)
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mais materiais:', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [disciplinaId, loadingMore, nextPagePdf, nextPageVideo, hasMorePdf, hasMoreVideo])
+
   // Carga inicial: ambas as abas
   useEffect(() => {
-    const carregarInicial = async () => {
+    const init = async () => {
       setLoading(true)
       await Promise.all([
-        carregarPagina('PDF', 1, true),
-        carregarPagina('VIDEO', 1, true),
+        carregarInicial('PDF'),
+        carregarInicial('VIDEO'),
       ])
       setLoading(false)
     }
-    carregarInicial()
-  }, [disciplinaId, carregarPagina])
+    init()
+  }, [disciplinaId, carregarInicial])
 
-  // Recarregar quando a janela ganhar foco (usuário voltar do PDF/video)
+  // Recarregar quando a janela ganhar foco
   useEffect(() => {
     const handleFocus = () => {
-      carregarPagina(activeTab === 'pdf' ? 'PDF' : 'VIDEO', activeTab === 'pdf' ? paginaPdfs : paginaVideos)
+      // Recarregar tudo do zero ao voltar
+      const recarregar = async () => {
+        // Salvar quantos itens já tinham carregados para recarregar todos
+        const totalLoadedPdf = materiaisPdf.length
+        const totalLoadedVideo = materiaisVideo.length
+
+        // Recarregar apenas a quantidade já carregada (manter scroll position)
+        const pagesPdf = Math.ceil(totalLoadedPdf / ITEMS_PER_PAGE) || 1
+        const pagesVideo = Math.ceil(totalLoadedVideo / ITEMS_PER_PAGE) || 1
+
+        try {
+          // Recarregar PDFs
+          const allPdfs: MaterialComTempo[] = []
+          for (let p = 1; p <= pagesPdf; p++) {
+            const res = await listarMateriaisPaginadosDaDisciplina(disciplinaId, 'PDF', p, ITEMS_PER_PAGE)
+            if (res.success && res.data) {
+              allPdfs.push(...(res.data as MaterialComTempo[]))
+              setTotalPdfs(res.pagination.total)
+              setHasMorePdf(p < res.pagination.pages)
+              setNextPagePdf(p + 1)
+            }
+          }
+          setMateriaisPdf(allPdfs)
+
+          // Recarregar Vídeos
+          const allVideos: MaterialComTempo[] = []
+          for (let p = 1; p <= pagesVideo; p++) {
+            const res = await listarMateriaisPaginadosDaDisciplina(disciplinaId, 'VIDEO', p, ITEMS_PER_PAGE)
+            if (res.success && res.data) {
+              allVideos.push(...(res.data as MaterialComTempo[]))
+              setTotalVideos(res.pagination.total)
+              setHasMoreVideo(p < res.pagination.pages)
+              setNextPageVideo(p + 1)
+            }
+          }
+          setMateriaisVideo(allVideos)
+        } catch (error) {
+          console.error('Erro ao recarregar materiais:', error)
+        }
+      }
+      recarregar()
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [disciplinaId, activeTab, paginaPdfs, paginaVideos, carregarPagina])
+  }, [disciplinaId, materiaisPdf.length, materiaisVideo.length])
 
-  // Recarregar ao mudar de página
+  // IntersectionObserver para infinite scroll
   useEffect(() => {
-    if (!loading) {
-      carregarPagina('PDF', paginaPdfs)
-    }
-  }, [paginaPdfs])
+    const sentinel = activeTab === 'pdf' ? sentinelPdfRef.current : sentinelVideoRef.current
+    if (!sentinel) return
 
-  useEffect(() => {
-    if (!loading) {
-      carregarPagina('VIDEO', paginaVideos)
-    }
-  }, [paginaVideos])
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loadingMore) {
+          carregarMais(activeTab === 'pdf' ? 'PDF' : 'VIDEO')
+        }
+      },
+      { threshold: 0.1 }
+    )
 
-  // Polling leve para PDFs em processamento (só na página atual)
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [activeTab, loadingMore, carregarMais])
+
+  // Polling leve para PDFs em processamento
   useEffect(() => {
     if (activeTab !== 'pdf') return
 
@@ -144,11 +220,12 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
     if (!temProcessamento) return
 
     const interval = setInterval(() => {
-      carregarPagina('PDF', paginaPdfs)
+      // Recarregar apenas a primeira página para atualizar status
+      carregarInicial('PDF')
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [activeTab, materiaisPdf, paginaPdfs, carregarPagina])
+  }, [activeTab, materiaisPdf, carregarInicial])
 
   const formatarTempo = (segundosTotais: number): string => {
     const horas = Math.floor(segundosTotais / 3600)
@@ -164,12 +241,11 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       const response = await deletarMaterialEstudo(id)
       if (response.success) {
         toast.success('Material excluído com sucesso!')
-        // Recarregar a aba atual
-        if (activeTab === 'pdf') {
-          await carregarPagina('PDF', paginaPdfs)
-        } else {
-          await carregarPagina('VIDEO', paginaVideos)
-        }
+        // Remover localmente
+        setMateriaisPdf(prev => prev.filter(m => m.id !== id))
+        setMateriaisVideo(prev => prev.filter(m => m.id !== id))
+        setTotalPdfs(prev => Math.max(0, prev - 1))
+        setTotalVideos(prev => Math.max(0, prev - 1))
       } else {
         toast.error(response.error || 'Erro ao excluir material')
       }
@@ -216,12 +292,11 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       const response = await deletarMateriaisEmMassa(Array.from(selectedIds))
       if (response.success) {
         toast.success(`${count} material(is) excluído(s) com sucesso!`)
+        const deletedIds = selectedIds
         setSelectedIds(new Set())
-        if (activeTab === 'pdf') {
-          await carregarPagina('PDF', paginaPdfs)
-        } else {
-          await carregarPagina('VIDEO', paginaVideos)
-        }
+        // Remover localmente
+        setMateriaisPdf(prev => prev.filter(m => !deletedIds.has(m.id)))
+        setMateriaisVideo(prev => prev.filter(m => !deletedIds.has(m.id)))
       } else {
         toast.error(response.error || 'Erro ao excluir materiais')
       }
@@ -310,10 +385,9 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
   const renderTable = (
     materiais: MaterialComTempo[],
     tipo: 'PDF' | 'VIDEO',
-    paginaAtual: number,
-    setPaginaAtual: (p: number | ((prev: number) => number)) => void,
     totalItems: number,
-    totalPaginas: number
+    hasMore: boolean,
+    sentinelRef: React.RefObject<HTMLDivElement | null>
   ) => {
     if (totalItems === 0) {
       return (
@@ -323,23 +397,14 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
       )
     }
 
-    const inicio = (paginaAtual - 1) * ITEMS_PER_PAGE
-    const fim = Math.min(inicio + materiais.length, totalItems)
-
     const allIds = materiais.map(m => m.id)
     const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
     const someSelected = allIds.some(id => selectedIds.has(id))
 
     return (
       <>
-        {loadingTab && (
-          <div className="flex items-center justify-center py-4">
-            <div className="text-sm text-muted-foreground">Carregando...</div>
-          </div>
-        )}
-
         {/* Mobile: Cards */}
-        <div className={`md:hidden space-y-3 ${loadingTab ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className="md:hidden space-y-3">
           {/* Selecionar todos - mobile */}
           <div className="flex items-center gap-2 px-1">
             <Checkbox
@@ -347,7 +412,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
               onCheckedChange={() => toggleSelectAll(materiais)}
               className="h-4 w-4"
             />
-            <span className="text-xs text-muted-foreground">Selecionar todos</span>
+            <span className="text-xs text-muted-foreground">Selecionar todos ({materiais.length} de {totalItems})</span>
           </div>
           {materiais.map((material) => {
             const tempoEstudadoSegundos = material.tempoEstudadoSegundos ?? 0
@@ -483,7 +548,7 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         </div>
 
         {/* Desktop: Tabela */}
-        <div className={`hidden md:block rounded-md border overflow-hidden ${loadingTab ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className="hidden md:block rounded-md border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="text-xs">
@@ -625,39 +690,20 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         </Table>
         </div>
 
-        {/* Paginação */}
-        {totalPaginas > 1 && (
-          <div className="flex flex-col items-center gap-2 mt-4">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPaginaAtual((prev: number) => Math.max(1, prev - 1))}
-                disabled={paginaAtual === 1 || loadingTab}
-                className="flex items-center gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Anterior
-              </Button>
-              <span className="text-sm px-3 py-1 bg-muted text-foreground rounded">
-                {paginaAtual} de {totalPaginas}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPaginaAtual((prev: number) => Math.min(totalPaginas, prev + 1))}
-                disabled={paginaAtual === totalPaginas || loadingTab}
-                className="flex items-center gap-1"
-              >
-                Próxima
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+        {/* Sentinel para infinite scroll + indicador de carregamento */}
+        <div ref={sentinelRef} className="py-4 flex flex-col items-center gap-2">
+          {loadingMore && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando mais...
             </div>
+          )}
+          {!hasMore && materiais.length > 0 && (
             <span className="text-xs text-muted-foreground">
-              Mostrando {inicio + 1}-{fim} de {totalItems}
+              Mostrando todos os {totalItems} {tipo === 'PDF' ? 'PDFs' : 'vídeos'}
             </span>
-          </div>
-        )}
+          )}
+        </div>
       </>
     )
   }
@@ -677,11 +723,11 @@ export function MateriaisTable({ disciplinaId }: MateriaisTableProps) {
         </TabsList>
 
         <TabsContent value="pdf" className="mt-2">
-          {renderTable(materiaisPdf, 'PDF', paginaPdfs, setPaginaPdfs, totalPdfs, totalPagesPdf)}
+          {renderTable(materiaisPdf, 'PDF', totalPdfs, hasMorePdf, sentinelPdfRef)}
         </TabsContent>
 
         <TabsContent value="video" className="mt-2">
-          {renderTable(materiaisVideo, 'VIDEO', paginaVideos, setPaginaVideos, totalVideos, totalPagesVideo)}
+          {renderTable(materiaisVideo, 'VIDEO', totalVideos, hasMoreVideo, sentinelVideoRef)}
         </TabsContent>
       </Tabs>
 

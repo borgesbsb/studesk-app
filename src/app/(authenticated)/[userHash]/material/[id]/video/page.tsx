@@ -27,6 +27,27 @@ const VideoPlayer = dynamic(
     }
 )
 
+/** Detecta a duração real de um vídeo a partir de um Blob */
+function getBlobVideoDuration(blob: Blob): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement('video')
+        video.preload = 'metadata'
+        const blobUrl = URL.createObjectURL(blob)
+
+        video.onloadedmetadata = () => {
+            URL.revokeObjectURL(blobUrl)
+            resolve(Math.floor(video.duration))
+        }
+
+        video.onerror = () => {
+            URL.revokeObjectURL(blobUrl)
+            reject(new Error('Erro ao detectar duração do vídeo'))
+        }
+
+        video.src = blobUrl
+    })
+}
+
 interface PageProps {
     params: Promise<{ id: string }>
 }
@@ -95,6 +116,25 @@ export default function VideoViewerPage({ params }: PageProps) {
                     const isGDrive = materialResponse.data.arquivoVideoUrl?.startsWith('gdrive://') ||
                                     materialResponse.data.googleDriveFileId !== null
 
+                    // Função para detectar e corrigir duração ao carregar do cache
+                    const corrigirDuracaoDoCache = async (blob: Blob, mat: any) => {
+                        try {
+                            const duracaoReal = await getBlobVideoDuration(blob)
+                            const duracaoBanco = mat.duracaoSegundos || 0
+                            if (duracaoReal > 0 && Math.abs(duracaoBanco - duracaoReal) > 5) {
+                                console.log(`📐 Corrigindo duração: ${duracaoBanco}s → ${duracaoReal}s`)
+                                await fetch(`/api/material/${id}/update-duration`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ duracaoSegundos: duracaoReal })
+                                })
+                                setMaterial((prev: any) => ({ ...prev, duracaoSegundos: duracaoReal }))
+                            }
+                        } catch (err) {
+                            console.warn('Não foi possível detectar duração do cache:', err)
+                        }
+                    }
+
                     if (isGDrive) {
                         console.log('☁️ Vídeo do Google Drive detectado')
                         setIsGoogleDriveVideo(true)
@@ -110,6 +150,9 @@ export default function VideoViewerPage({ params }: PageProps) {
                             setFromCache(true)
                             console.log('📦 Vídeo carregado do cache local!')
                             toast.success('Vídeo carregado do cache local')
+
+                            // Detectar e corrigir duração real
+                            corrigirDuracaoDoCache(cachedVideo.blob, materialResponse.data)
                         } else {
                             // Vídeo não está no cache - mostrar opções
                             console.log('⚠️ Vídeo não está no cache - mostrando opções')
@@ -126,6 +169,9 @@ export default function VideoViewerPage({ params }: PageProps) {
                             setFromCache(true)
                             console.log('📦 Vídeo local carregado do cache!')
                             toast.success('Vídeo carregado do cache local')
+
+                            // Detectar e corrigir duração real
+                            corrigirDuracaoDoCache(cachedVideo.blob, materialResponse.data)
                         } else {
                             console.warn('⚠️ Vídeo não encontrado no cache local')
                             toast.error('Vídeo não encontrado no cache. Faça upload novamente do material')
@@ -588,17 +634,38 @@ export default function VideoViewerPage({ params }: PageProps) {
 
             // Montar blob a partir dos chunks
             const blob = new Blob(chunks, { type: response.headers.get('Content-Type') || 'video/mp4' })
-            console.log('✅ Vídeo baixado, salvando no cache...')
+            console.log('✅ Vídeo baixado, detectando duração real...')
 
-            // Salvar no cache IndexedDB
+            // Detectar duração real do vídeo a partir do blob
+            const duracaoReal = await getBlobVideoDuration(blob)
+            console.log(`📐 Duração real detectada do blob: ${duracaoReal}s (${Math.floor(duracaoReal / 60)}m ${duracaoReal % 60}s)`)
+
+            // Salvar no cache IndexedDB com duração real
             await videoCacheService.saveVideoFromBlob(
                 materialId,
                 blob,
                 material.googleDriveFileName || `${material.nome}.mp4`,
-                blob.type || 'video/mp4'
+                blob.type || 'video/mp4',
+                duracaoReal
             )
 
             console.log('✅ Vídeo salvo no cache!')
+
+            // Atualizar duração no banco se diferente
+            const currentDuration = material.duracaoSegundos || 0
+            if (Math.abs(currentDuration - duracaoReal) > 5) {
+                try {
+                    await fetch(`/api/material/${materialId}/update-duration`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ duracaoSegundos: duracaoReal })
+                    })
+                    setMaterial((prev: any) => ({ ...prev, duracaoSegundos: duracaoReal }))
+                    console.log('✅ Duração atualizada no banco')
+                } catch (err) {
+                    console.error('❌ Erro ao atualizar duração no banco:', err)
+                }
+            }
 
             // Criar Blob URL para reprodução
             const blobUrl = URL.createObjectURL(blob)

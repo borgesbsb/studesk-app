@@ -2,6 +2,64 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { google } from 'googleapis'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
+
+const execFileAsync = promisify(execFile)
+const THUMB_DIR = path.join(process.cwd(), 'public', 'thumbnails')
+
+/**
+ * Gera thumbnail em background a partir de um arquivo de vídeo temporário.
+ * Não bloqueia a resposta ao cliente.
+ */
+function generateThumbnailInBackground(tmpFile: string, materialId: string) {
+  const thumbPath = path.join(THUMB_DIR, `${materialId}.jpg`)
+
+  // Se já existe thumbnail, só limpa o temp
+  if (fs.existsSync(thumbPath)) {
+    fs.unlink(tmpFile, () => {})
+    return
+  }
+
+  fs.mkdirSync(THUMB_DIR, { recursive: true })
+
+  const generate = async () => {
+    try {
+      try {
+        await execFileAsync('ffmpeg', [
+          '-ss', '60',
+          '-i', tmpFile,
+          '-vframes', '1',
+          '-q:v', '5',
+          '-vf', 'scale=320:-1',
+          '-y',
+          thumbPath,
+        ], { timeout: 30000 })
+      } catch {
+        // Vídeo menor que 60s, tentar no segundo 5
+        await execFileAsync('ffmpeg', [
+          '-ss', '5',
+          '-i', tmpFile,
+          '-vframes', '1',
+          '-q:v', '5',
+          '-vf', 'scale=320:-1',
+          '-y',
+          thumbPath,
+        ], { timeout: 30000 })
+      }
+      console.log(`✅ Thumbnail gerada durante download: ${materialId}`)
+    } catch (err: any) {
+      console.error(`❌ Falha ao gerar thumbnail: ${err?.message}`)
+    } finally {
+      fs.unlink(tmpFile, () => {})
+    }
+  }
+
+  generate()
+}
 
 /**
  * API Endpoint: Download Completo de Vídeos do Google Drive (para cache)
@@ -137,19 +195,33 @@ export async function GET(
     // @ts-ignore - response.data é um stream
     const stream = response.data
 
+    // Salvar em temp file enquanto faz stream (para gerar thumbnail depois)
+    const thumbPath = path.join(THUMB_DIR, `${materialId}.jpg`)
+    const thumbExists = fs.existsSync(thumbPath)
+    const tmpFile = thumbExists ? null : path.join(os.tmpdir(), `studesk_dl_${materialId}.mp4`)
+    const writeStream = tmpFile ? fs.createWriteStream(tmpFile) : null
+
     // Converter Node.js stream para Web ReadableStream
     const readableStream = new ReadableStream({
       async start(controller) {
         stream.on('data', (chunk: Buffer) => {
           controller.enqueue(new Uint8Array(chunk))
+          writeStream?.write(chunk)
         })
 
         stream.on('end', () => {
           controller.close()
+          if (writeStream && tmpFile) {
+            writeStream.end(() => {
+              generateThumbnailInBackground(tmpFile, materialId)
+            })
+          }
         })
 
         stream.on('error', (error: Error) => {
           controller.error(error)
+          writeStream?.destroy()
+          if (tmpFile) fs.unlink(tmpFile, () => {})
         })
       },
     })

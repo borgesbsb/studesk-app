@@ -19,11 +19,13 @@ import Video, {
   OnPlaybackStateChangedData,
 } from 'react-native-video';
 import videoService from '../services/video.service';
+import {api} from '../services/api';
 
 type RootStackParamList = {
   VideoPlayer: {
     materialId: string;
     materialNome: string;
+    disciplinaId?: string;
     tempoAssistido?: number;
     duracao?: number;
   };
@@ -34,7 +36,7 @@ type VideoPlayerRouteProp = RouteProp<RootStackParamList, 'VideoPlayer'>;
 export default function VideoPlayerScreen() {
   const route = useRoute<VideoPlayerRouteProp>();
   const navigation = useNavigation();
-  const {materialId, materialNome, tempoAssistido = 0, duracao = 0} = route.params;
+  const {materialId, materialNome, disciplinaId, tempoAssistido = 0, duracao = 0} = route.params;
 
   const videoRef = useRef<any>(null);
 
@@ -223,6 +225,20 @@ export default function VideoPlayerScreen() {
           Math.floor(currentTime),
           elapsedTime,
         );
+
+        // Adicionar tempo ao DisciplinaDia para refletir no card de hoje
+        if (disciplinaId) {
+          const minutos = Math.ceil(elapsedTime / 60);
+          try {
+            await api.post('/dashboard/adicionar-tempo', {
+              disciplinaId,
+              minutos,
+            });
+            console.log(`✅ ${minutos}min adicionados à disciplina ${disciplinaId}`);
+          } catch (tempoError) {
+            console.error('⚠️ Erro ao adicionar tempo à disciplina:', tempoError);
+          }
+        }
       }
 
       setElapsedTime(0);

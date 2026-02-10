@@ -39,6 +39,7 @@ type RootStackParamList = {
   VideoPlayer: {
     materialId: string;
     materialNome: string;
+    disciplinaId?: string;
     tempoAssistido?: number;
     duracao?: number;
   };
@@ -305,6 +306,7 @@ export default function DisciplinaDetailScreen() {
         navigation.navigate('VideoPlayer', {
           materialId: material.id,
           materialNome: material.nome,
+          disciplinaId: disciplinaId,
           tempoAssistido: material.tempoAssistido || 0,
           duracao: material.duracaoSegundos || material.duracao || 0,
         });

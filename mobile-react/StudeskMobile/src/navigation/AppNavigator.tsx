@@ -28,6 +28,7 @@ export type RootStackParamList = {
   VideoPlayer: {
     materialId: string;
     materialNome: string;
+    disciplinaId?: string;
     tempoAssistido?: number;
     duracao?: number;
   };

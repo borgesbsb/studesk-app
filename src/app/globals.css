@@ -203,6 +203,11 @@
   background-color: var(--header-hover) !important;
 }
 
+/* Fundo da área de visualização do PDF (Syncfusion PdfViewer) */
+.e-pv-viewer-container {
+  background-color: #aaa !important;
+}
+
 @keyframes progress-loading {
   0% {
     background-position: 200% 0;

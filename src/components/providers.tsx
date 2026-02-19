@@ -16,6 +16,7 @@ export function Providers({ children }: ProvidersProps) {
         defaultTheme="system"
         enableSystem
         disableTransitionOnChange
+        themes={["light", "dark", "navy"]}
       >
         {children}
       </ThemeProvider>

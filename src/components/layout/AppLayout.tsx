@@ -27,7 +27,7 @@ function AppLayoutContent({ children }: { children: ReactNode }) {
 
       {/* Mobile: Drawer */}
       <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-        <SheetContent side="left" className="p-0 w-72">
+        <SheetContent side="left" className="p-0 w-72" style={{ backgroundColor: 'var(--sidebar-panel-bg)' }}>
           <SidebarContent
             userHash={hash}
             isOpen={true}

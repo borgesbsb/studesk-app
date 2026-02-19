@@ -18,11 +18,11 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         // Desktop: sidebar fixa (mantém comportamento original)
         "hidden md:block",
         "fixed h-full z-30",
-        "bg-card",
         "border-r",
         "transition-all duration-300 ease-in-out",
         isOpen ? "w-72" : "w-20"
       )}
+      style={{ backgroundColor: 'var(--sidebar-panel-bg)' }}
     >
       <SidebarContent
         userHash={hash}

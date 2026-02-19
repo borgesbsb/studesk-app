@@ -1,10 +1,31 @@
 "use client"
 
 import * as React from "react"
-import { Moon, Sun } from "lucide-react"
+import { Moon, Sun, Palette } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+const themes = [
+  { name: "light", label: "Claro", icon: Sun },
+  { name: "dark", label: "Escuro", icon: Moon },
+  { name: "navy", label: "Navy", icon: Palette },
+]
+
+function NavyPreview() {
+  return (
+    <span className="ml-auto flex items-center gap-0.5">
+      <span className="w-3 h-3 rounded-sm border border-border" style={{ backgroundColor: '#111a41' }} />
+      <span className="w-3 h-3 rounded-sm border border-border" style={{ backgroundColor: '#fcfdfd' }} />
+    </span>
+  )
+}
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -14,16 +35,13 @@ export function ThemeToggle() {
     setMounted(true)
   }, [])
 
-  const toggleTheme = () => {
-    setTheme(theme === "light" ? "dark" : "light")
-  }
-
   if (!mounted) {
     return (
       <Button
         variant="ghost"
         size="icon"
-        className="hover:bg-accent rounded-full"
+        className="rounded-full"
+        style={{ color: 'var(--header-foreground)' }}
         disabled
       >
         <Sun className="h-[1.2rem] w-[1.2rem]" />
@@ -32,17 +50,35 @@ export function ThemeToggle() {
     )
   }
 
+  const CurrentIcon = theme === "dark" ? Moon : theme === "navy" ? Palette : Sun
+
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={toggleTheme}
-      className="hover:bg-accent rounded-full"
-      title={theme === "light" ? "Alternar para tema escuro" : "Alternar para tema claro"}
-    >
-      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Alternar tema</span>
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full"
+          style={{ color: 'var(--header-foreground)' }}
+          title="Selecionar tema"
+        >
+          <CurrentIcon className="h-[1.2rem] w-[1.2rem]" />
+          <span className="sr-only">Selecionar tema</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-36">
+        {themes.map(({ name, label, icon: Icon }) => (
+          <DropdownMenuItem
+            key={name}
+            onClick={() => setTheme(name)}
+            className={`cursor-pointer ${theme === name ? "bg-accent" : ""}`}
+          >
+            <Icon className="mr-2 h-4 w-4 shrink-0" />
+            <span>{label}</span>
+            {name === "navy" && <NavyPreview />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
-} 
+}

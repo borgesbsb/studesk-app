@@ -19,7 +19,10 @@ export function Header({ isOpen, setIsOpen, isMobileMenuOpen, setIsMobileMenuOpe
   const { customContent, title, backButton } = useHeader()
 
   return (
-    <header className="h-16 bg-card flex items-center px-6 sticky top-0 z-10 border-b">
+    <header
+      className="h-16 flex items-center px-6 sticky top-0 z-10 border-b"
+      style={{ backgroundColor: 'var(--header-bg)', color: 'var(--header-foreground)' }}
+    >
       {/* Lado esquerdo: Menu e Botão Voltar */}
       <div className="flex items-center">
         {/* Mobile: Botão hamburguer (sempre visível) */}

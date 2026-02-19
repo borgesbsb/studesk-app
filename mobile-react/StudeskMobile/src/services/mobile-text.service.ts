@@ -32,11 +32,12 @@ class MobileTextService {
       const netInfo = await NetInfo.fetch();
       const cached = await offlineStorage.get<MobileTextData>(cacheKey);
 
-      // Se offline, usar cache obrigatoriamente
+      // Se offline, usar cache obrigatoriamente (mesmo expirado)
       if (!netInfo.isConnected) {
-        if (cached) {
+        const stale = cached || await offlineStorage.getEvenIfExpired<MobileTextData>(cacheKey);
+        if (stale) {
           console.log('📦 Modo offline - usando texto do cache:', materialId);
-          return cached;
+          return stale;
         } else {
           throw new Error(
             'Sem conexão e sem texto em cache. Conecte-se à internet e abra este material online primeiro para poder lê-lo offline.'
@@ -79,8 +80,8 @@ class MobileTextService {
 
       return textData;
     } catch (error: any) {
-      // Se erro na API mas tem cache, retornar cache
-      const cached = await offlineStorage.get<MobileTextData>(cacheKey);
+      // Se erro na API mas tem cache, retornar cache (mesmo expirado)
+      const cached = await offlineStorage.getEvenIfExpired<MobileTextData>(cacheKey);
       if (cached) {
         console.log('⚠️ Erro na API, usando cache:', error.response?.data || error.message);
         return cached;
@@ -109,7 +110,9 @@ class MobileTextService {
   async isCached(materialId: string): Promise<boolean> {
     try {
       const cacheKey = `mobile-text:${materialId}`;
-      const cached = await offlineStorage.get<MobileTextData>(cacheKey);
+      // Usar getEvenIfExpired para que PDFs com cache expirado
+      // ainda apareçam como disponíveis offline
+      const cached = await offlineStorage.getEvenIfExpired<MobileTextData>(cacheKey);
       return cached !== null;
     } catch (error) {
       return false;

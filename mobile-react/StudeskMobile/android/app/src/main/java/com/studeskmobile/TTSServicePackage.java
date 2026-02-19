@@ -19,6 +19,7 @@ public class TTSServicePackage implements ReactPackage {
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
         List<NativeModule> modules = new ArrayList<>();
         modules.add(new TTSServiceModule(reactContext));
+        modules.add(new OrientationModule(reactContext));
         return modules;
     }
 }

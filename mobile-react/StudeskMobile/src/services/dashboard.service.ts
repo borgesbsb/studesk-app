@@ -87,7 +87,6 @@ class DashboardService {
 
     try {
       const netInfo = await NetInfo.fetch();
-      const cached = await offlineStorage.get<DashboardStats>(cacheKey);
 
       if (netInfo.isConnected) {
         try {
@@ -102,6 +101,7 @@ class DashboardService {
         } catch (apiError) {
           console.error('❌ Erro ao buscar da API:', apiError);
 
+          const cached = await offlineStorage.getEvenIfExpired<DashboardStats>(cacheKey);
           if (cached) {
             console.log('⚠️ Usando cache devido a erro na API');
             return cached;
@@ -110,11 +110,11 @@ class DashboardService {
           throw apiError;
         }
       } else {
+        const cached = await offlineStorage.getEvenIfExpired<DashboardStats>(cacheKey);
         if (cached) {
           console.log('📦 Modo offline - usando cache das estatísticas');
           return cached;
         } else {
-          // Retornar dados vazios em vez de erro
           console.log('⚠️ Modo offline sem cache - retornando dados vazios');
           return {
             totalMateriais: 0,
@@ -139,7 +139,6 @@ class DashboardService {
 
     try {
       const netInfo = await NetInfo.fetch();
-      const cached = await offlineStorage.get<MateriaDoDia[]>(cacheKey);
 
       if (netInfo.isConnected) {
         try {
@@ -156,6 +155,7 @@ class DashboardService {
         } catch (apiError) {
           console.error('❌ Erro ao buscar da API:', apiError);
 
+          const cached = await offlineStorage.getEvenIfExpired<MateriaDoDia[]>(cacheKey);
           if (cached) {
             console.log('⚠️ Usando cache devido a erro na API');
             return cached;
@@ -164,6 +164,7 @@ class DashboardService {
           throw apiError;
         }
       } else {
+        const cached = await offlineStorage.getEvenIfExpired<MateriaDoDia[]>(cacheKey);
         if (cached) {
           console.log('📦 Modo offline - usando cache:', cached.length, 'matérias');
           return cached;
@@ -186,7 +187,6 @@ class DashboardService {
 
     try {
       const netInfo = await NetInfo.fetch();
-      const cached = await offlineStorage.get<EvolucaoCiclo>(cacheKey);
 
       if (netInfo.isConnected) {
         try {
@@ -200,10 +200,11 @@ class DashboardService {
           return evolucao;
         } catch (apiError) {
           console.error('❌ Erro ao buscar evolução:', apiError);
-          if (cached) return cached;
-          return null;
+          const cached = await offlineStorage.getEvenIfExpired<EvolucaoCiclo>(cacheKey);
+          return cached || null;
         }
       } else {
+        const cached = await offlineStorage.getEvenIfExpired<EvolucaoCiclo>(cacheKey);
         return cached || null;
       }
     } catch (error) {
@@ -220,7 +221,6 @@ class DashboardService {
 
     try {
       const netInfo = await NetInfo.fetch();
-      const cached = await offlineStorage.get<AgendaMensal>(cacheKey);
 
       if (netInfo.isConnected) {
         try {
@@ -233,10 +233,11 @@ class DashboardService {
           return agenda;
         } catch (apiError) {
           console.error('Erro ao buscar agenda:', apiError);
-          if (cached) return cached;
-          return {mes, ano, dias: {}};
+          const cached = await offlineStorage.getEvenIfExpired<AgendaMensal>(cacheKey);
+          return cached || {mes, ano, dias: {}};
         }
       } else {
+        const cached = await offlineStorage.getEvenIfExpired<AgendaMensal>(cacheKey);
         return cached || {mes, ano, dias: {}};
       }
     } catch (error) {

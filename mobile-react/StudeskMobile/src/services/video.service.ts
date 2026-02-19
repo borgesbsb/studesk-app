@@ -20,6 +20,9 @@ export interface DownloadProgress {
   percent: number;
 }
 
+// Mínimo de espaço livre em disco para iniciar download (200MB)
+const MIN_FREE_SPACE_BYTES = 200 * 1024 * 1024;
+
 class VideoService {
   /**
    * Garante que o diretório de vídeos existe
@@ -28,6 +31,70 @@ class VideoService {
     const exists = await RNFS.exists(VIDEOS_DIR);
     if (!exists) {
       await RNFS.mkdir(VIDEOS_DIR);
+    }
+  }
+
+  /**
+   * Lista todos os vídeos em cache, ordenados por downloadedAt (mais antigo primeiro)
+   */
+  async listCachedVideos(): Promise<VideoMeta[]> {
+    const keys = await AsyncStorage.getAllKeys();
+    const videoKeys = keys.filter(k => k.startsWith(VIDEO_META_PREFIX));
+    const metas: VideoMeta[] = [];
+
+    for (const key of videoKeys) {
+      const raw = await AsyncStorage.getItem(key);
+      if (raw) {
+        try {
+          metas.push(JSON.parse(raw));
+        } catch {}
+      }
+    }
+
+    return metas.sort((a, b) => a.downloadedAt - b.downloadedAt);
+  }
+
+  /**
+   * Remove o vídeo mais antigo do cache.
+   * Retorna o materialId removido ou null se não havia nada.
+   */
+  async removeOldestVideo(excludeMaterialId?: string): Promise<string | null> {
+    const videos = await this.listCachedVideos();
+    const candidate = videos.find(v => v.materialId !== excludeMaterialId);
+
+    if (!candidate) {
+      return null;
+    }
+
+    console.log('🗑️ Removendo vídeo mais antigo para liberar espaço:', candidate.materialId,
+      `(${(candidate.fileSize / 1024 / 1024).toFixed(1)}MB)`);
+    await this.deleteVideo(candidate.materialId);
+    return candidate.materialId;
+  }
+
+  /**
+   * Garante espaço livre suficiente removendo vídeos antigos se necessário.
+   * Não remove o vídeo que está sendo baixado (excludeMaterialId).
+   */
+  async ensureFreeSpace(excludeMaterialId?: string): Promise<void> {
+    const freeSpace = await RNFS.getFSInfo().then(info => info.freeSpace);
+    console.log(`📊 Espaço livre: ${(freeSpace / 1024 / 1024).toFixed(0)}MB`);
+
+    if (freeSpace >= MIN_FREE_SPACE_BYTES) {
+      return;
+    }
+
+    console.log('⚠️ Espaço insuficiente, liberando cache de vídeos...');
+    let currentFree = freeSpace;
+
+    while (currentFree < MIN_FREE_SPACE_BYTES) {
+      const removed = await this.removeOldestVideo(excludeMaterialId);
+      if (!removed) {
+        console.log('⚠️ Não há mais vídeos para remover');
+        break;
+      }
+      currentFree = await RNFS.getFSInfo().then(info => info.freeSpace);
+      console.log(`📊 Espaço livre após remoção: ${(currentFree / 1024 / 1024).toFixed(0)}MB`);
     }
   }
 
@@ -47,7 +114,47 @@ class VideoService {
   }
 
   /**
-   * Download do vídeo via API Google Drive
+   * Executa o download RNFS de fato
+   */
+  private async executeDownload(
+    materialId: string,
+    filePath: string,
+    downloadUrl: string,
+    token: string,
+    onProgress?: (progress: DownloadProgress) => void,
+  ): Promise<{statusCode: number; bytesWritten: number}> {
+    const result = await RNFS.downloadFile({
+      fromUrl: downloadUrl,
+      toFile: filePath,
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      begin: (res) => {
+        console.log('📥 Download iniciado - Content-Length:', res.contentLength,
+          `(${(res.contentLength / 1024 / 1024).toFixed(1)}MB)`);
+      },
+      progress: (res) => {
+        const percent =
+          res.contentLength > 0
+            ? Math.round((res.bytesWritten / res.contentLength) * 100)
+            : 0;
+        if (onProgress) {
+          onProgress({
+            bytesWritten: res.bytesWritten,
+            contentLength: res.contentLength,
+            percent,
+          });
+        }
+      },
+      progressDivider: 5,
+    }).promise;
+
+    return result;
+  }
+
+  /**
+   * Download do vídeo via API Google Drive.
+   * Libera espaço automaticamente se necessário e retenta após falha.
    */
   async downloadVideo(
     materialId: string,
@@ -69,42 +176,42 @@ class VideoService {
     console.log('📥 Iniciando download do vídeo:', materialId);
     console.log('📥 URL:', downloadUrl);
 
+    // Liberar espaço antes de iniciar
+    await this.ensureFreeSpace(materialId);
+
     let result;
     try {
-      result = await RNFS.downloadFile({
-        fromUrl: downloadUrl,
-        toFile: filePath,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        begin: (res) => {
-          console.log('📥 Download iniciado - Content-Length:', res.contentLength);
-        },
-        progress: (res) => {
-          const percent =
-            res.contentLength > 0
-              ? Math.round((res.bytesWritten / res.contentLength) * 100)
-              : 0;
-          if (onProgress) {
-            onProgress({
-              bytesWritten: res.bytesWritten,
-              contentLength: res.contentLength,
-              percent,
-            });
-          }
-        },
-        progressDivider: 5,
-      }).promise;
+      result = await this.executeDownload(materialId, filePath, downloadUrl, token, onProgress);
     } catch (downloadError: any) {
       console.error('❌ Erro no download RNFS:', downloadError?.message || downloadError);
+
       // Limpar arquivo parcial
-      const exists = await RNFS.exists(filePath);
-      if (exists) {
+      const partialExists = await RNFS.exists(filePath);
+      if (partialExists) {
         await RNFS.unlink(filePath);
       }
-      throw new Error(
-        `Download interrompido: ${downloadError?.message || 'erro desconhecido'}`,
-      );
+
+      // Tentar liberar espaço removendo vídeo mais antigo e retentar
+      const removed = await this.removeOldestVideo(materialId);
+      if (removed) {
+        console.log('🔄 Retentando download após liberar espaço...');
+        try {
+          result = await this.executeDownload(materialId, filePath, downloadUrl, token, onProgress);
+        } catch (retryError: any) {
+          console.error('❌ Retry falhou:', retryError?.message || retryError);
+          const exists = await RNFS.exists(filePath);
+          if (exists) {
+            await RNFS.unlink(filePath);
+          }
+          throw new Error(
+            `Download falhou mesmo após liberar espaço: ${retryError?.message || 'erro desconhecido'}`,
+          );
+        }
+      } else {
+        throw new Error(
+          `Download interrompido: ${downloadError?.message || 'erro desconhecido'}`,
+        );
+      }
     }
 
     if (result.statusCode !== 200) {

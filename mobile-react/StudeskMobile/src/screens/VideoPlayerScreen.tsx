@@ -10,6 +10,7 @@ import {
   StatusBar,
   Dimensions,
   LayoutChangeEvent,
+  NativeModules,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRoute, useNavigation, RouteProp} from '@react-navigation/native';
@@ -49,6 +50,7 @@ export default function VideoPlayerScreen() {
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [seeked, setSeeked] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Timer state
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -63,6 +65,12 @@ export default function VideoPlayerScreen() {
   const elapsedTimeRef = useRef(0);
   const savedRef = useRef(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pausedRef = useRef(true);
+  const loadingRef = useRef(true);
+  const changingSpeedRef = useRef(false);
+  // Timestamp de quando o timer começou/retomou (para calcular tempo real)
+  const timerStartedAtRef = useRef<number | null>(null);
+  const accumulatedTimeRef = useRef(0);
 
   // Video path
   const videoPath = videoService.getVideoPath(materialId);
@@ -76,27 +84,63 @@ export default function VideoPlayerScreen() {
     elapsedTimeRef.current = elapsedTime;
   }, [elapsedTime]);
 
-  // Timer
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    pausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  // Timer baseado em timestamps reais (funciona mesmo com tela bloqueada)
+  useEffect(() => {
     if (isTimerRunning) {
-      interval = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
+      // Ao iniciar/retomar, gravar timestamp
+      timerStartedAtRef.current = Date.now();
+
+      const interval = setInterval(() => {
+        if (timerStartedAtRef.current) {
+          const now = Date.now();
+          const secondsSinceStart = Math.floor((now - timerStartedAtRef.current) / 1000);
+          setElapsedTime(accumulatedTimeRef.current + secondsSinceStart);
+        }
       }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      // Ao pausar, acumular o tempo decorrido
+      if (timerStartedAtRef.current) {
+        const secondsSinceStart = Math.floor((Date.now() - timerStartedAtRef.current) / 1000);
+        accumulatedTimeRef.current += secondsSinceStart;
+        timerStartedAtRef.current = null;
+        setElapsedTime(accumulatedTimeRef.current);
+      }
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
   }, [isTimerRunning]);
 
-  // Timer acompanha o vídeo mesmo em background (usuário pode ouvir áudio com tela bloqueada)
+  // Ao voltar do background, recalcular tempo real e mostrar controles
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') {
+        // Recalcular elapsed com base no timestamp real
+        if (timerStartedAtRef.current) {
+          const now = Date.now();
+          const secondsSinceStart = Math.floor((now - timerStartedAtRef.current) / 1000);
+          setElapsedTime(accumulatedTimeRef.current + secondsSinceStart);
+        }
         setShowControls(true);
       }
     });
     return () => subscription.remove();
+  }, []);
+
+  // Restaurar orientação portrait ao sair da tela
+  useEffect(() => {
+    return () => {
+      try {
+        NativeModules.OrientationModule?.setPortrait();
+      } catch {}
+    };
   }, []);
 
   // Auto-hide controls
@@ -132,31 +176,38 @@ export default function VideoPlayerScreen() {
     }
   };
 
-  const onProgress = (data: OnProgressData) => {
+  const onProgress = useCallback((data: OnProgressData) => {
+    // Ignorar currentTime=0 espúrio durante troca de velocidade ou buffering
+    if (data.currentTime === 0 && currentTimeRef.current > 1) {
+      return;
+    }
     setCurrentTime(data.currentTime);
-  };
+  }, []);
 
-  const onBuffer = ({isBuffering}: {isBuffering: boolean}) => {
+  const onBuffer = useCallback(({isBuffering}: {isBuffering: boolean}) => {
     setLoading(isBuffering);
-  };
+  }, []);
 
   // Sync React state with notification/lock screen controls
-  const onPlaybackStateChanged = (data: OnPlaybackStateChangedData) => {
-    if (data.isPlaying && paused) {
+  const onPlaybackStateChanged = useCallback((data: OnPlaybackStateChangedData) => {
+    // Ignorar transições espúrias durante troca de velocidade
+    if (changingSpeedRef.current) {
+      return;
+    }
+
+    if (data.isPlaying && pausedRef.current) {
       setPaused(false);
       setIsTimerRunning(true);
-      resetControlsTimeout();
-    } else if (!data.isPlaying && !paused && !loading) {
+    } else if (!data.isPlaying && !pausedRef.current && !loadingRef.current) {
       setPaused(true);
       setIsTimerRunning(false);
-      // Manter controles visíveis quando pausado
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = null;
       }
       setShowControls(true);
     }
-  };
+  }, []);
 
   const togglePlay = () => {
     const newPaused = !paused;
@@ -192,19 +243,61 @@ export default function VideoPlayerScreen() {
   };
 
   const handleSpeedChange = (speed: number) => {
+    // Sinalizar troca de velocidade para ignorar onPlaybackStateChanged espúrios
+    changingSpeedRef.current = true;
     setPlaybackRate(speed);
     setShowSpeedMenu(false);
+    resetControlsTimeout();
+    // Liberar após o player estabilizar
+    setTimeout(() => {
+      changingSpeedRef.current = false;
+    }, 500);
+  };
+
+  const OrientationModule = NativeModules.OrientationModule;
+
+  const setOrientation = (landscape: boolean) => {
+    try {
+      if (landscape) {
+        OrientationModule?.setLandscape();
+      } else {
+        OrientationModule?.setPortrait();
+      }
+    } catch {}
+  };
+
+  const toggleFullscreen = () => {
+    const newFullscreen = !isFullscreen;
+    setIsFullscreen(newFullscreen);
+    setOrientation(newFullscreen);
     resetControlsTimeout();
   };
 
   const handleGoBack = () => {
     setPaused(true);
     setIsTimerRunning(false);
+    if (isFullscreen) {
+      setOrientation(false);
+    }
     navigation.goBack();
   };
 
   const handleSaveProgress = async () => {
     if (savingProgress) return;
+
+    // Usar o maior valor entre state e ref para evitar salvar 0
+    const timeToSave = Math.max(currentTime, currentTimeRef.current);
+    const elapsedToSave = Math.max(elapsedTime, elapsedTimeRef.current);
+
+    console.log('💾 handleSaveProgress:', {
+      currentTime,
+      currentTimeRef: currentTimeRef.current,
+      timeToSave,
+      elapsedTime,
+      elapsedTimeRef: elapsedTimeRef.current,
+      elapsedToSave,
+      materialId,
+    });
 
     // Pausar vídeo e cancelar auto-hide dos controles
     setPaused(true);
@@ -217,18 +310,18 @@ export default function VideoPlayerScreen() {
     savedRef.current = true;
 
     try {
-      await videoService.salvarProgresso(materialId, currentTime);
+      await videoService.salvarProgresso(materialId, timeToSave);
 
-      if (elapsedTime > 0) {
+      if (elapsedToSave > 0) {
         await videoService.registrarHistorico(
           materialId,
-          Math.floor(currentTime),
-          elapsedTime,
+          Math.floor(timeToSave),
+          elapsedToSave,
         );
 
         // Adicionar tempo ao DisciplinaDia para refletir no card de hoje
         if (disciplinaId) {
-          const minutos = Math.ceil(elapsedTime / 60);
+          const minutos = Math.ceil(elapsedToSave / 60);
           try {
             await api.post('/dashboard/adicionar-tempo', {
               disciplinaId,
@@ -242,6 +335,8 @@ export default function VideoPlayerScreen() {
       }
 
       setElapsedTime(0);
+      accumulatedTimeRef.current = 0;
+      timerStartedAtRef.current = null;
       savedRef.current = false;
 
       Alert.alert('Sucesso', 'Progresso salvo com sucesso!');
@@ -298,10 +393,7 @@ export default function VideoPlayerScreen() {
       <StatusBar hidden />
 
       {/* Video */}
-      <TouchableOpacity
-        activeOpacity={1}
-        style={styles.videoContainer}
-        onPress={handleScreenTap}>
+      <View style={styles.videoContainer}>
         <Video
           ref={videoRef}
           source={{
@@ -334,16 +426,22 @@ export default function VideoPlayerScreen() {
           progressUpdateInterval={500}
         />
 
-        {/* Loading */}
-        {loading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
-        )}
+        {/* Camada de toque sempre por cima do vídeo nativo */}
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.touchLayer}
+          onPress={handleScreenTap}>
 
-        {/* Center play/pause controls (YouTube style) */}
-        {showControls && !loading && (
-          <View style={styles.centerControls} pointerEvents="box-none">
+          {/* Loading */}
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          )}
+
+          {/* Center play/pause controls (YouTube style) */}
+          {showControls && !loading && (
+            <View style={styles.centerControls} pointerEvents="box-none">
             <TouchableOpacity onPress={skipBackward} style={styles.centerCtrlBtn}>
               <Text style={styles.centerCtrlIcon}>10</Text>
               <Text style={styles.centerCtrlArrow}>↺</Text>
@@ -481,13 +579,22 @@ export default function VideoPlayerScreen() {
                         </>
                       )}
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={toggleFullscreen}
+                      style={styles.fullscreenBtn}>
+                      <Text style={styles.fullscreenBtnText}>
+                        {isFullscreen ? '⊡' : '⛶'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </SafeAreaView>
             </View>
           </View>
         )}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -501,6 +608,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  touchLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   video: {
     position: 'absolute',
@@ -738,6 +849,18 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 12,
     fontWeight: '700',
+    color: '#fff',
+  },
+  fullscreenBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenBtnText: {
+    fontSize: 18,
     color: '#fff',
   },
 });

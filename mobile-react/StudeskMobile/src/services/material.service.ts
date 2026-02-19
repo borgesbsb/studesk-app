@@ -42,20 +42,14 @@ class MaterialService {
     const cacheKey = 'materiais:all';
 
     try {
-      // Verificar conexão
       const netInfo = await NetInfo.fetch();
 
-      // Tentar buscar do cache primeiro
-      const cached = await offlineStorage.get<MaterialEstudo[]>(cacheKey);
-
       if (netInfo.isConnected) {
-        // Online: buscar da API e atualizar cache
         try {
           console.log('📚 Buscando materiais da API...');
           const response = await api.get<ListarMateriaisResponse>('/materiais');
           const materiais = response.data.data || [];
 
-          // Atualizar cache
           await offlineStorage.set(cacheKey, materiais, this.CACHE_TTL);
           console.log('✅ Materiais recebidos e salvos no cache:', materiais.length);
 
@@ -63,7 +57,7 @@ class MaterialService {
         } catch (apiError) {
           console.error('❌ Erro ao buscar da API:', apiError);
 
-          // Se tem cache, usar ele como fallback
+          const cached = await offlineStorage.getEvenIfExpired<MaterialEstudo[]>(cacheKey);
           if (cached) {
             console.log('⚠️ Usando cache devido a erro na API');
             return cached;
@@ -72,7 +66,7 @@ class MaterialService {
           throw apiError;
         }
       } else {
-        // Offline: usar cache
+        const cached = await offlineStorage.getEvenIfExpired<MaterialEstudo[]>(cacheKey);
         if (cached) {
           console.log('📦 Modo offline - usando cache:', cached.length, 'materiais');
           return cached;
@@ -96,7 +90,6 @@ class MaterialService {
 
     try {
       const netInfo = await NetInfo.fetch();
-      const cached = await offlineStorage.get<MaterialEstudo[]>(cacheKey);
 
       if (netInfo.isConnected) {
         try {
@@ -113,6 +106,7 @@ class MaterialService {
         } catch (apiError) {
           console.error('❌ Erro ao buscar da API:', apiError);
 
+          const cached = await offlineStorage.getEvenIfExpired<MaterialEstudo[]>(cacheKey);
           if (cached) {
             console.log('⚠️ Usando cache devido a erro na API');
             return cached;
@@ -121,6 +115,7 @@ class MaterialService {
           throw apiError;
         }
       } else {
+        const cached = await offlineStorage.getEvenIfExpired<MaterialEstudo[]>(cacheKey);
         if (cached) {
           console.log('📦 Modo offline - usando cache:', cached.length, 'materiais');
           return cached;
@@ -144,7 +139,6 @@ class MaterialService {
 
     try {
       const netInfo = await NetInfo.fetch();
-      const cached = await offlineStorage.get<MaterialEstudo>(cacheKey);
 
       if (netInfo.isConnected) {
         try {
@@ -159,6 +153,7 @@ class MaterialService {
         } catch (apiError) {
           console.error('❌ Erro ao buscar da API:', apiError);
 
+          const cached = await offlineStorage.getEvenIfExpired<MaterialEstudo>(cacheKey);
           if (cached) {
             console.log('⚠️ Usando cache devido a erro na API');
             return cached;
@@ -167,6 +162,7 @@ class MaterialService {
           throw apiError;
         }
       } else {
+        const cached = await offlineStorage.getEvenIfExpired<MaterialEstudo>(cacheKey);
         if (cached) {
           console.log('📦 Modo offline - usando cache:', cached.nome);
           return cached;

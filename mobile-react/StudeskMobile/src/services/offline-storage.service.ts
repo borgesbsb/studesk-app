@@ -75,6 +75,33 @@ class OfflineStorageService {
   }
 
   /**
+   * Obtém dados do cache MESMO se expirados.
+   * Útil para modo offline onde dados antigos são melhores que nenhum dado.
+   */
+  async getEvenIfExpired<T>(key: string): Promise<T | null> {
+    try {
+      const cacheKey = this.PREFIX + key;
+      const cached = await AsyncStorage.getItem(cacheKey);
+
+      if (!cached) {
+        return null;
+      }
+
+      const cacheData = JSON.parse(cached);
+      const isExpired = Date.now() > cacheData.expiresAt;
+
+      if (isExpired) {
+        console.log('⏰ Cache expirado mas usando offline:', key);
+      }
+
+      return cacheData.data as T;
+    } catch (error) {
+      console.error('❌ Erro ao ler cache (stale):', error);
+      return null;
+    }
+  }
+
+  /**
    * Remove item do cache
    */
   async remove(key: string): Promise<void> {

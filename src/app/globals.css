@@ -81,6 +81,8 @@
   --header-foreground: var(--card-foreground);
   --header-hover: var(--accent);
   --sidebar-panel-bg: var(--card);
+  --sidebar-header-bg: transparent;
+  --sidebar-header-foreground: var(--card-foreground);
 }
 
 .dark {
@@ -119,6 +121,8 @@
   --header-foreground: var(--card-foreground);
   --header-hover: var(--accent);
   --sidebar-panel-bg: var(--card);
+  --sidebar-header-bg: transparent;
+  --sidebar-header-foreground: var(--card-foreground);
 }
 
 /* Tema Navy: header escuro (#111a41) + sidebar clara (#fcfdfd) */
@@ -159,8 +163,10 @@
   --header-bg: #111a41;
   --header-foreground: #fcfdfd;
   --header-hover: rgba(255, 255, 255, 0.12);
-  /* Sidebar panel clara */
+  /* Sidebar panel clara + header da sidebar navy */
   --sidebar-panel-bg: #fcfdfd;
+  --sidebar-header-bg: #111a41;
+  --sidebar-header-foreground: #fcfdfd;
 }
 
 @layer base {

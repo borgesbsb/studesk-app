@@ -103,13 +103,16 @@ export function SidebarContent({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className={cn(
-        "h-16",
-        "flex items-center",
-        "border-b",
-        "transition-all duration-300",
-        isOpen || isMobile ? "px-6 justify-between" : "px-4 justify-center"
-      )}>
+      <div
+        className={cn(
+          "h-16",
+          "flex items-center",
+          "border-b",
+          "transition-all duration-300",
+          isOpen || isMobile ? "px-6 justify-between" : "px-4 justify-center"
+        )}
+        style={{ backgroundColor: 'var(--sidebar-header-bg)', color: 'var(--sidebar-header-foreground)' }}
+      >
         <div className={cn("flex items-center gap-3", !isOpen && !isMobile && "flex-1 justify-center")}>
           <div className={cn(
             "flex items-center justify-center",

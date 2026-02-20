@@ -209,6 +209,22 @@
   background-color: var(--header-hover) !important;
 }
 
+/* No tema navy, remove a borda direita da sidebar no nível do header
+   para que sidebar header e main header pareçam um bloco único */
+.navy aside {
+  border-right: none !important;
+}
+
+.navy aside::after {
+  content: '';
+  position: absolute;
+  top: 64px; /* h-16 = 4rem = 64px */
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: oklch(0.922 0 0); /* --border */
+}
+
 /* Fundo da área de visualização do PDF (Syncfusion PdfViewer) */
 .e-pv-viewer-container {
   background-color: #aaa !important;

@@ -163,10 +163,16 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <DualScreenshotCard
-              images={["/landing/img14.png", "/landing/img15.png"]}
+            <ScreenshotCard
+              image="/landing/img14.png"
               title="Dashboard Inteligente"
               description="Visualize seu progresso diário com métricas de tempo e questões por disciplina"
+            />
+
+            <ScreenshotCard
+              image="/landing/img15.png"
+              title="Progresso por Disciplina"
+              description="Acompanhe o desempenho detalhado de cada disciplina com gráficos e estatísticas"
             />
 
             <ScreenshotCard
@@ -395,40 +401,6 @@ function FeatureCard({ icon, title, description, gradient }: {
       </div>
       <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
       <p className="text-gray-600">{description}</p>
-    </div>
-  )
-}
-
-// Component: Dual Screenshot Card (two images side by side)
-function DualScreenshotCard({ images, title, description }: {
-  images: [string, string]
-  title: string
-  description: string
-}) {
-  return (
-    <div className="bg-white rounded-xl shadow-xl overflow-hidden hover:shadow-2xl transition-all hover:-translate-y-1">
-      <div className="relative h-64 bg-gray-100 flex gap-1">
-        <div className="relative flex-1">
-          <Image
-            src={images[0]}
-            alt={`${title} 1`}
-            fill
-            className="object-cover object-top"
-          />
-        </div>
-        <div className="relative flex-1">
-          <Image
-            src={images[1]}
-            alt={`${title} 2`}
-            fill
-            className="object-cover object-top"
-          />
-        </div>
-      </div>
-      <div className="p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
-        <p className="text-gray-600">{description}</p>
-      </div>
     </div>
   )
 }

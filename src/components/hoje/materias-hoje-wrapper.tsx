@@ -10,13 +10,23 @@ export function MateriasHojeWrapper() {
   const [materias, setMaterias] = useState<MateriaDoDia[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Formata a data como YYYY-MM-DD usando o timezone local do usuário
+  // Evita bug de fuso: new Date() às 23h UTC-3 serializa como UTC do dia seguinte
+  const toLocalDateString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const handleTempoAdicionado = useCallback(async () => {
     // Recarregar matérias quando tempo for adicionado
     console.log('🔄 [WRAPPER] handleTempoAdicionado chamado');
     setIsLoading(true);
     try {
-      console.log('🔄 [WRAPPER] Recarregando dados do dia:', selectedDate.toISOString());
-      const materiasData = await getMateriasDoDia(selectedDate);
+      const dateStr = toLocalDateString(selectedDate);
+      console.log('🔄 [WRAPPER] Recarregando dados do dia:', dateStr);
+      const materiasData = await getMateriasDoDia(dateStr);
       console.log('🔄 [WRAPPER] Dados recarregados:', materiasData.length, 'matérias');
       setMaterias(materiasData);
     } catch (error) {
@@ -31,7 +41,8 @@ export function MateriasHojeWrapper() {
     async function carregarMaterias() {
       setIsLoading(true);
       try {
-        const materiasData = await getMateriasDoDia(selectedDate);
+        const dateStr = toLocalDateString(selectedDate);
+        const materiasData = await getMateriasDoDia(dateStr);
         setMaterias(materiasData);
       } catch (error) {
         console.error('Erro ao carregar matérias:', error);

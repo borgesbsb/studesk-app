@@ -10,9 +10,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const dataParam = searchParams.get('data')
-    const data = dataParam ? new Date(dataParam) : undefined
-
-    const materias = await getMateriasDoDia(data)
+    // Passar como string YYYY-MM-DD para evitar bug de fuso horário no servidor
+    const materias = await getMateriasDoDia(dataParam || undefined)
     const headers = handleCors(request)
 
     return NextResponse.json(
@@ -38,9 +37,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const data = body.data ? new Date(body.data) : undefined
-
-    const materias = await getMateriasDoDia(data)
+    // Passar como string YYYY-MM-DD para evitar bug de fuso horário no servidor
+    const materias = await getMateriasDoDia(body.data || undefined)
     const headers = handleCors(request)
 
     return NextResponse.json(

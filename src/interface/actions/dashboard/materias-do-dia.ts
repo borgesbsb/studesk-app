@@ -58,11 +58,18 @@ function isDiaDeEstudo(diasEstudo: string | null, dataConsultada: Date, dataInic
   }
 }
 
-export async function getMateriasDoDia(data?: Date): Promise<MateriaDoDia[]> {
+export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoDia[]> {
   try {
     const { userId } = await requireAuth();
-    // Normalizar a data recebida para o início do dia
-    const diaConsultado = data ? startOfDay(data) : startOfDay(new Date())
+    // Se data for string no formato YYYY-MM-DD, parsear diretamente sem conversão de fuso
+    // Isso evita o bug de timezone onde 23:00 UTC-3 vira 02:00 UTC do dia seguinte
+    let diaConsultado: Date
+    if (typeof data === 'string') {
+      const [year, month, day] = data.split('-').map(Number)
+      diaConsultado = new Date(year, month - 1, day, 0, 0, 0, 0)
+    } else {
+      diaConsultado = data ? startOfDay(data) : startOfDay(new Date())
+    }
     const inicioDia = startOfDay(diaConsultado)
     const fimDia = endOfDay(diaConsultado)
 

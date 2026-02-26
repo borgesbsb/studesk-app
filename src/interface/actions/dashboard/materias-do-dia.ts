@@ -74,7 +74,7 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
     const fimDia = endOfDay(diaConsultado)
 
     console.log('🔍 DEBUG getMateriasDoDia - Início:', {
-      dataRecebida: data?.toISOString(),
+      dataRecebida: typeof data === 'string' ? data : data?.toISOString(),
       diaConsultado: diaConsultado.toISOString(),
       inicioDia: inicioDia.toISOString(),
       fimDia: fimDia.toISOString(),

@@ -10,7 +10,8 @@ import {
   FileText,
   BarChart3,
   LogOut,
-  Settings
+  Settings,
+  ClipboardList
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { logoutAdmin } from '@/interface/actions/admin/auth'
@@ -46,6 +47,11 @@ const navItems: NavItem[] = [
     title: 'Materiais',
     href: '/admin/materiais',
     icon: FileText
+  },
+  {
+    title: 'Simulados',
+    href: '/admin/simulados',
+    icon: ClipboardList
   },
   {
     title: 'Configurações',

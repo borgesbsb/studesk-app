@@ -210,7 +210,7 @@ export function UserPerformanceView({ data }: UserPerformanceViewProps) {
         {/* ABA DE QUESTÕES */}
         <TabsContent value="questoes" className="space-y-6">
           {/* Cards de Métricas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-slate-600">
@@ -220,22 +220,20 @@ export function UserPerformanceView({ data }: UserPerformanceViewProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{questoes.totalSimulados}</div>
-                <p className="text-xs text-slate-500">
-                  {questoes.simuladosFinalizados} finalizados
-                </p>
+                <p className="text-xs text-slate-500">registrados</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-slate-600">
-                  Questões
+                  Total de Questões
                 </CardTitle>
                 <Target className="h-5 w-5 text-purple-600" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{questoes.totalQuestoes}</div>
-                <p className="text-xs text-slate-500">Respondidas</p>
+                <p className="text-xs text-slate-500">{questoes.totalAcertos} acertos</p>
               </CardContent>
             </Card>
 
@@ -248,66 +246,15 @@ export function UserPerformanceView({ data }: UserPerformanceViewProps) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {questoes.taxaAcertoGeral.toFixed(1)}%
+                  {(questoes.taxaAcertoGeral || 0).toFixed(1)}%
                 </div>
-                <p className="text-xs text-slate-500">
-                  {questoes.questoesCorretas} corretas
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">
-                  Erros
-                </CardTitle>
-                <XCircle className="h-5 w-5 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {questoes.totalQuestoes - questoes.questoesCorretas}
-                </div>
-                <p className="text-xs text-slate-500">
-                  {(100 - questoes.taxaAcertoGeral).toFixed(1)}% erro
-                </p>
+                <p className="text-xs text-slate-500">média geral</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Performance por Disciplina */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance por Disciplina</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {questoes.performancePorDisciplina.map((disc: any) => (
-                  <div key={disc.disciplinaId} className="border-b pb-3 last:border-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium">{disc.disciplinaNome}</div>
-                      <div className="text-sm font-medium">
-                        {disc.percentualAcerto.toFixed(1)}%
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-green-600 rounded-full transition-all"
-                          style={{ width: `${disc.percentualAcerto}%` }}
-                        />
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {disc.questoesCorretas}/{disc.totalQuestoes}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Evolução da Taxa de Acerto */}
-          {questoes.evolucaoTaxaAcerto.length > 0 && (
+          {questoes.evolucaoTaxaAcerto?.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Evolução da Taxa de Acerto</CardTitle>
@@ -345,49 +292,49 @@ export function UserPerformanceView({ data }: UserPerformanceViewProps) {
         <TabsContent value="simulados" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Histórico de Simulados ({questoes.simulados.length})</CardTitle>
+              <CardTitle>Histórico de Simulados ({questoes.simulados?.length || 0})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {questoes.simulados.map((simulado: any) => (
+                {(questoes.simulados || []).map((simulado: any) => (
                   <div key={simulado.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <div className="font-medium text-lg">{simulado.nome}</div>
                         <div className="text-sm text-slate-600">
-                          {formatDate(simulado.dataRealizacao)} •{' '}
-                          {simulado.tempoTotalSegundos ? formatTime(simulado.tempoTotalSegundos) : 'N/A'}
+                          {formatDate(simulado.dataRealizacao)}
+                          {simulado.config && ` • ${simulado.config.nome}`}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold">
-                          {simulado.notaGeral.toFixed(1)}%
+                          {(simulado.percentualGeral || 0).toFixed(1)}%
                         </div>
                         <div className="text-sm text-slate-600">
-                          {simulado.questoesCorretas}/{simulado.questoesTotal}
+                          {simulado.totalAcertos}/{simulado.totalQuestoes}
                         </div>
                       </div>
                     </div>
 
                     {/* Disciplinas do Simulado */}
                     <div className="space-y-2 mt-4">
-                      {simulado.disciplinas.map((disc: any) => (
+                      {(simulado.disciplinas || []).map((disc: any) => (
                         <div key={disc.disciplinaId} className="flex items-center gap-2">
                           <div
                             className={`h-3 w-3 rounded-full ${
-                              disc.status === 'verde'
+                              disc.percentual >= 70
                                 ? 'bg-green-500'
-                                : disc.status === 'amarelo'
+                                : disc.percentual >= 50
                                 ? 'bg-yellow-500'
                                 : 'bg-red-500'
                             }`}
                           />
                           <div className="flex-1 text-sm">{disc.disciplinaNome}</div>
                           <div className="text-sm font-medium">
-                            {disc.nota.toFixed(1)}%
+                            {(disc.percentual || 0).toFixed(1)}%
                           </div>
                           <div className="text-xs text-slate-500">
-                            ({disc.questoesCorretas}/{disc.questoesTotal})
+                            ({disc.acertos}/{disc.totalQuestoes})
                           </div>
                         </div>
                       ))}

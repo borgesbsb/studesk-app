@@ -309,57 +309,39 @@ async function createUserWithData(
       const numQuestoes = randomInt(20, 50)
       const taxaAcerto = 0.5 + Math.random() * 0.4 // Entre 50% e 90%
 
-      const simulado = await prisma.simulado.create({
-        data: {
-          userId: user.id,
-          nome: `Simulado ${i + 1} - ${randomDate(dataInicio, new Date()).toLocaleDateString('pt-BR')}`,
-          status: Math.random() > 0.2 ? 'finalizado' : 'em_andamento',
-          dataRealizacao,
-          tempoTotalSegundos: randomInt(1800, 7200)
-        }
-      })
-
       // Criar disciplinas do simulado
       const numDisciplinasSimulado = Math.min(randomInt(3, 6), disciplinas.length)
       const disciplinasSimulado = disciplinas
         .sort(() => Math.random() - 0.5)
         .slice(0, numDisciplinasSimulado)
 
-      for (const disc of disciplinasSimulado) {
-        const simuladoDisciplina = await prisma.simuladoDisciplina.create({
-          data: {
-            simuladoId: simulado.id,
-            disciplinaId: disc.id,
-            limiteVermelho: 40,
-            limiteAmarelo: 70
-          }
-        })
-
-        // Criar questões para essa disciplina
-        const questoesPorDisciplina = Math.floor(numQuestoes / numDisciplinasSimulado)
-        for (let q = 0; q < questoesPorDisciplina; q++) {
-          const acertou = Math.random() < taxaAcerto
-          const alternativas = ['A', 'B', 'C', 'D', 'E']
-          const respostaCorreta = randomItem(alternativas)
-          const respostaUsuario = acertou ? respostaCorreta : randomItem(alternativas.filter(a => a !== respostaCorreta))
-
-          await prisma.questaoSimulado.create({
-            data: {
-              simuladoId: simulado.id,
-              simuladoDisciplinaId: simuladoDisciplina.id,
-              enunciado: `Questão ${q + 1}: Em relação ao tema estudado, assinale a alternativa correta.`,
-              alternativaA: 'Alternativa A - Conteúdo',
-              alternativaB: 'Alternativa B - Conteúdo',
-              alternativaC: 'Alternativa C - Conteúdo',
-              alternativaD: 'Alternativa D - Conteúdo',
-              alternativaE: 'Alternativa E - Conteúdo',
-              respostaCorreta,
-              respostaUsuario,
-              acertou
-            }
-          })
+      const questoesPorDisciplina = Math.floor(numQuestoes / numDisciplinasSimulado)
+      let totalAcertosSim = 0
+      const discData = disciplinasSimulado.map(disc => {
+        const acertos = Math.round(questoesPorDisciplina * taxaAcerto)
+        totalAcertosSim += acertos
+        return {
+          disciplinaId: disc.id,
+          totalQuestoes: questoesPorDisciplina,
+          acertos,
+          percentual: Math.round((acertos / questoesPorDisciplina) * 1000) / 10
         }
-      }
+      })
+
+      const totalQuestoesSim = questoesPorDisciplina * numDisciplinasSimulado
+      const percentualGeralSim = Math.round((totalAcertosSim / totalQuestoesSim) * 1000) / 10
+
+      await prisma.simulado.create({
+        data: {
+          userId: user.id,
+          nome: `Simulado ${i + 1} - ${randomDate(dataInicio, new Date()).toLocaleDateString('pt-BR')}`,
+          dataRealizacao,
+          totalQuestoes: totalQuestoesSim,
+          totalAcertos: totalAcertosSim,
+          percentualGeral: percentualGeralSim,
+          disciplinas: { create: discData }
+        }
+      })
     }
     console.log(`✓ ${numSimulados} simulados criados`)
   }

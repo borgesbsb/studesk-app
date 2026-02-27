@@ -3,41 +3,59 @@
 import { requireAuth } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 
+interface DisciplinaAcerto {
+  disciplinaId: string
+  totalQuestoes: number
+  acertos: number
+}
+
 interface CreateSimuladoData {
   nome: string
-  descricao?: string
+  configSimuladoId?: string
   semanaEstudoId?: string
   dataRealizacao: Date
+  disciplinas: DisciplinaAcerto[]
 }
 
 export async function criarSimulado(data: CreateSimuladoData) {
   try {
     const { userId } = await requireAuth()
 
-    console.log('[criarSimulado] Dados recebidos:', data)
-    console.log('[criarSimulado] User ID:', userId)
+    const totalQuestoes = data.disciplinas.reduce((sum, d) => sum + d.totalQuestoes, 0)
+    const totalAcertos = data.disciplinas.reduce((sum, d) => sum + d.acertos, 0)
+    const percentualGeral = totalQuestoes > 0
+      ? Math.round((totalAcertos / totalQuestoes) * 1000) / 10
+      : 0
 
     const simulado = await prisma.simulado.create({
       data: {
         userId,
         nome: data.nome,
-        descricao: data.descricao,
-        semanaEstudoId: data.semanaEstudoId,
+        configSimuladoId: data.configSimuladoId || null,
+        semanaEstudoId: data.semanaEstudoId || null,
         dataRealizacao: data.dataRealizacao,
-        status: "em_andamento"
+        totalQuestoes,
+        totalAcertos,
+        percentualGeral,
+        disciplinas: {
+          create: data.disciplinas.map(d => ({
+            disciplinaId: d.disciplinaId,
+            totalQuestoes: d.totalQuestoes,
+            acertos: d.acertos,
+            percentual: d.totalQuestoes > 0
+              ? Math.round((d.acertos / d.totalQuestoes) * 1000) / 10
+              : 0
+          }))
+        }
+      },
+      include: {
+        disciplinas: { include: { disciplina: true } }
       }
     })
 
-    console.log('[criarSimulado] Simulado criado:', simulado)
-
-    return {
-      success: true,
-      data: simulado
-    }
+    return { success: true, data: simulado }
   } catch (error) {
-    console.error("[criarSimulado] Erro completo:", error)
-    console.error("[criarSimulado] Error message:", (error as Error).message)
-    console.error("[criarSimulado] Error stack:", (error as Error).stack)
+    console.error("[criarSimulado] Erro:", error)
     return {
       success: false,
       error: `Erro ao criar simulado: ${(error as Error).message}`

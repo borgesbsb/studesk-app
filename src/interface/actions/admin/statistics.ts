@@ -10,7 +10,6 @@ export async function getReadingStatistics() {
   }
 
   try {
-    // Estatísticas gerais de leitura
     const [
       totalHistoricoLeitura,
       totalTempoLeitura,
@@ -18,30 +17,21 @@ export async function getReadingStatistics() {
       usuariosAtivos,
       leiturasPorUsuario
     ] = await Promise.all([
-      // Total de registros de leitura
       prisma.historicoLeitura.count(),
 
-      // Tempo total de leitura (em segundos)
       prisma.historicoLeitura.aggregate({
-        _sum: {
-          tempoLeituraSegundos: true
-        }
+        _sum: { tempoLeituraSegundos: true }
       }),
 
-      // Total de páginas lidas (soma das páginas atuais)
       prisma.historicoLeitura.aggregate({
-        _sum: {
-          paginaAtual: true
-        }
+        _sum: { paginaAtual: true }
       }),
 
-      // Usuários com pelo menos 1 leitura
       prisma.historicoLeitura.groupBy({
         by: ['materialId'],
         _count: true
       }),
 
-      // Top 10 usuários por tempo de leitura
       prisma.$queryRaw<Array<{
         userId: string
         userName: string | null
@@ -66,7 +56,6 @@ export async function getReadingStatistics() {
       `
     ])
 
-    // Leituras por dia (últimos 30 dias)
     const last30Days = Array.from({ length: 30 }, (_, i) => {
       const date = new Date()
       date.setDate(date.getDate() - i)
@@ -81,23 +70,11 @@ export async function getReadingStatistics() {
 
         const [count, tempoTotal] = await Promise.all([
           prisma.historicoLeitura.count({
-            where: {
-              dataLeitura: {
-                gte: date,
-                lt: nextDate
-              }
-            }
+            where: { dataLeitura: { gte: date, lt: nextDate } }
           }),
           prisma.historicoLeitura.aggregate({
-            where: {
-              dataLeitura: {
-                gte: date,
-                lt: nextDate
-              }
-            },
-            _sum: {
-              tempoLeituraSegundos: true
-            }
+            where: { dataLeitura: { gte: date, lt: nextDate } },
+            _sum: { tempoLeituraSegundos: true }
           })
         ])
 
@@ -109,23 +86,14 @@ export async function getReadingStatistics() {
       })
     )
 
-    // Materiais mais lidos
     const materiaisMaisLidos = await prisma.materialEstudo.findMany({
       select: {
         id: true,
         nome: true,
         tipo: true,
-        _count: {
-          select: {
-            historicoLeitura: true
-          }
-        }
+        _count: { select: { historicoLeitura: true } }
       },
-      orderBy: {
-        historicoLeitura: {
-          _count: 'desc'
-        }
-      },
+      orderBy: { historicoLeitura: { _count: 'desc' } },
       take: 10
     })
 
@@ -136,7 +104,7 @@ export async function getReadingStatistics() {
         totalTempoLeituraSegundos: totalTempoLeitura._sum.tempoLeituraSegundos || 0,
         totalPaginasLidas: totalPaginasLidas._sum.paginaAtual || 0,
         usuariosAtivos: usuariosAtivos.length,
-        leiturasPorUsuario: leiturasPorUsuario.map(item => ({
+        leiturasPorUsuario: usuariosAtivos.map(item => ({
           userId: item.materialId,
           count: item._count
         })),
@@ -162,50 +130,28 @@ export async function getQuestionsStatistics() {
   }
 
   try {
-    // Buscar todos os simulados com suas questões
     const [
       totalSimulados,
-      totalQuestoes,
-      totalQuestoesRespondidas,
-      totalQuestoesCorretas,
-      simuladosFinalizados,
-      usuariosComSimulados
+      usuariosComSimulados,
+      agregadoSimulados
     ] = await Promise.all([
-      // Total de simulados
       prisma.simulado.count(),
 
-      // Total de questões criadas
-      prisma.questaoSimulado.count(),
-
-      // Total de questões respondidas
-      prisma.questaoSimulado.count({
-        where: {
-          respostaUsuario: {
-            not: null
-          }
-        }
-      }),
-
-      // Total de questões corretas
-      prisma.questaoSimulado.count({
-        where: {
-          acertou: true
-        }
-      }),
-
-      // Simulados finalizados
-      prisma.simulado.count({
-        where: {
-          status: 'finalizado'
-        }
-      }),
-
-      // Usuários que fizeram simulados
       prisma.simulado.groupBy({
         by: ['userId'],
         _count: true
+      }),
+
+      prisma.simulado.aggregate({
+        _sum: { totalQuestoes: true, totalAcertos: true }
       })
     ])
+
+    const totalQuestoes = agregadoSimulados._sum.totalQuestoes || 0
+    const totalQuestoesCorretas = agregadoSimulados._sum.totalAcertos || 0
+    const percentualAcertoGeral = totalQuestoes > 0
+      ? parseFloat(((totalQuestoesCorretas / totalQuestoes) * 100).toFixed(2))
+      : 0
 
     // Performance por usuário
     const performancePorUsuario = await prisma.$queryRaw<Array<{
@@ -222,23 +168,21 @@ export async function getQuestionsStatistics() {
         u.name as "userName",
         u.email as "userEmail",
         COUNT(DISTINCT s.id) as "totalSimulados",
-        COUNT(q.id) as "totalQuestoes",
-        COUNT(CASE WHEN q.acertou = true THEN 1 END) as "totalCorretas",
+        SUM(s."totalQuestoes") as "totalQuestoes",
+        SUM(s."totalAcertos") as "totalCorretas",
         CASE
-          WHEN COUNT(q.id) > 0 THEN
-            ROUND((COUNT(CASE WHEN q.acertou = true THEN 1 END)::numeric / COUNT(q.id)::numeric * 100), 2)::double precision
+          WHEN SUM(s."totalQuestoes") > 0 THEN
+            ROUND((SUM(s."totalAcertos")::numeric / SUM(s."totalQuestoes")::numeric * 100), 2)::double precision
           ELSE 0
         END as "percentualAcerto"
       FROM "User" u
       INNER JOIN "Simulado" s ON s."userId" = u.id
-      LEFT JOIN "QuestaoSimulado" q ON q."simuladoId" = s.id AND q."respostaUsuario" IS NOT NULL
       GROUP BY u.id, u.name, u.email
-      HAVING COUNT(q.id) > 0
+      HAVING SUM(s."totalQuestoes") > 0
       ORDER BY "percentualAcerto" DESC
       LIMIT 10
     `
 
-    // Simulados por dia (últimos 30 dias)
     const last30Days = Array.from({ length: 30 }, (_, i) => {
       const date = new Date()
       date.setDate(date.getDate() - i)
@@ -251,49 +195,22 @@ export async function getQuestionsStatistics() {
         const nextDate = new Date(date)
         nextDate.setDate(nextDate.getDate() + 1)
 
-        const [simuladosCount, questoesCount] = await Promise.all([
-          prisma.simulado.count({
-            where: {
-              dataRealizacao: {
-                gte: date,
-                lt: nextDate
-              }
-            }
-          }),
-          prisma.questaoSimulado.count({
-            where: {
-              simulado: {
-                dataRealizacao: {
-                  gte: date,
-                  lt: nextDate
-                }
-              },
-              respostaUsuario: {
-                not: null
-              }
-            }
-          })
-        ])
+        const simuladosCount = await prisma.simulado.count({
+          where: { dataRealizacao: { gte: date, lt: nextDate } }
+        })
 
         return {
           date: date.toISOString().split('T')[0],
           simulados: simuladosCount,
-          questoesRespondidas: questoesCount
+          questoesRespondidas: 0
         }
       })
     )
 
-    // Disciplinas mais praticadas
     const disciplinasMaisPraticadas = await prisma.simuladoDisciplina.groupBy({
       by: ['disciplinaId'],
-      _count: {
-        id: true
-      },
-      orderBy: {
-        _count: {
-          id: 'desc'
-        }
-      },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
       take: 10
     })
 
@@ -311,19 +228,15 @@ export async function getQuestionsStatistics() {
       })
     )
 
-    const percentualAcertoGeral = totalQuestoesRespondidas > 0
-      ? ((totalQuestoesCorretas / totalQuestoesRespondidas) * 100).toFixed(2)
-      : '0.00'
-
     return {
       success: true,
       statistics: {
         totalSimulados,
         totalQuestoes,
-        totalQuestoesRespondidas,
+        totalQuestoesRespondidas: totalQuestoes,
         totalQuestoesCorretas,
-        percentualAcertoGeral: parseFloat(percentualAcertoGeral),
-        simuladosFinalizados,
+        percentualAcertoGeral,
+        simuladosFinalizados: totalSimulados,
         usuariosComSimulados: usuariosComSimulados.length,
         performancePorUsuario: performancePorUsuario.map(u => ({
           ...u,

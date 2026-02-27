@@ -205,7 +205,7 @@ export function EstatisticasClient({ reading, questions }: EstatisticasClientPro
               <CardContent>
                 <div className="text-3xl font-bold">{questions.totalSimulados}</div>
                 <p className="text-xs text-slate-500 mt-1">
-                  {questions.simuladosFinalizados} finalizados
+                  {questions.usuariosComSimulados} usuários
                 </p>
               </CardContent>
             </Card>

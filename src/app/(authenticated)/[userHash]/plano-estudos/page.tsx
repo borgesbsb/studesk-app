@@ -1,17 +1,13 @@
 "use client"
 
 import { PlanosEstudoGrid } from '@/components/plano-estudos/planos-estudos-grid'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Calendar, BookOpen } from 'lucide-react'
-import Link from 'next/link'
+import { Calendar, BookOpen } from 'lucide-react'
 import { useHeader } from "@/contexts/header-context"
-import { useUserHash } from "@/contexts/user-hash-context"
 import { useEffect } from "react"
 
 export default function PlanosEstudoPage() {
   const { setTitle } = useHeader()
-  const { hash } = useUserHash()
 
   useEffect(() => {
     setTitle("Planos de Estudo")
@@ -20,7 +16,6 @@ export default function PlanosEstudoPage() {
   return (
     <div className="h-full md:h-auto overflow-y-auto md:overflow-visible">
       <div className="space-y-6 pb-6 md:pb-0 pt-6 px-6">
-        {/* Content Card */}
         <Card className="border border-gray-200 shadow-sm bg-white">
           <CardHeader className="pb-5 border-b border-gray-100">
             <div className="flex items-center justify-between">
@@ -46,17 +41,6 @@ export default function PlanosEstudoPage() {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            {/* Botão adicionar */}
-            <div className="flex items-center justify-between mb-6">
-              <Link href={`/${hash}/plano-estudos/criar`}>
-                <Button size="lg" className="shadow-sm">
-                  <Plus className="h-5 w-5 mr-2" />
-                  Novo Plano
-                </Button>
-              </Link>
-            </div>
-
-            {/* Grid de planos */}
             <PlanosEstudoGrid />
           </CardContent>
         </Card>

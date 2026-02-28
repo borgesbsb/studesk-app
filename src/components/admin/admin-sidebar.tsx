@@ -11,9 +11,9 @@ import {
   BarChart3,
   LogOut,
   Settings,
-  ClipboardList
+  ClipboardList,
+  CalendarDays
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { logoutAdmin } from '@/interface/actions/admin/auth'
 
 interface NavItem {
@@ -37,6 +37,11 @@ const navItems: NavItem[] = [
     title: 'Usuários',
     href: '/admin/users',
     icon: Users
+  },
+  {
+    title: 'Planos de Estudo',
+    href: '/admin/plano-estudos',
+    icon: CalendarDays
   },
   {
     title: 'Disciplinas',
@@ -71,44 +76,55 @@ export function AdminSidebar() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 text-white w-64">
-      <div className="p-6 border-b border-slate-800">
-        <h1 className="text-xl font-bold">Studesk Admin</h1>
-        <p className="text-xs text-slate-400 mt-1">Painel Administrativo</p>
+    <div className="flex flex-col h-full w-60" style={{ background: '#1a1714' }}>
+      {/* Branding */}
+      <div className="px-5 py-5 border-b" style={{ borderColor: '#2c2825' }}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-sm">S</span>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm leading-tight">Studesk</p>
+            <p className="text-xs leading-tight" style={{ color: '#a09890' }}>Admin</p>
+          </div>
+        </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
         {navItems.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
                 isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-orange-500/15 text-orange-400 font-medium'
+                  : 'font-normal hover:bg-white/5'
               )}
+              style={!isActive ? { color: '#a09890' } : undefined}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-orange-400' : '')} />
               <span>{item.title}</span>
             </Link>
           )
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-slate-300 hover:bg-slate-800 hover:text-white"
+      {/* Logout */}
+      <div className="px-3 pb-4 border-t pt-3" style={{ borderColor: '#2c2825' }}>
+        <button
           onClick={handleLogout}
+          className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"
+          style={{ color: '#a09890' }}
         >
-          <LogOut className="h-5 w-5 mr-3" />
-          Sair
-        </Button>
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          <span>Sair</span>
+        </button>
       </div>
     </div>
   )

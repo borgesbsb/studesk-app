@@ -28,12 +28,13 @@ model User {
   googleDriveTokenExpiry  DateTime?
 
   // Relações
-  accounts         Account[]
-  sessions         Session[]
-  disciplinas      Disciplina[]
-  materiaisEstudo  MaterialEstudo[]
-  planosEstudo     PlanoEstudo[]
-  simulados        Simulado[]
+  accounts              Account[]
+  sessions              Session[]
+  disciplinas           Disciplina[]
+  materiaisEstudo       MaterialEstudo[]
+  planosEstudo          PlanoEstudo[]
+  resultadosSimulado    SimuladoResultado[]
+  planosAtribuidos      PlanoEstudoUsuario[]
 
   @@index([hash])
   @@index([email])
@@ -96,7 +97,7 @@ model Admin {
 
 model Disciplina {
   id            String               @id @default(cuid())
-  userId        String
+  userId        String?              // null para disciplinas admin (compartilhadas)
   nome          String
   descricao     String?
   cargaHoraria  Int                  @default(0)
@@ -104,11 +105,13 @@ model Disciplina {
   cor           String?              @default("#3b82f6")
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
-  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  materiais          DisciplinaMaterial[]
-  semanasEstudo      DisciplinaSemana[]
-  simulados          SimuladoDisciplina[]
-  configSimulados    ConfigSimuladoDisciplina[]
+  user                    User?                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materiais               DisciplinaMaterial[]
+  semanasEstudo           DisciplinaSemana[]
+  resultadosSimulado      SimuladoResultadoDisciplina[]
+  configSimulados         ConfigSimuladoDisciplina[]
+  planosDisponiveis       PlanoEstudoDisciplina[]
+  progressosExtras        ProgressoUsuarioDisciplinaExtra[]
 
   @@index([userId])
   @@index([nome])
@@ -116,7 +119,7 @@ model Disciplina {
 
 model MaterialEstudo {
   id                  String               @id @default(cuid())
-  userId              String
+  userId              String?              // null para materiais admin (compartilhados)
   nome                String
   tipo                String               @default("PDF")  // PDF ou VIDEO
   totalPaginas        Int
@@ -130,7 +133,7 @@ model MaterialEstudo {
   fonteOrigem         String?              // Fonte de origem (ex: "Google Drive: path/to/file")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
-  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
   anotacoes           Anotacao[]
   disciplinas         DisciplinaMaterial[]
   historicoLeitura    HistoricoLeitura[]
@@ -226,7 +229,7 @@ model PdfMobileText {
 
 model PlanoEstudo {
   id         String         @id @default(cuid())
-  userId     String
+  userId     String?        // null para planos criados pelo admin (compartilhados)
   nome       String
   descricao  String?
   dataInicio DateTime
@@ -234,8 +237,10 @@ model PlanoEstudo {
   ativo      Boolean        @default(true)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   semanas    SemanaEstudo[]
+  usuarios   PlanoEstudoUsuario[]
+  disciplinasDisponiveis PlanoEstudoDisciplina[]
 
   @@index([userId])
   @@index([ativo])
@@ -255,8 +260,8 @@ model SemanaEstudo {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   disciplinas     DisciplinaSemana[]
+  disciplinasExtras ProgressoUsuarioDisciplinaExtra[]
   plano           PlanoEstudo        @relation(fields: [planoId], references: [id], onDelete: Cascade)
-  simulados       Simulado[]
 
   @@unique([planoId, numeroSemana])
   @@index([planoId])
@@ -288,6 +293,7 @@ model DisciplinaSemana {
   disciplina          Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
   semana              SemanaEstudo    @relation(fields: [semanaId], references: [id], onDelete: Cascade)
   dias                DisciplinaDia[] // Relação com DisciplinaDia
+  progressosUsuarios  ProgressoUsuarioDisciplina[]
 
   @@unique([semanaId, disciplinaId])
   @@index([semanaId])
@@ -312,6 +318,110 @@ model DisciplinaDia {
   @@unique([disciplinaSemanaId, dia])
   @@index([disciplinaSemanaId])
   @@index([dia])
+}
+
+// ============================================
+// MÓDULO DE PLANOS COMPARTILHADOS (ADMIN)
+// ============================================
+
+// Join table: usuário atribuído a um plano compartilhado
+model PlanoEstudoUsuario {
+  id             String   @id @default(cuid())
+  planoId        String
+  userId         String
+  dataAtribuicao DateTime @default(now())
+  plano          PlanoEstudo @relation(fields: [planoId], references: [id], onDelete: Cascade)
+  usuario        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progressos     ProgressoUsuarioDisciplina[]
+  disciplinasExtras ProgressoUsuarioDisciplinaExtra[]
+
+  @@unique([planoId, userId])
+  @@index([userId])
+  @@index([planoId])
+}
+
+// Metas e progresso de um usuário em uma disciplina de um plano compartilhado
+model ProgressoUsuarioDisciplina {
+  id                  String   @id @default(cuid())
+  planoUsuarioId      String
+  disciplinaSemanaId  String
+  // Metas definidas pelo usuário
+  horasPlanejadas     Int      @default(0)
+  questoesPlanejadas  Int      @default(0)
+  tempoVideoPlanejado Int      @default(0)
+  totalPaginas        Int      @default(0)
+  diasEstudo          String?
+  // Progresso do usuário
+  horasRealizadas     Int      @default(0)
+  questoesRealizadas  Int      @default(0)
+  paginasLidas        Int      @default(0)
+  tempoVideoRealizado Int      @default(0)
+  concluida           Boolean  @default(false)
+  removida            Boolean  @default(false)
+  observacoes         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  planoUsuario        PlanoEstudoUsuario @relation(fields: [planoUsuarioId], references: [id], onDelete: Cascade)
+  disciplinaSemana    DisciplinaSemana   @relation(fields: [disciplinaSemanaId], references: [id], onDelete: Cascade)
+  dias                ProgressoUsuarioDisciplinaDia[]
+
+  @@unique([planoUsuarioId, disciplinaSemanaId])
+  @@index([planoUsuarioId])
+  @@index([disciplinaSemanaId])
+}
+
+// Progresso diário de um usuário em uma disciplina de um plano compartilhado
+model ProgressoUsuarioDisciplinaDia {
+  id                 String   @id @default(cuid())
+  progressoId        String
+  dia                String   // "dia1" ... "dia7"
+  horasRealizadas    Float    @default(0)
+  questoesRealizadas Int      @default(0)
+  concluida          Boolean  @default(false)
+  observacoes        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  progresso          ProgressoUsuarioDisciplina @relation(fields: [progressoId], references: [id], onDelete: Cascade)
+
+  @@unique([progressoId, dia])
+  @@index([progressoId])
+}
+
+// Pool de disciplinas disponíveis em um plano admin
+model PlanoEstudoDisciplina {
+  id           String      @id @default(cuid())
+  planoId      String
+  disciplinaId String
+  createdAt    DateTime    @default(now())
+  plano        PlanoEstudo @relation(fields: [planoId], references: [id], onDelete: Cascade)
+  disciplina   Disciplina  @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([planoId, disciplinaId])
+  @@index([planoId])
+}
+
+// Disciplinas extras adicionadas pelo usuário em um ciclo (fora do padrão admin)
+model ProgressoUsuarioDisciplinaExtra {
+  id                 String   @id @default(cuid())
+  planoUsuarioId     String
+  semanaId           String
+  disciplinaId       String
+  diasEstudo         String?
+  horasPlanejadas    Int      @default(0)
+  questoesPlanejadas Int      @default(0)
+  horasRealizadas    Int      @default(0)
+  questoesRealizadas Int      @default(0)
+  concluida          Boolean  @default(false)
+  observacoes        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  planoUsuario       PlanoEstudoUsuario @relation(fields: [planoUsuarioId], references: [id], onDelete: Cascade)
+  semana             SemanaEstudo       @relation(fields: [semanaId], references: [id], onDelete: Cascade)
+  disciplina         Disciplina         @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([planoUsuarioId, semanaId, disciplinaId])
+  @@index([planoUsuarioId])
+  @@index([semanaId])
 }
 
 // ============================================
@@ -346,44 +456,59 @@ model ConfigSimuladoDisciplina {
   @@index([disciplinaId])
 }
 
+// Simulado = evento criado pelo admin
 model Simulado {
   id               String    @id @default(cuid())
-  userId           String
   configSimuladoId String?
-  semanaEstudoId   String?
   nome             String
-  dataRealizacao   DateTime  @default(now())
-  totalQuestoes    Int       @default(0)
-  totalAcertos     Int       @default(0)
-  percentualGeral  Float     @default(0)
+  dataRealizacao   DateTime
+  ativo            Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  config           ConfigSimulado? @relation(fields: [configSimuladoId], references: [id], onDelete: SetNull)
-  semanaEstudo     SemanaEstudo?  @relation(fields: [semanaEstudoId], references: [id], onDelete: SetNull)
-  disciplinas      SimuladoDisciplina[]
+  config           ConfigSimulado?    @relation(fields: [configSimuladoId], references: [id], onDelete: SetNull)
+  resultados       SimuladoResultado[]
 
-  @@index([userId])
   @@index([configSimuladoId])
-  @@index([semanaEstudoId])
   @@index([dataRealizacao])
+  @@index([ativo])
 }
 
-model SimuladoDisciplina {
-  id             String    @id @default(cuid())
-  simuladoId     String
-  disciplinaId   String
-  totalQuestoes  Int
-  acertos        Int
-  percentual     Float
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+// Resultado de um usuário em um simulado
+model SimuladoResultado {
+  id              String   @id @default(cuid())
+  simuladoId      String
+  userId          String
+  totalQuestoes   Int      @default(0)
+  totalAcertos    Int      @default(0)
+  percentualGeral Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  simulado       Simulado   @relation(fields: [simuladoId], references: [id], onDelete: Cascade)
-  disciplina     Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  simulado        Simulado   @relation(fields: [simuladoId], references: [id], onDelete: Cascade)
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disciplinas     SimuladoResultadoDisciplina[]
 
-  @@unique([simuladoId, disciplinaId])
+  @@unique([simuladoId, userId])
   @@index([simuladoId])
+  @@index([userId])
+}
+
+// Resultado por disciplina de um usuário em um simulado
+model SimuladoResultadoDisciplina {
+  id          String   @id @default(cuid())
+  resultadoId String
+  disciplinaId String
+  totalQuestoes Int
+  acertos      Int
+  percentual   Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  resultado    SimuladoResultado @relation(fields: [resultadoId], references: [id], onDelete: Cascade)
+  disciplina   Disciplina        @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([resultadoId, disciplinaId])
+  @@index([resultadoId])
   @@index([disciplinaId])
 }

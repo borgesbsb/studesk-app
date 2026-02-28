@@ -19,8 +19,11 @@ export async function adicionarQuestoes(params: AdicionarQuestoesParams) {
     // Buscar a semana de estudo ativa para a disciplina do usuário
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
-        userId,
         ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ],
         dataInicio: {
           lte: diaConsultado
         },
@@ -60,6 +63,81 @@ export async function adicionarQuestoes(params: AdicionarQuestoesParams) {
       throw new Error('Semana de estudo não encontrada para o período');
     }
 
+    // Calcular qual é o diaId atual (dia1, dia2, etc)
+    const inicioNormalizado = new Date(semanaEstudo.dataInicio);
+    inicioNormalizado.setHours(0, 0, 0, 0);
+    const consultadaNormalizada = new Date(diaConsultado);
+    consultadaNormalizada.setHours(0, 0, 0, 0);
+    const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    const diaIdAtual = `dia${diffDays + 1}`;
+
+    // ── PLANO COMPARTILHADO ────────────────────────────────────────────────────
+    if (planoAtivo.userId === null) {
+      const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+        where: { planoId_userId: { planoId: planoAtivo.id, userId } }
+      });
+      if (!planoUsuario) throw new Error('Usuário não atribuído ao plano');
+
+      const discSemana = await prisma.disciplinaSemana.findFirst({
+        where: { semanaId: semanaEstudo.id, disciplinaId }
+      });
+
+      if (discSemana) {
+        // Disciplina do admin: registra em ProgressoUsuarioDisciplinaDia
+        const progresso = await prisma.progressoUsuarioDisciplina.upsert({
+          where: {
+            planoUsuarioId_disciplinaSemanaId: {
+              planoUsuarioId: planoUsuario.id,
+              disciplinaSemanaId: discSemana.id
+            }
+          },
+          update: {},
+          create: { planoUsuarioId: planoUsuario.id, disciplinaSemanaId: discSemana.id }
+        });
+
+        const diaExistente = await prisma.progressoUsuarioDisciplinaDia.findUnique({
+          where: { progressoId_dia: { progressoId: progresso.id, dia: diaIdAtual } }
+        });
+
+        if (diaExistente) {
+          await prisma.progressoUsuarioDisciplinaDia.update({
+            where: { id: diaExistente.id },
+            data: { questoesRealizadas: diaExistente.questoesRealizadas + quantidade }
+          });
+        } else {
+          await prisma.progressoUsuarioDisciplinaDia.create({
+            data: { progressoId: progresso.id, dia: diaIdAtual, questoesRealizadas: quantidade }
+          });
+        }
+      } else {
+        // Disciplina extra do pool
+        const extra = await prisma.progressoUsuarioDisciplinaExtra.findUnique({
+          where: {
+            planoUsuarioId_semanaId_disciplinaId: {
+              planoUsuarioId: planoUsuario.id,
+              semanaId: semanaEstudo.id,
+              disciplinaId
+            }
+          }
+        });
+        if (!extra) throw new Error('Disciplina não encontrada no plano');
+        await prisma.progressoUsuarioDisciplinaExtra.update({
+          where: { id: extra.id },
+          data: { questoesRealizadas: extra.questoesRealizadas + quantidade }
+        });
+      }
+
+      revalidatePath('/dashboard');
+      revalidatePath('/hoje');
+      return {
+        success: true,
+        message: `${quantidade} ${quantidade !== 1 ? 'questões adicionadas' : 'questão adicionada'} com sucesso!`,
+        questoesAdicionadas: quantidade
+      };
+    }
+    // ── PLANO PESSOAL ─────────────────────────────────────────────────────────
+
     // Buscar a disciplina na semana
     const disciplinaSemana = await prisma.disciplinaSemana.findFirst({
       where: {
@@ -71,15 +149,6 @@ export async function adicionarQuestoes(params: AdicionarQuestoesParams) {
     if (!disciplinaSemana) {
       throw new Error('Disciplina não encontrada na semana de estudo');
     }
-
-    // Calcular qual é o diaId atual (dia1, dia2, etc)
-    const inicioNormalizado = new Date(semanaEstudo.dataInicio);
-    inicioNormalizado.setHours(0, 0, 0, 0);
-    const consultadaNormalizada = new Date(diaConsultado);
-    consultadaNormalizada.setHours(0, 0, 0, 0);
-    const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    const diaIdAtual = `dia${diffDays + 1}`;
 
     // Buscar ou criar DisciplinaDia para o dia específico
     let disciplinaDia = await prisma.disciplinaDia.findFirst({

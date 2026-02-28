@@ -88,8 +88,11 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
     // Primeiro, buscar TODOS os planos ativos do usuário para debug
     const todosPlanos = await prisma.planoEstudo.findMany({
       where: {
-        userId,
-        ativo: true
+        ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ]
       },
       select: {
         id: true,
@@ -112,21 +115,23 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
     })
 
     // Busca o plano de estudo ativo do usuário que contenha o dia consultado
-    // Importante: comparar apenas as DATAS, ignorando horários
+    // Inclui planos pessoais (userId match) e planos compartilhados atribuídos ao usuário
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
-        userId,
         ativo: true,
-        // Comparar se diaConsultado está entre dataInicio e dataFim (ignorando horários)
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ],
         AND: [
           {
             dataInicio: {
-              lte: fimDia  // Se início do plano <= fim do dia consultado
+              lte: fimDia
             }
           },
           {
             dataFim: {
-              gte: inicioDia  // Se fim do plano >= início do dia consultado
+              gte: inicioDia
             }
           }
         ]
@@ -195,6 +200,111 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
       diffDays,
       diaIdAtual
     })
+
+    // ── PLANO COMPARTILHADO ──────────────────────────────────────────────────
+    if (planoAtivo.userId === null) {
+      const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+        where: { planoId_userId: { planoId: planoAtivo.id, userId } }
+      })
+      if (!planoUsuario) return []
+
+      // Progressos do usuário para disciplinas deste ciclo
+      const progressos = await prisma.progressoUsuarioDisciplina.findMany({
+        where: {
+          planoUsuarioId: planoUsuario.id,
+          removida: false,
+          disciplinaSemana: { semanaId: semanaAtual.id }
+        },
+        include: {
+          disciplinaSemana: { include: { disciplina: true } },
+          dias: { where: { dia: diaIdAtual } }
+        }
+      })
+
+      const progressosDoDia = progressos.filter(p => {
+        const dias = p.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
+        return dias.includes(diaIdAtual)
+      })
+
+      // Disciplinas extras do pool agendadas para hoje
+      const extras = await prisma.progressoUsuarioDisciplinaExtra.findMany({
+        where: { planoUsuarioId: planoUsuario.id, semanaId: semanaAtual.id },
+        include: { disciplina: true }
+      })
+
+      const extrasDoDia = extras.filter(e => {
+        const dias = e.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
+        return dias.includes(diaIdAtual)
+      })
+
+      const calcTempoSessoesPdf = async (disciplinaId: string) => {
+        const mats = await prisma.disciplinaMaterial.findMany({
+          where: { disciplinaId },
+          include: {
+            material: {
+              include: {
+                historicoLeitura: {
+                  where: {
+                    dataLeitura: { gte: semanaAtual.dataInicio, lte: semanaAtual.dataFim },
+                    nomeSessao: { not: null },
+                    assuntosEstudados: { not: null },
+                    NOT: { assuntosEstudados: { contains: '[TEMPO TRANSFERIDO]' } }
+                  }
+                }
+              }
+            }
+          }
+        })
+        const seg = mats.reduce((t, dm) =>
+          t + dm.material.historicoLeitura.reduce((s, h) => s + h.tempoLeituraSegundos, 0), 0)
+        return Math.round((seg / 3600) * 100) / 100
+      }
+
+      const materiasDeProgressos: MateriaDoDia[] = await Promise.all(
+        progressosDoDia.map(async (prog) => {
+          const diaRec = prog.dias[0]
+          return {
+            id: prog.disciplinaSemanaId,
+            disciplinaId: prog.disciplinaSemana.disciplinaId,
+            disciplinaNome: prog.disciplinaSemana.disciplina.nome,
+            disciplinaCor: prog.disciplinaSemana.disciplina.cor || undefined,
+            horasPlanejadas: prog.horasPlanejadas,
+            horasRealizadas: diaRec?.horasRealizadas ?? 0,
+            tempoRealEstudo: diaRec?.horasRealizadas ?? 0,
+            tempoSessoesPdf: await calcTempoSessoesPdf(prog.disciplinaSemana.disciplinaId),
+            concluida: prog.concluida,
+            materialNome: prog.disciplinaSemana.materialNome || undefined,
+            questoesPlanejadas: prog.questoesPlanejadas,
+            questoesRealizadas: diaRec?.questoesRealizadas ?? 0,
+            prioridade: prog.disciplinaSemana.prioridade,
+            observacoes: prog.observacoes || prog.disciplinaSemana.observacoes || undefined
+          }
+        })
+      )
+
+      const materiasDeExtras: MateriaDoDia[] = await Promise.all(
+        extrasDoDia.map(async (extra) => ({
+          id: extra.id,
+          disciplinaId: extra.disciplinaId,
+          disciplinaNome: extra.disciplina.nome,
+          disciplinaCor: extra.disciplina.cor || undefined,
+          horasPlanejadas: extra.horasPlanejadas,
+          // horasRealizadas armazenado em minutos (Int) → converter para horas
+          horasRealizadas: Math.round((extra.horasRealizadas / 60) * 100) / 100,
+          tempoRealEstudo: Math.round((extra.horasRealizadas / 60) * 100) / 100,
+          tempoSessoesPdf: await calcTempoSessoesPdf(extra.disciplinaId),
+          concluida: extra.concluida,
+          materialNome: undefined,
+          questoesPlanejadas: extra.questoesPlanejadas,
+          questoesRealizadas: extra.questoesRealizadas,
+          prioridade: 999,
+          observacoes: extra.observacoes || undefined
+        }))
+      )
+
+      return [...materiasDeProgressos, ...materiasDeExtras].sort((a, b) => a.prioridade - b.prioridade)
+    }
+    // ── FIM PLANO COMPARTILHADO (plano pessoal continua abaixo) ──────────────
 
     // Filtra disciplinas programadas para o dia consultado
     const disciplinasDoDia = semanaAtual.disciplinas.filter((disciplinaSemana) => {

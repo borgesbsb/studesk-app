@@ -31,7 +31,6 @@ import {
   getProgressoUsuarioPlano,
   upsertProgressoUsuarioDisciplina,
   adicionarDisciplinaCicloUsuario,
-  removerDisciplinaExtraCicloUsuario,
   removerDiaExtraCicloUsuario,
   atualizarMetasExtraCicloUsuario,
 } from '@/interface/actions/plano-estudo/progresso-usuario'
@@ -81,7 +80,7 @@ interface DisciplinaExtra {
   id: string
   semanaId: string
   disciplinaId: string
-  diasEstudo: string | null
+  dia: string
   horasPlanejadas: number
   questoesPlanejadas: number
   disciplina: DisciplinaInfo
@@ -368,10 +367,10 @@ function DiaBloco({
   const opcoesAdmin = ciclo.disciplinas.filter(d => !idsNoDia.includes(d.disciplinaId))
   const opcoesPool = pool.filter(p =>
     !idsAdminNoCiclo.includes(p.disciplinaId) &&
-    !disciplinasExtras.some(e => e.disciplinaId === p.disciplinaId && parseDias(e.diasEstudo).includes(dia.id))
+    !disciplinasExtras.some(e => e.disciplinaId === p.disciplinaId && e.dia === dia.id)
   )
 
-  const extrasNoDia = disciplinasExtras.filter(e => parseDias(e.diasEstudo).includes(dia.id))
+  const extrasNoDia = disciplinasExtras.filter(e => e.dia === dia.id)
 
   const handleAdicionar = async () => {
     if (!selecionada) return
@@ -409,13 +408,9 @@ function DiaBloco({
   }
 
   const handleRemoverExtraDoDia = async (extraId: string) => {
-    const res = await removerDiaExtraCicloUsuario(extraId, dia.id)
+    const res = await removerDiaExtraCicloUsuario(extraId)
     if (res.error) { toast.error(res.error); return }
-    if ('deleted' in res && res.deleted) {
-      onExtraExcluida(extraId)
-    } else if (res.success && res.data) {
-      onExtraAdicionada(res.data as DisciplinaExtra)
-    }
+    onExtraExcluida(extraId)
   }
 
   const temOpcoes = opcoesAdmin.length > 0 || opcoesPool.length > 0
@@ -515,7 +510,6 @@ function CicloCard({
   disciplinasExtras,
   onAtualizado,
   onExtraAdicionada,
-  onExtraRemovida,
   onExtraExcluida,
 }: {
   ciclo: Ciclo
@@ -525,13 +519,10 @@ function CicloCard({
   disciplinasExtras: DisciplinaExtra[]
   onAtualizado: (p: ProgressoDisciplina) => void
   onExtraAdicionada: (extra: DisciplinaExtra) => void
-  onExtraRemovida: (extraId: string) => void
   onExtraExcluida: (extraId: string) => void
 }) {
   const [expandido, setExpandido] = useState(false)
   const extrasNoCiclo = disciplinasExtras.filter(e => e.semanaId === ciclo.id)
-  // Extras sem nenhum dia associado (registros legados ou adicionados sem dia)
-  const extrasSemDia = extrasNoCiclo.filter(e => !parseDias(e.diasEstudo).length)
 
   return (
     <Card>
@@ -580,25 +571,6 @@ function CicloCard({
               />
             ))
           )}
-
-          {extrasSemDia.length > 0 && (
-            <div className="pt-1">
-              <p className="text-xs text-muted-foreground mb-2">Disciplinas extras adicionadas</p>
-              <div className="flex flex-wrap gap-2">
-                {extrasSemDia.map(extra => (
-                  <Badge key={extra.id} variant="secondary" className="gap-1.5 pr-1">
-                    {extra.disciplina.nome}
-                    <button
-                      onClick={() => onExtraRemovida(extra.id)}
-                      className="hover:text-destructive transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
         </CardContent>
       )}
     </Card>
@@ -635,15 +607,6 @@ export function DetalhePlanoCompartilhado({ planoId }: { planoId: string }) {
       }
       return { ...prev, disciplinasExtras: [...prev.disciplinasExtras, extra] }
     })
-  }
-
-  const handleExtraRemovida = async (extraId: string) => {
-    const res = await removerDisciplinaExtraCicloUsuario(extraId)
-    if (res.error) toast.error(res.error)
-    else {
-      toast.success('Disciplina removida')
-      handleRemoverExtraEstado(extraId)
-    }
   }
 
   const handleRemoverExtraEstado = (extraId: string) => {
@@ -722,7 +685,6 @@ export function DetalhePlanoCompartilhado({ planoId }: { planoId: string }) {
             disciplinasExtras={planoUsuario.disciplinasExtras}
             onAtualizado={handleAtualizado}
             onExtraAdicionada={handleExtraAdicionada}
-            onExtraRemovida={handleExtraRemovida}
             onExtraExcluida={handleRemoverExtraEstado}
           />
         ))

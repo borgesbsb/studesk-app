@@ -227,14 +227,9 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
       })
 
       // Disciplinas extras do pool agendadas para hoje
-      const extras = await prisma.progressoUsuarioDisciplinaExtra.findMany({
-        where: { planoUsuarioId: planoUsuario.id, semanaId: semanaAtual.id },
+      const extrasDoDia = await prisma.progressoUsuarioDisciplinaExtra.findMany({
+        where: { planoUsuarioId: planoUsuario.id, semanaId: semanaAtual.id, dia: diaIdAtual },
         include: { disciplina: true }
-      })
-
-      const extrasDoDia = extras.filter(e => {
-        const dias = e.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
-        return dias.includes(diaIdAtual)
       })
 
       const calcTempoSessoesPdf = async (disciplinaId: string) => {

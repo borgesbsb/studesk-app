@@ -20,8 +20,11 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
 
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
-        userId,
         ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ],
         dataInicio: { lte: diaConsultado },
         dataFim: { gte: diaConsultado }
       }
@@ -46,6 +49,81 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
     });
 
     if (!semanaAtual) return [];
+
+    // ── PLANO COMPARTILHADO ────────────────────────────────────────────────────
+    if (planoAtivo.userId === null) {
+      const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+        where: { planoId_userId: { planoId: planoAtivo.id, userId } }
+      });
+      if (!planoUsuario) return [];
+
+      const [progressos, extras] = await Promise.all([
+        prisma.progressoUsuarioDisciplina.findMany({
+          where: {
+            planoUsuarioId: planoUsuario.id,
+            removida: false,
+            disciplinaSemana: { semanaId: semanaAtual.id }
+          },
+          include: {
+            disciplinaSemana: {
+              include: { disciplina: true }
+            },
+            dias: true
+          }
+        }),
+        prisma.progressoUsuarioDisciplinaExtra.findMany({
+          where: { planoUsuarioId: planoUsuario.id, semanaId: semanaAtual.id },
+          include: { disciplina: true }
+        })
+      ]);
+
+      const disciplinasDeProgressos: DisciplinaCiclo[] = progressos.map(p => {
+        const ds = p.disciplinaSemana;
+        const horasPlanejadas = ds.horasPlanejadas;
+        const questoesPlanejadas = ds.questoesPlanejadas;
+        const horasRealizadas = p.dias.reduce((acc, d) => acc + d.horasRealizadas, 0);
+        const questoesRealizadas = p.dias.reduce((acc, d) => acc + d.questoesRealizadas, 0);
+        return {
+          disciplinaId: ds.disciplinaId,
+          nome: ds.disciplina.nome.trim(),
+          cor: ds.disciplina.cor,
+          horasPlanejadas: Math.round(horasPlanejadas * 100) / 100,
+          horasRealizadas: Math.round(horasRealizadas * 100) / 100,
+          questoesPlanejadas,
+          questoesRealizadas,
+        };
+      });
+
+      // Agrupar extras por disciplinaId (cada disciplina pode ter um registro por dia)
+      const extrasMap = new Map<string, DisciplinaCiclo>()
+      for (const e of extras) {
+        const existing = extrasMap.get(e.disciplinaId)
+        if (existing) {
+          existing.horasPlanejadas += e.horasPlanejadas / 60
+          existing.horasRealizadas += e.horasRealizadas / 60
+          existing.questoesPlanejadas += e.questoesPlanejadas
+          existing.questoesRealizadas += e.questoesRealizadas
+        } else {
+          extrasMap.set(e.disciplinaId, {
+            disciplinaId: e.disciplinaId,
+            nome: e.disciplina.nome.trim(),
+            cor: e.disciplina.cor,
+            horasPlanejadas: e.horasPlanejadas / 60,
+            horasRealizadas: e.horasRealizadas / 60,
+            questoesPlanejadas: e.questoesPlanejadas,
+            questoesRealizadas: e.questoesRealizadas,
+          })
+        }
+      }
+      const disciplinasDeExtras: DisciplinaCiclo[] = Array.from(extrasMap.values()).map(e => ({
+        ...e,
+        horasPlanejadas: Math.round(e.horasPlanejadas * 100) / 100,
+        horasRealizadas: Math.round(e.horasRealizadas * 100) / 100,
+      }))
+
+      return [...disciplinasDeProgressos, ...disciplinasDeExtras];
+    }
+    // ── PLANO PESSOAL ─────────────────────────────────────────────────────────
 
     return semanaAtual.disciplinas.map(ds => {
       let horasPlanejadas = 0;

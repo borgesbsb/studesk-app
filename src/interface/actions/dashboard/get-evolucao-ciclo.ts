@@ -38,8 +38,11 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
     // Buscar o plano ativo que contém o dia consultado
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
-        userId,
         ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ],
         dataInicio: {
           lte: diaConsultado
         },
@@ -86,6 +89,126 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
     if (!semanaAtual) {
       return null;
     }
+
+    // ── PLANO COMPARTILHADO ────────────────────────────────────────────────────
+    if (planoAtivo.userId === null) {
+      const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+        where: { planoId_userId: { planoId: planoAtivo.id, userId } }
+      });
+      if (!planoUsuario) return null;
+
+      const [progressos, extras] = await Promise.all([
+        prisma.progressoUsuarioDisciplina.findMany({
+          where: {
+            planoUsuarioId: planoUsuario.id,
+            removida: false,
+            disciplinaSemana: { semanaId: semanaAtual.id }
+          },
+          include: {
+            disciplinaSemana: {
+              include: {
+                disciplina: { select: { id: true, nome: true, cor: true } }
+              }
+            },
+            dias: true
+          }
+        }),
+        prisma.progressoUsuarioDisciplinaExtra.findMany({
+          where: { planoUsuarioId: planoUsuario.id, semanaId: semanaAtual.id },
+          include: { disciplina: { select: { id: true, nome: true, cor: true } } }
+        })
+      ]);
+
+      // Montar mapa de dias
+      const inicioNorm = new Date(semanaAtual.dataInicio);
+      inicioNorm.setHours(0, 0, 0, 0);
+      const diaConsNorm = new Date(diaConsultado);
+      diaConsNorm.setHours(0, 0, 0, 0);
+      const diasDecorridos = Math.floor((diaConsNorm.getTime() - inicioNorm.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      const diasMapShared = new Map<string, DiaEvolucao>();
+      for (let i = 0; i < diasDecorridos; i++) {
+        const diaId = `dia${i + 1}`;
+        const dataDia = new Date(inicioNorm);
+        dataDia.setDate(dataDia.getDate() + i);
+        diasMapShared.set(diaId, {
+          dia: diaId,
+          data: dataDia,
+          horasPlanejadas: 0,
+          horasRealizadas: 0,
+          questoesPlanejadas: 0,
+          questoesRealizadas: 0
+        });
+      }
+
+      // Admin progressos: distribui planejadas pelos dias de estudo; realizadas por ProgressoUsuarioDisciplinaDia
+      progressos.forEach(p => {
+        const diasEstudo = p.diasEstudo
+          ? p.diasEstudo.split(',').map(d => d.trim()).filter(Boolean)
+          : []
+        const numDias = diasEstudo.length || 1
+        const horasPorDia = p.disciplinaSemana.horasPlanejadas / numDias
+        const questoesPorDia = p.disciplinaSemana.questoesPlanejadas / numDias
+
+        diasEstudo.forEach(diaId => {
+          const entry = diasMapShared.get(diaId)
+          if (entry) {
+            entry.horasPlanejadas += horasPorDia
+            entry.questoesPlanejadas += questoesPorDia
+          }
+        })
+
+        p.dias.forEach(d => {
+          const entry = diasMapShared.get(d.dia)
+          if (entry) {
+            entry.horasRealizadas += d.horasRealizadas
+            entry.questoesRealizadas += d.questoesRealizadas
+          }
+        })
+      });
+
+      // Extras: cada registro tem dia e valores corretos por dia
+      extras.forEach(e => {
+        const entry = diasMapShared.get(e.dia);
+        if (entry) {
+          entry.horasPlanejadas += e.horasPlanejadas / 60;
+          entry.questoesPlanejadas += e.questoesPlanejadas;
+          entry.horasRealizadas += e.horasRealizadas / 60;
+          entry.questoesRealizadas += e.questoesRealizadas;
+        }
+      });
+
+      const diasShared = Array.from(diasMapShared.values()).sort((a, b) => parseInt(a.dia.replace('dia', '')) - parseInt(b.dia.replace('dia', '')));
+
+      const disciplinasDeProgressos: DisciplinaCiclo[] = progressos.map(p => ({
+        id: p.disciplinaSemana.disciplina.id,
+        nome: p.disciplinaSemana.disciplina.nome,
+        cor: p.disciplinaSemana.disciplina.cor || undefined,
+        horasPlanejadas: p.disciplinaSemana.horasPlanejadas,
+        horasRealizadas: p.dias.reduce((acc, d) => acc + d.horasRealizadas, 0),
+        questoesPlanejadas: p.disciplinaSemana.questoesPlanejadas,
+        questoesRealizadas: p.dias.reduce((acc, d) => acc + d.questoesRealizadas, 0),
+      }));
+
+      const disciplinasDeExtras: DisciplinaCiclo[] = extras.map(e => ({
+        id: e.disciplina.id,
+        nome: e.disciplina.nome,
+        cor: e.disciplina.cor || undefined,
+        horasPlanejadas: Math.round((e.horasPlanejadas / 60) * 100) / 100,
+        horasRealizadas: Math.round((e.horasRealizadas / 60) * 100) / 100,
+        questoesPlanejadas: e.questoesPlanejadas,
+        questoesRealizadas: e.questoesRealizadas,
+      }));
+
+      return {
+        dias: diasShared,
+        disciplinas: [...disciplinasDeProgressos, ...disciplinasDeExtras],
+        nomeCiclo: `Ciclo ${semanaAtual.numeroSemana || 1}`,
+        dataInicio: semanaAtual.dataInicio,
+        dataFim: semanaAtual.dataFim
+      };
+    }
+    // ── PLANO PESSOAL ─────────────────────────────────────────────────────────
 
     // Calcular quantos dias se passaram desde o início do ciclo até a data consultada
     const inicioNormalizado = new Date(semanaAtual.dataInicio);

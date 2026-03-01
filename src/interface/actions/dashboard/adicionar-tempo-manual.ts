@@ -155,10 +155,11 @@ export async function adicionarTempoManual(params: AdicionarTempoManualParams) {
         // Disciplina extra do pool: armazena em minutos (Int)
         const extra = await prisma.progressoUsuarioDisciplinaExtra.findUnique({
           where: {
-            planoUsuarioId_semanaId_disciplinaId: {
+            planoUsuarioId_semanaId_disciplinaId_dia: {
               planoUsuarioId: planoUsuario.id,
               semanaId: semanaEstudo.id,
-              disciplinaId
+              disciplinaId,
+              dia: diaIdAtual
             }
           }
         });

@@ -400,13 +400,13 @@ model PlanoEstudoDisciplina {
   @@index([planoId])
 }
 
-// Disciplinas extras adicionadas pelo usuário em um ciclo (fora do padrão admin)
+// Disciplinas extras adicionadas pelo usuário em um ciclo (fora do padrão admin) — um registro por dia
 model ProgressoUsuarioDisciplinaExtra {
   id                 String   @id @default(cuid())
   planoUsuarioId     String
   semanaId           String
   disciplinaId       String
-  diasEstudo         String?
+  dia                String   // "dia1", "dia2", etc.
   horasPlanejadas    Int      @default(0)
   questoesPlanejadas Int      @default(0)
   horasRealizadas    Int      @default(0)
@@ -419,7 +419,7 @@ model ProgressoUsuarioDisciplinaExtra {
   semana             SemanaEstudo       @relation(fields: [semanaId], references: [id], onDelete: Cascade)
   disciplina         Disciplina         @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
 
-  @@unique([planoUsuarioId, semanaId, disciplinaId])
+  @@unique([planoUsuarioId, semanaId, disciplinaId, dia])
   @@index([planoUsuarioId])
   @@index([semanaId])
 }

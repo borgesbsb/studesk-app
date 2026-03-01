@@ -40,7 +40,8 @@ export async function getProgressoUsuarioPlano(planoId: string) {
         disciplinasExtras: {
           include: {
             disciplina: { select: { id: true, nome: true, cor: true } }
-          }
+          },
+          orderBy: { dia: 'asc' }
         }
       }
     })
@@ -124,7 +125,7 @@ export async function upsertProgressoUsuarioDisciplina(data: {
   }
 }
 
-// Adiciona uma disciplina do pool ao ciclo associando a um dia específico (upsert)
+// Adiciona uma disciplina do pool ao ciclo para um dia específico (upsert por dia)
 export async function adicionarDisciplinaCicloUsuario(data: {
   planoId: string
   semanaId: string
@@ -145,36 +146,21 @@ export async function adicionarDisciplinaCicloUsuario(data: {
     })
     if (!noPool) return { error: 'Disciplina não está no pool deste plano' }
 
-    // Verifica se já existe um extra para esta disciplina neste ciclo (upsert)
-    const existente = await prisma.progressoUsuarioDisciplinaExtra.findUnique({
+    const extra = await prisma.progressoUsuarioDisciplinaExtra.upsert({
       where: {
-        planoUsuarioId_semanaId_disciplinaId: {
+        planoUsuarioId_semanaId_disciplinaId_dia: {
           planoUsuarioId: planoUsuario.id,
           semanaId: data.semanaId,
-          disciplinaId: data.disciplinaId
+          disciplinaId: data.disciplinaId,
+          dia: data.dia
         }
-      }
-    })
-
-    if (existente) {
-      const diasAtuais = existente.diasEstudo
-        ? existente.diasEstudo.split(',').map(d => d.trim()).filter(Boolean)
-        : []
-      if (!diasAtuais.includes(data.dia)) diasAtuais.push(data.dia)
-      const updated = await prisma.progressoUsuarioDisciplinaExtra.update({
-        where: { id: existente.id },
-        data: { diasEstudo: diasAtuais.join(',') },
-        include: { disciplina: { select: { id: true, nome: true, cor: true } } }
-      })
-      return { success: true, data: updated }
-    }
-
-    const extra = await prisma.progressoUsuarioDisciplinaExtra.create({
-      data: {
+      },
+      update: {},
+      create: {
         planoUsuarioId: planoUsuario.id,
         semanaId: data.semanaId,
         disciplinaId: data.disciplinaId,
-        diasEstudo: data.dia
+        dia: data.dia
       },
       include: {
         disciplina: { select: { id: true, nome: true, cor: true } }
@@ -216,8 +202,8 @@ export async function atualizarMetasExtraCicloUsuario(data: {
   }
 }
 
-// Remove um dia específico de uma disciplina extra; se ficar sem dias, deleta o registro
-export async function removerDiaExtraCicloUsuario(extraId: string, dia: string) {
+// Remove o registro de disciplina extra de um dia específico (cada extra já é por dia)
+export async function removerDiaExtraCicloUsuario(extraId: string) {
   try {
     const { userId } = await requireAuth()
 
@@ -226,22 +212,8 @@ export async function removerDiaExtraCicloUsuario(extraId: string, dia: string) 
     })
     if (!extra) return { error: 'Disciplina não encontrada ou sem acesso' }
 
-    const diasAtuais = extra.diasEstudo
-      ? extra.diasEstudo.split(',').map(d => d.trim()).filter(Boolean)
-      : []
-    const novosDias = diasAtuais.filter(d => d !== dia)
-
-    if (novosDias.length === 0) {
-      await prisma.progressoUsuarioDisciplinaExtra.delete({ where: { id: extraId } })
-      return { success: true, deleted: true }
-    }
-
-    const updated = await prisma.progressoUsuarioDisciplinaExtra.update({
-      where: { id: extraId },
-      data: { diasEstudo: novosDias.join(',') },
-      include: { disciplina: { select: { id: true, nome: true, cor: true } } }
-    })
-    return { success: true, data: updated }
+    await prisma.progressoUsuarioDisciplinaExtra.delete({ where: { id: extraId } })
+    return { success: true, deleted: true }
   } catch (error) {
     console.error('Erro ao remover dia do extra:', error)
     return { error: 'Erro ao remover disciplina do dia' }

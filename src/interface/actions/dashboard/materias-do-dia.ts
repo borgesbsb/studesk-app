@@ -18,7 +18,9 @@ export interface MateriaDoDia {
   questoesPlanejadas: number
   questoesRealizadas: number
   prioridade: number
-  observacoes?: string // Assuntos a estudar
+  observacoes?: string
+  assuntos?: string
+  materiaisAdmin: { id: string; nome: string; tipo: string; paginasLidas: number; totalPaginas: number; tempoAssistido: number | null; duracaoSegundos: number | null }[]
 }
 
 // Função para verificar se o dia atual está nos dias de estudo do ciclo
@@ -163,7 +165,11 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
         disciplinas: {
           include: {
             disciplina: true,
-            dias: true // Incluir DisciplinaDia para obter valores específicos de cada dia
+            dias: true,
+            materiais: {
+              include: { material: { select: { id: true, nome: true, tipo: true, paginasLidas: true, totalPaginas: true, tempoAssistido: true, duracaoSegundos: true, historicoLeitura: { where: { OR: [{ userId }, { userId: null }] }, orderBy: { dataLeitura: 'desc' }, take: 1, select: { paginaAtual: true } } } } },
+              orderBy: { ordem: 'asc' }
+            }
           },
           orderBy: {
             prioridade: 'asc'
@@ -216,7 +222,15 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           disciplinaSemana: { semanaId: semanaAtual.id }
         },
         include: {
-          disciplinaSemana: { include: { disciplina: true } },
+          disciplinaSemana: {
+            include: {
+              disciplina: true,
+              materiais: {
+                include: { material: { select: { id: true, nome: true, tipo: true, paginasLidas: true, totalPaginas: true, tempoAssistido: true, duracaoSegundos: true, historicoLeitura: { where: { OR: [{ userId }, { userId: null }] }, orderBy: { dataLeitura: 'desc' }, take: 1, select: { paginaAtual: true } } } } },
+                orderBy: { ordem: 'asc' }
+              }
+            }
+          },
           dias: { where: { dia: diaIdAtual } }
         }
       })
@@ -263,16 +277,27 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
             disciplinaId: prog.disciplinaSemana.disciplinaId,
             disciplinaNome: prog.disciplinaSemana.disciplina.nome,
             disciplinaCor: prog.disciplinaSemana.disciplina.cor || undefined,
-            horasPlanejadas: prog.horasPlanejadas,
+            // Usa as metas do dia específico; fallback para o valor compartilhado do ciclo
+            horasPlanejadas: diaRec?.horasPlanejadas ?? prog.horasPlanejadas,
             horasRealizadas: diaRec?.horasRealizadas ?? 0,
             tempoRealEstudo: diaRec?.horasRealizadas ?? 0,
             tempoSessoesPdf: await calcTempoSessoesPdf(prog.disciplinaSemana.disciplinaId),
             concluida: prog.concluida,
             materialNome: prog.disciplinaSemana.materialNome || undefined,
-            questoesPlanejadas: prog.questoesPlanejadas,
+            questoesPlanejadas: diaRec?.questoesPlanejadas ?? prog.questoesPlanejadas,
             questoesRealizadas: diaRec?.questoesRealizadas ?? 0,
             prioridade: prog.disciplinaSemana.prioridade,
-            observacoes: prog.observacoes || prog.disciplinaSemana.observacoes || undefined
+            observacoes: prog.observacoes || prog.disciplinaSemana.observacoes || undefined,
+            assuntos: prog.disciplinaSemana.assuntos || undefined,
+            materiaisAdmin: prog.disciplinaSemana.materiais.map(m => ({
+              id: m.material.id,
+              nome: m.material.nome,
+              tipo: m.material.tipo,
+              paginasLidas: m.material.historicoLeitura[0]?.paginaAtual ?? m.material.paginasLidas,
+              totalPaginas: m.material.totalPaginas,
+              tempoAssistido: m.material.tempoAssistido ?? null,
+              duracaoSegundos: m.material.duracaoSegundos ?? null,
+            }))
           }
         })
       )
@@ -293,7 +318,8 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           questoesPlanejadas: extra.questoesPlanejadas,
           questoesRealizadas: extra.questoesRealizadas,
           prioridade: 999,
-          observacoes: extra.observacoes || undefined
+          observacoes: extra.observacoes || undefined,
+          materiaisAdmin: []
         }))
       )
 
@@ -466,10 +492,16 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           tempoSessoesPdf,
           concluida: disciplinaSemana.concluida,
           materialNome: disciplinaSemana.materialNome || undefined,
-          questoesPlanejadas: questoesPorDia, // Questões planejadas para o dia específico
-          questoesRealizadas: questoesRealizadasDia, // USAR DO DisciplinaDia
+          questoesPlanejadas: questoesPorDia,
+          questoesRealizadas: questoesRealizadasDia,
           prioridade: disciplinaSemana.prioridade,
-          observacoes: disciplinaSemana.observacoes || undefined
+          observacoes: disciplinaSemana.observacoes || undefined,
+          assuntos: disciplinaSemana.assuntos || undefined,
+          materiaisAdmin: disciplinaSemana.materiais.map(m => ({
+            id: m.material.id,
+            nome: m.material.nome,
+            tipo: m.material.tipo,
+          }))
         }
       })
     )

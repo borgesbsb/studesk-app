@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,14 +20,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Trash2, Loader2, CheckCircle, XCircle, ChevronDown, ChevronRight } from "lucide-react"
+import {
+  Plus,
+  Trash2,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  ChevronRight,
+  CalendarDays,
+  Settings2,
+} from "lucide-react"
 import {
   listarConfigs,
   criarConfig,
   atualizarConfig,
   deletarConfig,
+  listarSimuladosAdmin,
+  criarSimuladoAdmin,
+  atualizarSimuladoAdmin,
+  deletarSimuladoAdmin,
 } from "@/interface/actions/simulado/config-admin"
-import { prisma } from "@/lib/prisma"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
 interface Disciplina {
   id: string
@@ -52,20 +67,29 @@ interface Config {
   }[]
 }
 
+interface SimuladoAdmin {
+  id: string
+  nome: string
+  dataRealizacao: Date
+  ativo: boolean
+  config: { id: string; nome: string; totalQuestoes: number } | null
+  _count: { resultados: number }
+}
+
 async function getDisciplinas(): Promise<Disciplina[]> {
-  // Busca via API route para funcionar no client
   const res = await fetch('/api/admin/disciplinas')
   if (!res.ok) return []
   return res.json()
 }
 
-export default function AdminSimuladosPage() {
+// ─── Seção: ConfigSimulado ────────────────────────────────────────────────────
+
+function ConfigSimuladoSection() {
   const [configs, setConfigs] = useState<Config[]>([])
   const [disciplinas, setDisciplinas] = useState<Disciplina[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
-  // Form criar config
   const [openModal, setOpenModal] = useState(false)
   const [nomeCfg, setNomeCfg] = useState("")
   const [totalQstCfg, setTotalQstCfg] = useState(80)
@@ -137,13 +161,14 @@ export default function AdminSimuladosPage() {
   const somaLinhas = linhas.reduce((s, l) => s + (l.totalQuestoes || 0), 0)
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Configurações de Simulados</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Defina o gabarito de questões por disciplina para cada tipo de simulado.
-          </p>
+        <div className="flex items-center gap-2">
+          <Settings2 className="h-5 w-5 text-slate-600" />
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">Configurações de Simulado</h2>
+            <p className="text-slate-500 text-sm">Templates com distribuição de questões por disciplina</p>
+          </div>
         </div>
         <Dialog open={openModal} onOpenChange={setOpenModal}>
           <DialogTrigger asChild>
@@ -152,7 +177,7 @@ export default function AdminSimuladosPage() {
               Nova Configuração
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleCriar}>
               <DialogHeader>
                 <DialogTitle>Nova Configuração de Simulado</DialogTitle>
@@ -244,11 +269,11 @@ export default function AdminSimuladosPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
         </div>
       ) : configs.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">
+        <div className="text-center py-8 text-slate-500 border rounded-lg bg-white">
           Nenhuma configuração cadastrada. Crie a primeira!
         </div>
       ) : (
@@ -261,13 +286,13 @@ export default function AdminSimuladosPage() {
                 <TableHead className="font-semibold text-center">Total Questões</TableHead>
                 <TableHead className="font-semibold text-center">Disciplinas</TableHead>
                 <TableHead className="font-semibold text-center">Status</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-16" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {configs.map(cfg => (
-                <>
-                  <TableRow key={cfg.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => toggleRow(cfg.id)}>
+                <Fragment key={cfg.id}>
+                  <TableRow className="hover:bg-slate-50 cursor-pointer" onClick={() => toggleRow(cfg.id)}>
                     <TableCell className="text-center">
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                         {expandedRows.has(cfg.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -322,12 +347,244 @@ export default function AdminSimuladosPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Seção: Simulados (eventos) ───────────────────────────────────────────────
+
+function SimuladosEventosSection() {
+  const [simulados, setSimulados] = useState<SimuladoAdmin[]>([])
+  const [configs, setConfigs] = useState<{ id: string; nome: string }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [openModal, setOpenModal] = useState(false)
+  const [nome, setNome] = useState("")
+  const [dataRealizacao, setDataRealizacao] = useState("")
+  const [configId, setConfigId] = useState("")
+  const [salvando, setSalvando] = useState(false)
+
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletandoId, setDeletandoId] = useState<string | null>(null)
+
+  useEffect(() => {
+    carregarTudo()
+  }, [])
+
+  const carregarTudo = async () => {
+    setLoading(true)
+    const [simRes, cfgRes] = await Promise.all([
+      listarSimuladosAdmin(),
+      listarConfigs()
+    ])
+    if (simRes.success && simRes.data) setSimulados(simRes.data as SimuladoAdmin[])
+    if (cfgRes.success && cfgRes.data) setConfigs(cfgRes.data.map(c => ({ id: c.id, nome: c.nome })))
+    setLoading(false)
+  }
+
+  const handleCriar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nome.trim() || !dataRealizacao) return
+
+    setSalvando(true)
+    const res = await criarSimuladoAdmin({
+      nome: nome.trim(),
+      dataRealizacao: new Date(dataRealizacao),
+      configSimuladoId: configId || undefined
+    })
+    setSalvando(false)
+
+    if (res.success) {
+      setOpenModal(false)
+      setNome("")
+      setDataRealizacao("")
+      setConfigId("")
+      carregarTudo()
+    }
+  }
+
+  const toggleAtivo = async (s: SimuladoAdmin) => {
+    setTogglingId(s.id)
+    await atualizarSimuladoAdmin(s.id, { ativo: !s.ativo })
+    setTogglingId(null)
+    carregarTudo()
+  }
+
+  const handleDeletar = async (id: string, nome: string) => {
+    if (!confirm(`Deletar o simulado "${nome}"?\n\nTodos os resultados dos usuários também serão deletados.`)) return
+    setDeletandoId(id)
+    await deletarSimuladoAdmin(id)
+    setDeletandoId(null)
+    carregarTudo()
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-5 w-5 text-slate-600" />
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">Simulados</h2>
+            <p className="text-slate-500 text-sm">Eventos disponíveis para os usuários registrarem acertos</p>
+          </div>
+        </div>
+        <Dialog open={openModal} onOpenChange={setOpenModal}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Simulado
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="w-[95vw] max-w-[425px]">
+            <form onSubmit={handleCriar}>
+              <DialogHeader>
+                <DialogTitle>Novo Simulado</DialogTitle>
+              </DialogHeader>
+
+              <div className="py-4 space-y-4">
+                <div className="grid gap-2">
+                  <Label>Nome *</Label>
+                  <Input
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Ex: 24º Simulado – Janeiro/2026"
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Data de Realização *</Label>
+                  <Input
+                    type="date"
+                    value={dataRealizacao}
+                    onChange={(e) => setDataRealizacao(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Configuração (opcional)</Label>
+                  <select
+                    className="border rounded-md px-3 h-9 text-sm bg-background"
+                    value={configId}
+                    onChange={(e) => setConfigId(e.target.value)}
+                  >
+                    <option value="">Sem configuração específica</option>
+                    {configs.map(c => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="submit" disabled={salvando}>
+                  {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Criar Simulado
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      ) : simulados.length === 0 ? (
+        <div className="text-center py-8 text-slate-500 border rounded-lg bg-white">
+          Nenhum simulado criado. Crie o primeiro!
+        </div>
+      ) : (
+        <div className="rounded-lg border bg-white overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50">
+                <TableHead className="font-semibold">Nome</TableHead>
+                <TableHead className="font-semibold text-center">Data</TableHead>
+                <TableHead className="font-semibold">Configuração</TableHead>
+                <TableHead className="font-semibold text-center">Participantes</TableHead>
+                <TableHead className="font-semibold text-center">Status</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {simulados.map(s => (
+                <TableRow key={s.id} className="hover:bg-slate-50">
+                  <TableCell className="font-medium">{s.nome}</TableCell>
+                  <TableCell className="text-center text-sm">
+                    {format(new Date(s.dataRealizacao), "dd/MM/yyyy", { locale: ptBR })}
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-600">
+                    {s.config?.nome ?? <span className="text-slate-400 italic">Sem configuração</span>}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="text-sm font-medium">{s._count.resultados}</span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleAtivo(s)}
+                      disabled={togglingId === s.id}
+                      className="gap-1.5"
+                    >
+                      {togglingId === s.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : s.ativo ? (
+                        <><CheckCircle className="h-4 w-4 text-green-600" /><span className="text-green-600 text-xs">Ativo</span></>
+                      ) : (
+                        <><XCircle className="h-4 w-4 text-slate-400" /><span className="text-slate-400 text-xs">Inativo</span></>
+                      )}
+                    </Button>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                      onClick={() => handleDeletar(s.id, s.nome)}
+                      disabled={deletandoId === s.id}
+                    >
+                      {deletandoId === s.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Página Principal ─────────────────────────────────────────────────────────
+
+export default function AdminSimuladosPage() {
+  return (
+    <div className="p-8 space-y-10">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">Gerenciar Simulados</h1>
+        <p className="text-slate-500 text-sm mt-1">
+          Configure os templates de disciplinas e crie os eventos de simulado para os usuários.
+        </p>
+      </div>
+
+      <SimuladosEventosSection />
+
+      <hr className="border-slate-200" />
+
+      <ConfigSimuladoSection />
     </div>
   )
 }

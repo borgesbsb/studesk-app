@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,7 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Loader2, FileText, Video, Upload, X } from 'lucide-react'
+import { Plus, Trash2, Loader2, FileText, Video, Upload, X, CheckCircle2 } from 'lucide-react'
 import {
   adminCriarMaterial,
   adminDeletarMaterial,
@@ -62,16 +62,88 @@ export function MateriaisAdminTable({ materiaisIniciais, disciplinasDisponiveis 
     duracaoSegundos: '',
     disciplinaIds: [] as string[],
   })
+  const [buscandoDuracao, setBuscandoDuracao] = useState(false)
+  const [duracaoStatus, setDuracaoStatus] = useState<'idle' | 'detected' | 'manual'>('idle')
 
-  const resetForm = () => setForm({
-    nome: '',
-    tipo: 'PDF',
-    arquivoPdfUrl: '',
-    arquivoVideoUrl: '',
-    totalPaginas: '',
-    duracaoSegundos: '',
-    disciplinaIds: [],
-  })
+  const resetForm = () => {
+    setForm({
+      nome: '',
+      tipo: 'PDF',
+      arquivoPdfUrl: '',
+      arquivoVideoUrl: '',
+      totalPaginas: '',
+      duracaoSegundos: '',
+      disciplinaIds: [],
+    })
+    setDuracaoStatus('idle')
+  }
+
+  const isYouTubeUrl = (url: string) =>
+    /youtube\.com|youtu\.be/i.test(url)
+
+  const buscarDuracaoViaServidor = async (url: string) => {
+    try {
+      const res = await fetch(`/api/admin/video-duration?url=${encodeURIComponent(url)}`)
+      const json = await res.json()
+      if (json.segundos || json.titulo) {
+        setForm(p => ({
+          ...p,
+          ...(json.segundos ? { duracaoSegundos: String(json.segundos) } : {}),
+          ...(json.titulo && !p.nome.trim() ? { nome: json.titulo } : {}),
+        }))
+        setDuracaoStatus(json.segundos ? 'detected' : 'manual')
+      } else {
+        setDuracaoStatus('manual')
+      }
+    } catch {
+      setDuracaoStatus('manual')
+    } finally {
+      setBuscandoDuracao(false)
+    }
+  }
+
+  const handleUrlVideoBlur = useCallback((url: string) => {
+    if (!url.trim()) return
+
+    setBuscandoDuracao(true)
+    setDuracaoStatus('idle')
+
+    if (isYouTubeUrl(url)) {
+      buscarDuracaoViaServidor(url)
+      return
+    }
+
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.crossOrigin = 'anonymous'
+
+    const timeout = setTimeout(() => {
+      video.src = ''
+      setBuscandoDuracao(false)
+      setDuracaoStatus('manual')
+    }, 10000)
+
+    video.addEventListener('loadedmetadata', () => {
+      clearTimeout(timeout)
+      if (isFinite(video.duration) && video.duration > 0) {
+        setForm(p => ({ ...p, duracaoSegundos: String(Math.round(video.duration)) }))
+        setDuracaoStatus('detected')
+      } else {
+        setDuracaoStatus('manual')
+      }
+      setBuscandoDuracao(false)
+      video.src = ''
+    })
+
+    video.addEventListener('error', () => {
+      clearTimeout(timeout)
+      setBuscandoDuracao(false)
+      // HTML5 falhou (CORS ou formato não suportado) — tenta via servidor
+      buscarDuracaoViaServidor(url)
+    })
+
+    video.src = url
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUploadPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -310,19 +382,57 @@ export function MateriaisAdminTable({ materiaisIniciais, disciplinasDisponiveis 
                     <Label>URL do Vídeo</Label>
                     <Input
                       value={form.arquivoVideoUrl}
-                      onChange={e => setForm(p => ({ ...p, arquivoVideoUrl: e.target.value }))}
+                      onChange={e => {
+                        setForm(p => ({ ...p, arquivoVideoUrl: e.target.value }))
+                        setDuracaoStatus('idle')
+                      }}
+                      onBlur={e => handleUrlVideoBlur(e.target.value)}
                       placeholder="https://..."
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Duração (segundos)</Label>
+                    <Label className="flex items-center gap-2">
+                      Duração (segundos)
+                      {buscandoDuracao && (
+                        <span className="flex items-center gap-1 text-xs text-slate-400 font-normal">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Detectando...
+                        </span>
+                      )}
+                      {duracaoStatus === 'detected' && !buscandoDuracao && (
+                        <span className="flex items-center gap-1 text-xs text-emerald-600 font-normal">
+                          <CheckCircle2 className="h-3 w-3" /> Detectado automaticamente
+                        </span>
+                      )}
+                      {duracaoStatus === 'manual' && !buscandoDuracao && (
+                        <span className="text-xs text-amber-600 font-normal">
+                          Preencha manualmente
+                        </span>
+                      )}
+                    </Label>
                     <Input
                       type="number"
                       min="0"
                       value={form.duracaoSegundos}
-                      onChange={e => setForm(p => ({ ...p, duracaoSegundos: e.target.value }))}
+                      onChange={e => {
+                        setForm(p => ({ ...p, duracaoSegundos: e.target.value }))
+                        setDuracaoStatus('idle')
+                      }}
                       placeholder="Ex: 3600 para 1 hora"
                     />
+                    {form.duracaoSegundos && (
+                      <p className="text-xs text-slate-400">
+                        {(() => {
+                          const s = parseInt(form.duracaoSegundos)
+                          if (!s) return ''
+                          const h = Math.floor(s / 3600)
+                          const m = Math.floor((s % 3600) / 60)
+                          const sec = s % 60
+                          return h > 0
+                            ? `${h}h ${m}m ${sec}s`
+                            : m > 0 ? `${m}m ${sec}s` : `${sec}s`
+                        })()}
+                      </p>
+                    )}
                   </div>
                 </>
               )}

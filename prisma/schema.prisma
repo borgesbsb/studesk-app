@@ -35,6 +35,7 @@ model User {
   planosEstudo          PlanoEstudo[]
   resultadosSimulado    SimuladoResultado[]
   planosAtribuidos      PlanoEstudoUsuario[]
+  historicosLeitura     HistoricoLeitura[]
 
   @@index([hash])
   @@index([email])
@@ -138,6 +139,7 @@ model MaterialEstudo {
   disciplinas         DisciplinaMaterial[]
   historicoLeitura    HistoricoLeitura[]
   mobileText          PdfMobileText?       // Texto formatado para mobile
+  disciplinasSemana   DisciplinaSemanaMateria[]
 
   @@index([userId])
   @@index([tipo])
@@ -159,6 +161,7 @@ model DisciplinaMaterial {
 model HistoricoLeitura {
   id                   String         @id @default(cuid())
   materialId           String
+  userId               String?
   paginaAtual          Int
   tempoLeituraSegundos Int
   dataLeitura          DateTime       @default(now())
@@ -166,8 +169,10 @@ model HistoricoLeitura {
   assuntosEstudados    String?
   nomeSessao           String?
   material             MaterialEstudo @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  user                 User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([materialId])
+  @@index([userId])
   @@index([dataLeitura])
   @@index([paginaAtual])
 }
@@ -257,16 +262,20 @@ model SemanaEstudo {
   observacoes     String?
   totalHoras      Int                @default(0)
   horasRealizadas Int                @default(0)
+  simuladoId      String?            // Simulado associado a este ciclo
+  simuladoHoras   Int                @default(3) // Horas planejadas para o simulado
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   disciplinas     DisciplinaSemana[]
   disciplinasExtras ProgressoUsuarioDisciplinaExtra[]
   plano           PlanoEstudo        @relation(fields: [planoId], references: [id], onDelete: Cascade)
+  simulado        Simulado?          @relation(fields: [simuladoId], references: [id], onDelete: SetNull)
 
   @@unique([planoId, numeroSemana])
   @@index([planoId])
   @@index([numeroSemana])
   @@index([dataInicio])
+  @@index([simuladoId])
 }
 
 model DisciplinaSemana {
@@ -290,10 +299,12 @@ model DisciplinaSemana {
   tipoVeiculo         String?
   totalPaginas        Int             @default(0)
   diasEstudo          String?
+  assuntos            String?         @db.Text // JSON array de strings
   disciplina          Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
   semana              SemanaEstudo    @relation(fields: [semanaId], references: [id], onDelete: Cascade)
   dias                DisciplinaDia[] // Relação com DisciplinaDia
   progressosUsuarios  ProgressoUsuarioDisciplina[]
+  materiais           DisciplinaSemanaMateria[]
 
   @@unique([semanaId, disciplinaId])
   @@index([semanaId])
@@ -318,6 +329,19 @@ model DisciplinaDia {
   @@unique([disciplinaSemanaId, dia])
   @@index([disciplinaSemanaId])
   @@index([dia])
+}
+
+model DisciplinaSemanaMateria {
+  id                 String           @id @default(cuid())
+  disciplinaSemanaId String
+  materialId         String
+  ordem              Int              @default(0)
+  createdAt          DateTime         @default(now())
+  disciplinaSemana   DisciplinaSemana @relation(fields: [disciplinaSemanaId], references: [id], onDelete: Cascade)
+  material           MaterialEstudo   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([disciplinaSemanaId, materialId])
+  @@index([disciplinaSemanaId])
 }
 
 // ============================================
@@ -375,6 +399,8 @@ model ProgressoUsuarioDisciplinaDia {
   id                 String   @id @default(cuid())
   progressoId        String
   dia                String   // "dia1" ... "dia7"
+  horasPlanejadas    Float    @default(0)
+  questoesPlanejadas Int      @default(0)
   horasRealizadas    Float    @default(0)
   questoesRealizadas Int      @default(0)
   concluida          Boolean  @default(false)
@@ -468,6 +494,7 @@ model Simulado {
 
   config           ConfigSimulado?    @relation(fields: [configSimuladoId], references: [id], onDelete: SetNull)
   resultados       SimuladoResultado[]
+  semanas          SemanaEstudo[]
 
   @@index([configSimuladoId])
   @@index([dataRealizacao])

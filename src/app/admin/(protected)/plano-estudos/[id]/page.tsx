@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, CalendarDays, Users } from 'lucide-react'
 
-import { adminBuscarPlano } from '@/interface/actions/admin/plano-estudos'
+import { adminBuscarPlano, adminListarSimuladosDisponiveis } from '@/interface/actions/admin/plano-estudos'
 import { GerenciarDisciplinasPlano } from '@/components/admin/planos-estudos/gerenciar-disciplinas-plano'
 import { GerenciarCiclosAdmin } from '@/components/admin/planos-estudos/gerenciar-ciclos-admin'
 import { GerenciarUsuariosPlano } from '@/components/admin/planos-estudos/gerenciar-usuarios-plano'
@@ -18,11 +18,15 @@ interface Props {
 
 export default async function AdminPlanoDetalhe({ params }: Props) {
   const { id } = await params
-  const res = await adminBuscarPlano(id)
+  const [res, simsRes] = await Promise.all([
+    adminBuscarPlano(id),
+    adminListarSimuladosDisponiveis(),
+  ])
 
   if (!res.success || !res.data) notFound()
 
   const plano = res.data
+  const simuladosDisponiveis = simsRes.success && simsRes.data ? simsRes.data : []
 
   return (
     <div className="p-8 space-y-8">
@@ -61,8 +65,8 @@ export default async function AdminPlanoDetalhe({ params }: Props) {
       {/* Ciclos */}
       <GerenciarCiclosAdmin
         planoId={id}
-        ciclosIniciais={plano.semanas}
-        planoId_pool={id}
+        ciclosIniciais={plano.semanas as any}
+        simuladosDisponiveis={simuladosDisponiveis}
       />
 
       {/* Usuários atribuídos */}

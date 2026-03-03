@@ -29,11 +29,11 @@ export async function GET(
 
     console.log('📚 API - Buscando histórico de leitura:', { materialId, userId: session.user.id })
 
-    // Verificar se o material existe e pertence ao usuário
-    const material = await prisma.materialEstudo.findUnique({
+    // Verificar se o material existe (do usuário ou admin)
+    const material = await prisma.materialEstudo.findFirst({
       where: {
         id: materialId,
-        userId: session.user.id
+        OR: [{ userId: session.user.id }, { userId: null }]
       },
       select: { id: true }
     })
@@ -45,9 +45,9 @@ export async function GET(
       )
     }
 
-    // Busca o histórico de leitura ordenado por data
+    // Busca o histórico de leitura do usuário ordenado por data (inclui registros legados sem userId)
     const historico = await prisma.historicoLeitura.findMany({
-      where: { materialId },
+      where: { materialId, OR: [{ userId: session.user.id }, { userId: null }] },
       orderBy: { dataLeitura: 'desc' },
       select: {
         id: true,
@@ -183,13 +183,16 @@ export async function POST(
       userId: auth.userId
     })
 
-    // Verifica se o material existe e pertence ao usuário
-    const materialExistente = await prisma.materialEstudo.findUnique({
+    // Verifica se o material existe (do usuário ou admin)
+    const materialExistente = await prisma.materialEstudo.findFirst({
       where: {
         id: materialId,
-        userId: auth.userId
+        OR: [
+          { userId: auth.userId },
+          { userId: null }
+        ]
       },
-      select: { id: true, nome: true, tipo: true, totalPaginas: true }
+      select: { id: true, nome: true, tipo: true, totalPaginas: true, userId: true }
     })
 
     if (!materialExistente) {
@@ -230,6 +233,7 @@ export async function POST(
     const historicoLeitura = await prisma.historicoLeitura.create({
       data: {
         materialId,
+        userId: auth.userId,
         paginaAtual,
         tempoLeituraSegundos,
         assuntosEstudados: assuntosEstudados || null,
@@ -237,8 +241,8 @@ export async function POST(
       }
     })
 
-    // Atualiza o progresso no MaterialEstudo (paginasLidas)
-    if (materialExistente.tipo === 'PDF') {
+    // Atualiza o progresso no MaterialEstudo (paginasLidas) — apenas para materiais do próprio usuário
+    if (materialExistente.tipo === 'PDF' && materialExistente.userId === auth.userId) {
       await prisma.materialEstudo.update({
         where: { id: materialId },
         data: { paginasLidas: paginaAtual }

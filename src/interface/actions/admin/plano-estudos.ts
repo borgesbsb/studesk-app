@@ -45,10 +45,19 @@ export async function adminBuscarPlano(id: string) {
         },
         semanas: {
           include: {
+            simulado: { select: { id: true, nome: true, dataRealizacao: true, config: { select: { totalQuestoes: true } } } },
             disciplinas: {
               include: {
                 disciplina: true,
-                dias: { orderBy: { dia: 'asc' } }
+                dias: { orderBy: { dia: 'asc' } },
+                materiais: {
+                  include: {
+                    material: {
+                      select: { id: true, nome: true, tipo: true, arquivoPdfUrl: true, arquivoVideoUrl: true, duracaoSegundos: true }
+                    }
+                  },
+                  orderBy: { ordem: 'asc' }
+                }
               },
               orderBy: { prioridade: 'asc' }
             }
@@ -155,6 +164,37 @@ export async function adminExcluirPlano(id: string) {
   }
 }
 
+export async function adminBuscarCiclo(cicloId: string) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const ciclo = await prisma.semanaEstudo.findUnique({
+      where: { id: cicloId },
+      include: {
+        plano: { select: { id: true, nome: true } },
+        disciplinas: {
+          include: {
+            disciplina: true,
+            materiais: {
+              include: {
+                material: { select: { id: true, nome: true, tipo: true } }
+              },
+              orderBy: { ordem: 'asc' }
+            }
+          },
+          orderBy: { prioridade: 'asc' }
+        }
+      }
+    })
+    if (!ciclo) return { error: 'Ciclo não encontrado' }
+    return { success: true, data: ciclo }
+  } catch (error) {
+    console.error('Erro ao buscar ciclo:', error)
+    return { error: 'Erro ao buscar ciclo' }
+  }
+}
+
 // ─── Ciclos (SemanaEstudo) ────────────────────────────────────────────────────
 
 export async function adminAdicionarCiclo(data: {
@@ -253,13 +293,60 @@ export async function adminAdicionarDisciplina(data: {
         materialNome: data.materialNome || null,
         concluida: false
       },
-      include: { disciplina: true }
+      include: {
+        disciplina: true,
+        materiais: {
+          include: {
+            material: { select: { id: true, nome: true, tipo: true, arquivoPdfUrl: true, arquivoVideoUrl: true, duracaoSegundos: true } }
+          },
+          orderBy: { ordem: 'asc' }
+        }
+      }
     })
     revalidatePath(`/admin/plano-estudos/${data.planoId}`)
     return { success: true, data: disciplina }
   } catch (error) {
     console.error('Erro ao adicionar disciplina:', error)
     return { error: 'Erro ao adicionar disciplina' }
+  }
+}
+
+export async function adminAtualizarDisciplinaSemana(
+  id: string,
+  planoId: string,
+  data: {
+    horasPlanejadas?: number
+    questoesPlanejadas?: number
+    assuntos?: string
+  }
+) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const updateData: Record<string, unknown> = {}
+    if (data.horasPlanejadas !== undefined) updateData.horasPlanejadas = data.horasPlanejadas
+    if (data.questoesPlanejadas !== undefined) updateData.questoesPlanejadas = data.questoesPlanejadas
+    if (data.assuntos !== undefined) updateData.assuntos = data.assuntos || null
+
+    const disc = await prisma.disciplinaSemana.update({
+      where: { id },
+      data: updateData,
+      include: {
+        disciplina: true,
+        materiais: {
+          include: {
+            material: { select: { id: true, nome: true, tipo: true, arquivoPdfUrl: true, arquivoVideoUrl: true, duracaoSegundos: true } }
+          },
+          orderBy: { ordem: 'asc' }
+        }
+      }
+    })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true, data: disc }
+  } catch (error) {
+    console.error('Erro ao atualizar disciplina do ciclo:', error)
+    return { error: 'Erro ao atualizar disciplina' }
   }
 }
 
@@ -394,5 +481,138 @@ export async function adminRemoverDisciplinaDoPlano(planoId: string, disciplinaI
   } catch (error) {
     console.error('Erro ao remover disciplina do plano:', error)
     return { error: 'Erro ao remover disciplina do pool' }
+  }
+}
+
+// ─── Materiais por Disciplina/Ciclo ──────────────────────────────────────────
+
+export async function adminAdicionarMaterialAoCiclo(data: {
+  disciplinaSemanaId: string
+  materialId: string
+  planoId: string
+  ordem?: number
+}) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const entry = await prisma.disciplinaSemanaMateria.create({
+      data: {
+        disciplinaSemanaId: data.disciplinaSemanaId,
+        materialId: data.materialId,
+        ordem: data.ordem ?? 0,
+      },
+      include: {
+        material: {
+          select: { id: true, nome: true, tipo: true, arquivoPdfUrl: true, arquivoVideoUrl: true, duracaoSegundos: true }
+        }
+      }
+    })
+    revalidatePath(`/admin/plano-estudos/${data.planoId}`)
+    return { success: true, data: entry }
+  } catch (error: unknown) {
+    if (
+      typeof error === 'object' && error !== null && 'code' in error &&
+      (error as { code: string }).code === 'P2002'
+    ) {
+      return { error: 'Material já associado a esta disciplina neste ciclo' }
+    }
+    console.error('Erro ao adicionar material ao ciclo:', error)
+    return { error: 'Erro ao adicionar material' }
+  }
+}
+
+export async function adminRemoverMaterialDoCiclo(id: string, planoId: string) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    // Verifica que o registro pertence ao plano (segurança)
+    const entry = await prisma.disciplinaSemanaMateria.findUnique({
+      where: { id },
+      include: { disciplinaSemana: { include: { semana: true } } }
+    })
+    if (!entry || entry.disciplinaSemana.semana.planoId !== planoId) {
+      return { error: 'Registro não encontrado ou não pertence a este plano' }
+    }
+
+    await prisma.disciplinaSemanaMateria.delete({ where: { id } })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao remover material do ciclo:', error)
+    return { error: 'Erro ao remover material' }
+  }
+}
+
+// ─── Simulado por Ciclo ───────────────────────────────────────────────────────
+
+export async function adminListarSimuladosDisponiveis() {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const simulados = await prisma.simulado.findMany({
+      where: { ativo: true },
+      select: {
+        id: true,
+        nome: true,
+        dataRealizacao: true,
+        config: { select: { totalQuestoes: true } },
+      },
+      orderBy: { dataRealizacao: 'desc' },
+    })
+    return { success: true, data: simulados }
+  } catch (error) {
+    console.error('Erro ao listar simulados:', error)
+    return { error: 'Erro ao listar simulados' }
+  }
+}
+
+export async function adminAssociarSimuladoAoCiclo(
+  semanaId: string,
+  simuladoId: string | null,
+  planoId: string
+) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const semana = await prisma.semanaEstudo.findFirst({ where: { id: semanaId, planoId } })
+    if (!semana) return { error: 'Ciclo não encontrado neste plano' }
+
+    await prisma.semanaEstudo.update({
+      where: { id: semanaId },
+      data: { simuladoId: simuladoId || null, ...(simuladoId ? {} : { simuladoHoras: 3 }) },
+    })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao associar simulado ao ciclo:', error)
+    return { error: 'Erro ao associar simulado' }
+  }
+}
+
+export async function adminAtualizarHorasSimuladoCiclo(
+  semanaId: string,
+  horas: number,
+  planoId: string
+) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const semana = await prisma.semanaEstudo.findFirst({ where: { id: semanaId, planoId } })
+    if (!semana) return { error: 'Ciclo não encontrado neste plano' }
+
+    await prisma.semanaEstudo.update({
+      where: { id: semanaId },
+      data: { simuladoHoras: horas },
+    })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao atualizar horas do simulado:', error)
+    return { error: 'Erro ao salvar horas' }
   }
 }

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp, Play } from "lucide-react";
+import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp, Play, List, FileText } from "lucide-react";
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
 import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
@@ -65,6 +65,14 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     window.addEventListener('cronometro-saved', handler);
     return () => window.removeEventListener('cronometro-saved', handler);
   }, [triggerRefresh, onTempoAdicionado]);
+
+  const renderMarkdown = (text: string) => {
+    const html = text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br />')
+    return { __html: html }
+  }
 
   const calcularProgressoHoras = (realizadas: number, planejadas: number) => {
     if (planejadas === 0) return 0;
@@ -237,11 +245,12 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     setModalQuestoesAberto(true);
   };
 
-  const handleSalvarTempo = async (horas: number, minutos: number) => {
+  const handleSalvarTempo = async (totalMinutos: number) => {
     if (!disciplinaSelecionada) return;
 
     const disciplinaId = disciplinaSelecionada.disciplinaId;
-    const totalMinutos = (horas * 60) + minutos;
+    const horas = Math.floor(totalMinutos / 60);
+    const minutos = totalMinutos % 60;
     const horasAdicionadas = totalMinutos / 60;
 
     // Fechar modal imediatamente
@@ -412,7 +421,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                 </div>
 
                 {/* Radial Charts */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${materia.assuntos ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   {/* Card Tempo com ações */}
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
                     {/* Coluna esquerda: label + gráfico */}
@@ -427,42 +436,95 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                       </div>
                     </div>
                     {/* Coluna direita: botões */}
-                    <div className="flex flex-col gap-2 justify-center">
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAbrirTempo(materia);
-                        }}
-                        className="w-full h-auto py-1.5 px-2 text-[10px]"
-                      >
-                        <Timer className="h-3 w-3 mr-1" />
-                        Add Tempo
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAbrirCronometro(materia);
-                        }}
-                        className="w-full h-auto py-1.5 px-2 text-[10px]"
-                      >
-                        <Play className="h-3 w-3 mr-1" />
-                        Cronômetro
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/${hash}/disciplina/${materia.disciplinaId}/materiais`);
-                        }}
-                        className="w-full h-auto py-1.5 px-2 text-[10px]"
-                      >
-                        <BookOpen className="h-3 w-3 mr-1" />
-                        Estudar
-                      </Button>
+                    <div className="flex flex-col gap-2 justify-start">
+                      {/* Botões de tempo - lado a lado no topo */}
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAbrirTempo(materia);
+                          }}
+                          className="flex-1 h-auto py-1.5 px-1 text-[10px]"
+                        >
+                          <Timer className="h-3 w-3 mr-0.5" />
+                          Tempo
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAbrirCronometro(materia);
+                          }}
+                          className="flex-1 h-auto py-1.5 px-1 text-[10px]"
+                        >
+                          <Play className="h-3 w-3 mr-0.5" />
+                          Crono
+                        </Button>
+                      </div>
+                      {/* Materiais abaixo */}
+                      {materia.materiaisAdmin?.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {materia.materiaisAdmin.map(mat => (
+                            <button
+                              key={mat.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const path = mat.tipo === 'VIDEO'
+                                  ? `/${hash}/material/${mat.id}/video`
+                                  : `/${hash}/material/${mat.id}/ler?mode=pdf`;
+                                router.push(path);
+                              }}
+                              className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-[10px] font-medium hover:bg-accent transition-colors text-left w-full overflow-hidden"
+                            >
+                              {/* Barra de progresso de fundo */}
+                              {(() => {
+                                const progresso = mat.tipo === 'VIDEO'
+                                  ? (mat.duracaoSegundos && mat.duracaoSegundos > 0 ? Math.min((mat.tempoAssistido ?? 0) / mat.duracaoSegundos * 100, 100) : 0)
+                                  : (mat.totalPaginas > 0 ? Math.min(mat.paginasLidas / mat.totalPaginas * 100, 100) : 0);
+                                return progresso > 0 ? (
+                                  <span
+                                    className="absolute inset-y-0 left-0 pointer-events-none bg-primary"
+                                    style={{ width: `${progresso}%`, opacity: 0.2 }}
+                                  />
+                                ) : null;
+                              })()}
+                              {mat.tipo === 'VIDEO'
+                                ? <Play className="h-3 w-3 shrink-0 text-blue-500 relative z-10" />
+                                : <FileText className="h-3 w-3 shrink-0 text-red-500 relative z-10" />}
+                              <span className="truncate relative z-10">{mat.nome}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/${hash}/disciplina/${materia.disciplinaId}/materiais`);
+                          }}
+                          className="w-full h-auto py-1.5 px-2 text-[10px]"
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Estudar
+                        </Button>
+                      )}
                     </div>
                   </div>
+
+                  {/* Card Assuntos */}
+                  {materia.assuntos && (
+                    <div className="p-3 rounded-lg border bg-card flex flex-col gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <List className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs font-semibold">Assuntos</span>
+                      </div>
+                      <div
+                        className="text-xs text-muted-foreground leading-relaxed overflow-y-auto max-h-[120px]"
+                        dangerouslySetInnerHTML={renderMarkdown(materia.assuntos)}
+                      />
+                    </div>
+                  )}
 
                   {/* Card Questões com ação */}
                   {materia.questoesPlanejadas > 0 && (

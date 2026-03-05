@@ -36,6 +36,7 @@ model User {
   resultadosSimulado    SimuladoResultado[]
   planosAtribuidos      PlanoEstudoUsuario[]
   historicosLeitura     HistoricoLeitura[]
+  solicitacoesPlano     SolicitacaoPlano[]
 
   @@index([hash])
   @@index([email])
@@ -246,6 +247,7 @@ model PlanoEstudo {
   semanas    SemanaEstudo[]
   usuarios   PlanoEstudoUsuario[]
   disciplinasDisponiveis PlanoEstudoDisciplina[]
+  solicitacoes           SolicitacaoPlano[]
 
   @@index([userId])
   @@index([ativo])
@@ -423,6 +425,22 @@ model PlanoEstudoDisciplina {
   disciplina   Disciplina  @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
 
   @@unique([planoId, disciplinaId])
+  @@index([planoId])
+}
+
+// Solicitação de acesso de um usuário a um plano compartilhado (pré-cadastro)
+model SolicitacaoPlano {
+  id        String      @id @default(cuid())
+  userId    String
+  planoId   String
+  status    String      @default("PENDENTE") // PENDENTE, APROVADO, REJEITADO
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plano     PlanoEstudo @relation(fields: [planoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, planoId])
+  @@index([status])
   @@index([planoId])
 }
 

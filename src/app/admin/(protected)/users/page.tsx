@@ -1,5 +1,6 @@
-import { getUsers } from '@/interface/actions/admin/users'
+import { getUsers, getSolicitacoesPendentes } from '@/interface/actions/admin/users'
 import { UsersTable } from '@/components/admin/users-table'
+import { SolicitacoesCard } from '@/components/admin/solicitacoes-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface PageProps {
@@ -11,7 +12,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
   const search = params.search
   const page = parseInt(params.page || '1')
 
-  const result = await getUsers(page, 20, search)
+  const [result, solResult] = await Promise.all([
+    getUsers(page, 20, search),
+    getSolicitacoesPendentes(),
+  ])
 
   if (result.error || !result.users) {
     return (
@@ -21,6 +25,8 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     )
   }
 
+  const solicitacoes = solResult.success && solResult.data ? solResult.data : []
+
   return (
     <div className="p-8 space-y-6">
       <div>
@@ -29,6 +35,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           Visualize e gerencie todos os usuários do sistema
         </p>
       </div>
+
+      {solicitacoes.length > 0 && (
+        <SolicitacoesCard solicitacoesIniciais={solicitacoes} />
+      )}
 
       <Card>
         <CardHeader>

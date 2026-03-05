@@ -2,9 +2,15 @@
 
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
+
+interface PlanoPublico {
+  id: string
+  nome: string
+  descricao: string | null
+}
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -12,10 +18,19 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [planoId, setPlanoId] = useState("")
+  const [planos, setPlanos] = useState<PlanoPublico[]>([])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/planos-publicos")
+      .then((r) => r.json())
+      .then((data) => Array.isArray(data) && setPlanos(data))
+      .catch(() => {})
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -45,6 +60,7 @@ export default function RegisterPage() {
           name,
           email,
           password,
+          ...(planoId ? { planoId } : {}),
         }),
       })
 
@@ -189,6 +205,33 @@ export default function RegisterPage() {
                 </button>
               </div>
             </div>
+
+            {planos.length > 0 && (
+              <div>
+                <label
+                  htmlFor="plano"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  Curso de interesse <span className="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <select
+                  id="plano"
+                  value={planoId}
+                  onChange={(e) => setPlanoId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white bg-white"
+                >
+                  <option value="">Selecione um curso...</option>
+                  {planos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Sua solicitação será analisada pelo administrador.
+                </p>
+              </div>
+            )}
 
             <button
               type="submit"

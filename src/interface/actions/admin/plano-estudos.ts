@@ -71,6 +71,13 @@ export async function adminBuscarPlano(id: string) {
             }
           },
           orderBy: { dataAtribuicao: 'desc' }
+        },
+        solicitacoes: {
+          where: { status: 'PENDENTE' },
+          include: {
+            user: { select: { id: true, name: true, email: true } }
+          },
+          orderBy: { createdAt: 'asc' }
         }
       }
     })
@@ -429,6 +436,87 @@ export async function adminRemoverUsuario(planoId: string, userId: string) {
   } catch (error) {
     console.error('Erro ao remover usuário do plano:', error)
     return { error: 'Erro ao remover usuário' }
+  }
+}
+
+// ─── Solicitações de Acesso ───────────────────────────────────────────────────
+
+export async function adminListarSolicitacoes(planoId: string) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const solicitacoes = await prisma.solicitacaoPlano.findMany({
+      where: { planoId, status: 'PENDENTE' },
+      include: {
+        user: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+    return { success: true, data: solicitacoes }
+  } catch (error) {
+    console.error('Erro ao listar solicitações:', error)
+    return { error: 'Erro ao listar solicitações' }
+  }
+}
+
+export async function adminAprovarSolicitacao(solicitacaoId: string) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const solicitacao = await prisma.solicitacaoPlano.findUnique({
+      where: { id: solicitacaoId },
+      select: { id: true, planoId: true, userId: true, status: true }
+    })
+    if (!solicitacao) return { error: 'Solicitação não encontrada' }
+    if (solicitacao.status !== 'PENDENTE') return { error: 'Solicitação já processada' }
+
+    // Aprovar: cria atribuição e atualiza status
+    const [atribuicao] = await prisma.$transaction([
+      prisma.planoEstudoUsuario.create({
+        data: { planoId: solicitacao.planoId, userId: solicitacao.userId },
+        include: { usuario: { select: { id: true, name: true, email: true, hash: true } } }
+      }),
+      prisma.solicitacaoPlano.update({
+        where: { id: solicitacaoId },
+        data: { status: 'APROVADO' }
+      })
+    ])
+    revalidatePath(`/admin/plano-estudos/${solicitacao.planoId}`)
+    return { success: true, data: atribuicao }
+  } catch (error: unknown) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code: string }).code === 'P2002'
+    ) {
+      // Usuário já atribuído — só marca como aprovado
+      await prisma.solicitacaoPlano.update({
+        where: { id: solicitacaoId },
+        data: { status: 'APROVADO' }
+      })
+      return { error: 'Usuário já está atribuído a este plano' }
+    }
+    console.error('Erro ao aprovar solicitação:', error)
+    return { error: 'Erro ao aprovar solicitação' }
+  }
+}
+
+export async function adminRejeitarSolicitacao(solicitacaoId: string) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    await prisma.solicitacaoPlano.update({
+      where: { id: solicitacaoId },
+      data: { status: 'REJEITADO' }
+    })
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao rejeitar solicitação:', error)
+    return { error: 'Erro ao rejeitar solicitação' }
   }
 }
 

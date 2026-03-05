@@ -11,10 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Loader2, Trash2, UserPlus, Search } from 'lucide-react'
+import { Loader2, Trash2, UserPlus, Search, CheckCircle, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { adminAdicionarUsuario, adminRemoverUsuario } from '@/interface/actions/admin/plano-estudos'
+import { Badge } from '@/components/ui/badge'
+import { adminAdicionarUsuario, adminRemoverUsuario, adminAprovarSolicitacao, adminRejeitarSolicitacao } from '@/interface/actions/admin/plano-estudos'
 import { getUsers } from '@/interface/actions/admin/users'
 
 interface UsuarioAtribuido {
@@ -29,15 +30,29 @@ interface UsuarioAtribuido {
   }
 }
 
+interface Solicitacao {
+  id: string
+  userId: string
+  createdAt: Date
+  user: {
+    id: string
+    name: string | null
+    email: string
+  }
+}
+
 interface GerenciarUsuariosPlanoProps {
   planoId: string
   usuariosIniciais: UsuarioAtribuido[]
+  solicitacoesIniciais: Solicitacao[]
 }
 
-export function GerenciarUsuariosPlano({ planoId, usuariosIniciais }: GerenciarUsuariosPlanoProps) {
+export function GerenciarUsuariosPlano({ planoId, usuariosIniciais, solicitacoesIniciais }: GerenciarUsuariosPlanoProps) {
   const [usuarios, setUsuarios] = useState<UsuarioAtribuido[]>(usuariosIniciais)
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>(solicitacoesIniciais)
   const [removendoId, setRemovendoId] = useState<string | null>(null)
   const [adicionando, setAdicionando] = useState(false)
+  const [processandoSolId, setProcessandoSolId] = useState<string | null>(null)
 
   // Busca de usuários para adicionar
   const [busca, setBusca] = useState('')
@@ -96,6 +111,32 @@ export function GerenciarUsuariosPlano({ planoId, usuariosIniciais }: GerenciarU
     return () => clearTimeout(timer)
   }, [busca])
 
+  const handleAprovar = async (sol: Solicitacao) => {
+    setProcessandoSolId(sol.id)
+    const res = await adminAprovarSolicitacao(sol.id)
+    setProcessandoSolId(null)
+    if (res.error) {
+      alert(res.error)
+    } else {
+      setSolicitacoes(prev => prev.filter(s => s.id !== sol.id))
+      if (res.success && res.data) {
+        setUsuarios(prev => [res.data as UsuarioAtribuido, ...prev])
+      }
+    }
+  }
+
+  const handleRejeitar = async (solId: string) => {
+    if (!confirm('Rejeitar esta solicitação?')) return
+    setProcessandoSolId(solId)
+    const res = await adminRejeitarSolicitacao(solId)
+    setProcessandoSolId(null)
+    if (res.error) {
+      alert(res.error)
+    } else {
+      setSolicitacoes(prev => prev.filter(s => s.id !== solId))
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Seletor de usuário */}
@@ -144,6 +185,59 @@ export function GerenciarUsuariosPlano({ planoId, usuariosIniciais }: GerenciarU
           </div>
         )}
       </div>
+
+      {/* Solicitações Pendentes */}
+      {solicitacoes.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-amber-200 flex items-center gap-2">
+            <span className="text-sm font-semibold text-amber-800">Solicitações Pendentes</span>
+            <Badge variant="secondary" className="bg-amber-200 text-amber-900 text-xs">
+              {solicitacoes.length}
+            </Badge>
+          </div>
+          <Table>
+            <TableBody>
+              {solicitacoes.map((sol) => (
+                <TableRow key={sol.id} className="bg-amber-50 hover:bg-amber-100">
+                  <TableCell className="font-medium text-sm text-slate-900">
+                    {sol.user.name || '(sem nome)'}
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-600">{sol.user.email}</TableCell>
+                  <TableCell className="text-center text-xs text-slate-500">
+                    {format(new Date(sol.createdAt), 'dd/MM/yyyy', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-green-600 hover:bg-green-50 gap-1 text-xs"
+                        onClick={() => handleAprovar(sol)}
+                        disabled={processandoSolId === sol.id}
+                      >
+                        {processandoSolId === sol.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <CheckCircle className="h-3.5 w-3.5" />}
+                        Aprovar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-red-600 hover:bg-red-50 gap-1 text-xs"
+                        onClick={() => handleRejeitar(sol.id)}
+                        disabled={processandoSolId === sol.id}
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                        Rejeitar
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* Lista de usuários atribuídos */}
       {usuarios.length === 0 ? (

@@ -87,6 +87,7 @@ export default async function AdminPlanoDetalhe({ params }: Props) {
           <GerenciarUsuariosPlano
             planoId={id}
             usuariosIniciais={plano.usuarios}
+            solicitacoesIniciais={plano.solicitacoes}
           />
         </CardContent>
       </Card>

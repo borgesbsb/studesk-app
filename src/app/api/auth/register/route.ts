@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password } = await req.json()
+    const { name, email, password, planoId } = await req.json()
 
     // Validações
     if (!email || !password) {
@@ -56,6 +56,19 @@ export async function POST(req: NextRequest) {
         createdAt: true,
       }
     })
+
+    // Criar solicitação de acesso ao plano, se informado
+    if (planoId && typeof planoId === 'string') {
+      const planoExiste = await prisma.planoEstudo.findFirst({
+        where: { id: planoId, userId: null, ativo: true },
+        select: { id: true },
+      })
+      if (planoExiste) {
+        await prisma.solicitacaoPlano.create({
+          data: { userId: user.id, planoId },
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,

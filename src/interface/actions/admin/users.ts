@@ -30,6 +30,12 @@ export async function getUsers(page = 1, limit = 20, search?: string) {
           hash: true,
           createdAt: true,
           updatedAt: true,
+          planosAtribuidos: {
+            select: {
+              id: true,
+              plano: { select: { id: true, nome: true } }
+            }
+          },
           _count: {
             select: {
               disciplinas: true,
@@ -91,6 +97,26 @@ export async function getUserDetails(userId: string) {
   } catch (error) {
     console.error('Erro ao buscar detalhes do usuário:', error)
     return { error: 'Erro ao buscar detalhes do usuário' }
+  }
+}
+
+export async function getSolicitacoesPendentes() {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const solicitacoes = await prisma.solicitacaoPlano.findMany({
+      where: { status: 'PENDENTE' },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        plano: { select: { id: true, nome: true } }
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+    return { success: true, data: solicitacoes }
+  } catch (error) {
+    console.error('Erro ao buscar solicitações pendentes:', error)
+    return { error: 'Erro ao buscar solicitações' }
   }
 }
 

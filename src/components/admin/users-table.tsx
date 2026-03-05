@@ -33,6 +33,7 @@ interface User {
   email: string
   hash: string
   createdAt: Date
+  planosAtribuidos: { id: string; plano: { id: string; nome: string } }[]
   _count: {
     disciplinas: number
     materiaisEstudo: number
@@ -96,8 +97,8 @@ export function UsersTable({ initialUsers, initialTotal }: UsersTableProps) {
               <TableHead>Nome</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Hash</TableHead>
+              <TableHead>Plano</TableHead>
               <TableHead>Cadastro</TableHead>
-              <TableHead>Conteúdo</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -114,23 +115,20 @@ export function UsersTable({ initialUsers, initialTotal }: UsersTableProps) {
                   </code>
                 </TableCell>
                 <TableCell>
-                  {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                  {user.planosAtribuidos.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {user.planosAtribuidos.map(p => (
+                        <Badge key={p.id} variant="outline" className="text-xs border-blue-200 text-blue-700">
+                          {p.plano.nome}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    <Badge variant="secondary" className="text-xs">
-                      {user._count.disciplinas} disc.
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {user._count.materiaisEstudo} mat.
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {user._count.planosEstudo} planos
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {user._count.resultadosSimulado} sim.
-                    </Badge>
-                  </div>
+                  {new Date(user.createdAt).toLocaleDateString('pt-BR')}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">

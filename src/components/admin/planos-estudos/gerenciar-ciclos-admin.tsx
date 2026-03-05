@@ -14,7 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  Plus, Trash2, Loader2, CalendarDays, FileText, Video, Link2, Check, X, Bold, Italic, ClipboardList,
+  Plus, Trash2, Loader2, CalendarDays, FileText, Video, Link2, Check, X, Bold, Italic, ClipboardList, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -145,6 +145,23 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
   )
   const [salvandoSimHorasId, setSalvandoSimHorasId] = useState<string | null>(null)
   const [savedSimHorasId, setSavedSimHorasId] = useState<string | null>(null)
+
+  // ── Estado: collapse por ciclo (todos fechados exceto o da semana atual) ──────
+  const [ciclosColapsados, setCiclosColapsados] = useState<Set<string>>(() => {
+    const hoje = new Date()
+    return new Set(
+      ciclosIniciais
+        .filter(c => !(new Date(c.dataInicio) <= hoje && hoje <= new Date(c.dataFim)))
+        .map(c => c.id)
+    )
+  })
+
+  const toggleColapso = (cicloId: string) =>
+    setCiclosColapsados(prev => {
+      const next = new Set(prev)
+      next.has(cicloId) ? next.delete(cicloId) : next.add(cicloId)
+      return next
+    })
 
   // ── Estado: ciclos ────────────────────────────────────────────────────────────
   const [removendoCicloId, setRemovendoCicloId] = useState<string | null>(null)
@@ -380,6 +397,16 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                 {/* Cabeçalho do ciclo */}
                 <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b gap-4">
                   <div className="flex items-center gap-3 flex-wrap min-w-0">
+                    <button
+                      type="button"
+                      className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
+                      onClick={() => toggleColapso(ciclo.id)}
+                      title={ciclosColapsados.has(ciclo.id) ? 'Expandir' : 'Colapsar'}
+                    >
+                      {ciclosColapsados.has(ciclo.id)
+                        ? <ChevronDown className="h-4 w-4" />
+                        : <ChevronUp className="h-4 w-4" />}
+                    </button>
                     <span className="font-semibold text-slate-900 text-sm shrink-0">Ciclo {ciclo.numeroSemana}</span>
                     <span className="text-xs text-slate-500 shrink-0">
                       {format(new Date(ciclo.dataInicio), 'dd/MM/yy', { locale: ptBR })}
@@ -422,7 +449,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                 </div>
 
                 {/* Tabela de disciplinas */}
-                <div className="overflow-x-auto">
+                {!ciclosColapsados.has(ciclo.id) && <div className="overflow-x-auto">
                     <table style={{tableLayout:'fixed', width:'100%'}}>
                       <colgroup>
                         <col style={{width:'176px'}} />
@@ -679,7 +706,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                         })}
                       </tbody>
                     </table>
-                  </div>
+                  </div>}
               </div>
             ))
           )}

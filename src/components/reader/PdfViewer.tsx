@@ -423,7 +423,7 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
 
   if (!resourceUrl) return null
 
-  if (isProcessingBlob || !absolutePdfUrl) {
+  if (isProcessingBlob) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -453,11 +453,11 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
           transition: 'filter 0.3s ease'
         }}
       >
-        {mounted && resourceUrl && absolutePdfUrl && (
+        {mounted && resourceUrl && (
           <PdfViewerComponent
             id="container"
             ref={viewerRef}
-            documentPath={absolutePdfUrl}
+            documentPath={absolutePdfUrl || undefined}
             resourceUrl={resourceUrl}
             style={{ height: '100%', width: '100%' }}
             toolbarSettings={toolbarSettings}
@@ -474,7 +474,7 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
             <Inject services={[Toolbar, Magnification, Navigation, LinkAnnotation, BookmarkView, ThumbnailView, Print, TextSelection, TextSearch, FormFields, FormDesigner, Annotation]} />
           </PdfViewerComponent>
         )}
-        {(!mounted || !resourceUrl || !absolutePdfUrl) && (
+        {(!mounted || !resourceUrl) && (
           <div className="h-full w-full flex items-center justify-center bg-gray-50">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>

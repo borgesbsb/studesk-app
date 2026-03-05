@@ -22,16 +22,17 @@ export async function GET(
 
     const { id } = await params
 
-    const material = await prisma.materialEstudo.findUnique({
+    const material = await prisma.materialEstudo.findFirst({
       where: {
         id,
-        userId: session.user.id
+        OR: [{ userId: session.user.id }, { userId: null }]
       },
       select: {
         id: true,
         nome: true,
         tipo: true,
         arquivoPdfUrl: true,
+        googleDriveFileId: true,
         totalPaginas: true,
         createdAt: true,
         updatedAt: true,

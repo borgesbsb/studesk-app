@@ -6,12 +6,26 @@ import { buscarMaterialEstudoPorId } from "@/interface/actions/material-estudo/l
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, AlertCircle, Download, Wifi } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { AdicionarTempoCicloDialog } from "@/components/material-estudo/adicionar-tempo-ciclo-dialog"
+import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual"
 import { videoCacheService } from "@/services/video-cache.service"
+import { YouTubePlayer } from "@/components/video/YouTubePlayer"
 import { useHeader } from "@/contexts/header-context"
 import { toast } from "sonner"
 
-// Carregar VideoPlayer apenas no cliente
+function extractYouTubeId(url: string): string | null {
+    const patterns = [
+        /youtube\.com\/watch\?v=([^&\s]+)/,
+        /youtu\.be\/([^?\s]+)/,
+        /youtube\.com\/embed\/([^?\s]+)/,
+    ]
+    for (const rx of patterns) {
+        const m = url.match(rx)
+        if (m) return m[1]
+    }
+    return null
+}
+
+// Carregar players apenas no cliente
 const VideoPlayer = dynamic(
     () => import("@/components/video/VideoPlayer"),
     {
@@ -62,6 +76,8 @@ export default function VideoViewerPage({ params }: PageProps) {
     const [videoBlobUrl, setVideoBlobUrl] = useState<string>("")
     const [fromCache, setFromCache] = useState<boolean>(false)
     const [isGoogleDriveVideo, setIsGoogleDriveVideo] = useState<boolean>(false)
+    const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null)
+    const [youtubeStartTime, setYoutubeStartTime] = useState<number>(0)
     const [showVideoOptions, setShowVideoOptions] = useState<boolean>(false)
     const [loadingVideo, setLoadingVideo] = useState<boolean>(false)
     const [downloadProgress, setDownloadProgress] = useState<number>(0) // 0 a 100
@@ -76,7 +92,6 @@ export default function VideoViewerPage({ params }: PageProps) {
 
     // Estados para marcar progresso
     const [savingProgress, setSavingProgress] = useState(false)
-    const [dialogTempoCicloOpen, setDialogTempoCicloOpen] = useState(false)
     const [lastSavedElapsedSeconds, setLastSavedElapsedSeconds] = useState(0)
 
     // Carregar dados do material
@@ -111,6 +126,24 @@ export default function VideoViewerPage({ params }: PageProps) {
 
                 if (materialResponse.success && materialResponse.data) {
                     setMaterial(materialResponse.data)
+
+                    // Verificar se é vídeo do YouTube
+                    const ytId = extractYouTubeId(materialResponse.data.arquivoVideoUrl || '')
+                    if (ytId) {
+                        setYoutubeVideoId(ytId)
+                        // Buscar última posição salva no histórico
+                        try {
+                            const histRes = await fetch(`/api/material/${id}/historico-leitura`)
+                            if (histRes.ok) {
+                                const histData = await histRes.json()
+                                if (histData.success && histData.historico?.length > 0) {
+                                    setYoutubeStartTime(histData.historico[0].paginaAtual || 0)
+                                }
+                            }
+                        } catch {}
+                        setLoading(false)
+                        return
+                    }
 
                     // Verificar se é vídeo do Google Drive
                     const isGDrive = materialResponse.data.arquivoVideoUrl?.startsWith('gdrive://') ||
@@ -185,24 +218,21 @@ export default function VideoViewerPage({ params }: PageProps) {
         loadMaterial()
     }, [params])
 
-    // Iniciar cronômetro automaticamente quando a página carregar
+    // Iniciar cronômetro automaticamente quando o material carrega
     useEffect(() => {
         if (material && !timerInitialized) {
-            console.log('⏱️ Iniciando cronômetro de visualização...')
             setIsTimerRunning(true)
             setElapsedTime(0)
             setTimerInitialized(true)
         }
     }, [material, timerInitialized])
 
-    // Controlar pausa do cronômetro quando aba muda
+    // Pausar cronômetro ao trocar de aba, retomar ao voltar
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden && isTimerRunning) {
-                console.log('⏸️ Aba oculta - pausando cronômetro')
                 setIsTimerRunning(false)
             } else if (!document.hidden && timerInitialized && !isTimerRunning) {
-                console.log('▶️ Aba visível - retomando cronômetro')
                 setIsTimerRunning(true)
             }
         }
@@ -251,7 +281,11 @@ export default function VideoViewerPage({ params }: PageProps) {
     // Callback quando o tempo do vídeo atualiza
     const handleVideoTimeUpdate = (time: number) => {
         setCurrentTime(time)
-        console.log(`📹 Tempo do vídeo: ${Math.floor(time)}s`)
+    }
+
+    // Callback para YouTube: apenas garante que o timer foi inicializado (play state não controla o cronômetro)
+    const handleYouTubePlayState = (_playing: boolean) => {
+        if (!timerInitialized) setTimerInitialized(true)
     }
 
     // Handler para atualizar duração real do vídeo no banco
@@ -286,57 +320,73 @@ export default function VideoViewerPage({ params }: PageProps) {
         }
     }
 
-    // Função para salvar histórico de visualização
-    const saveWatchHistory = async (tempoSegundos: number, tempoVideoAtual: number) => {
-        if (!materialId) return
 
-        try {
-            const response = await fetch(`/api/material/${materialId}/historico-leitura`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    paginaAtual: Math.floor(tempoVideoAtual), // Usar tempo do vídeo como "página"
-                    tempoLeituraSegundos: tempoSegundos,
-                    assuntosEstudados: null
-                }),
-            })
-
-            if (!response.ok) {
-                throw new Error('Erro ao salvar histórico de visualização')
-            }
-
-            const result = await response.json()
-            console.log('✅ Histórico de visualização salvo:', result)
-            return result
-        } catch (error) {
-            console.error('❌ Erro ao salvar histórico de visualização:', error)
-            throw error
-        }
-    }
-
-    // Refs para acesso no cleanup
+    // Refs para acesso no cleanup e auto-save
     const elapsedTimeRef = useRef(elapsedTime)
     const currentTimeRef = useRef(currentTime)
     const materialIdRef = useRef(materialId)
     const lastSavedElapsedSecondsRef = useRef(lastSavedElapsedSeconds)
+    const isTimerRunningRef = useRef(isTimerRunning)
+    const disciplinaIdRef = useRef<string>('')
 
+    useEffect(() => { elapsedTimeRef.current = elapsedTime }, [elapsedTime])
+    useEffect(() => { currentTimeRef.current = currentTime }, [currentTime])
+    useEffect(() => { materialIdRef.current = materialId }, [materialId])
+    useEffect(() => { lastSavedElapsedSecondsRef.current = lastSavedElapsedSeconds }, [lastSavedElapsedSeconds])
+    useEffect(() => { isTimerRunningRef.current = isTimerRunning }, [isTimerRunning])
     useEffect(() => {
-        elapsedTimeRef.current = elapsedTime
-    }, [elapsedTime])
+        if (disciplinaIdFromUrl) {
+            disciplinaIdRef.current = disciplinaIdFromUrl
+        } else if (material?.disciplinas?.[0]) {
+            const id = material.disciplinas[0].disciplina?.id || material.disciplinas[0].disciplinaId
+            if (id) disciplinaIdRef.current = id
+        }
+    }, [disciplinaIdFromUrl, material])
 
+    // Auto-save a cada 2 minutos enquanto o vídeo está tocando
     useEffect(() => {
-        currentTimeRef.current = currentTime
-    }, [currentTime])
+        const interval = setInterval(async () => {
+            const elapsed = elapsedTimeRef.current
+            const lastSaved = lastSavedElapsedSecondsRef.current
+            const matId = materialIdRef.current
+            const videoTime = currentTimeRef.current
+            const disciplinaId = disciplinaIdRef.current
 
-    useEffect(() => {
-        materialIdRef.current = materialId
-    }, [materialId])
+            if (!isTimerRunningRef.current || !matId) return
+            const delta = elapsed - lastSaved
+            if (delta < 120) return // menos de 2 min desde último save
 
-    useEffect(() => {
-        lastSavedElapsedSecondsRef.current = lastSavedElapsedSeconds
-    }, [lastSavedElapsedSeconds])
+            try {
+                await fetch(`/api/material/${matId}/historico-leitura`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paginaAtual: Math.floor(videoTime),
+                        tempoLeituraSegundos: delta,
+                        assuntosEstudados: null
+                    })
+                })
+
+                // Adicionar tempo ao ciclo de estudos automaticamente
+                if (disciplinaId) {
+                    const deltaMinutos = Math.floor(delta / 60)
+                    if (deltaMinutos >= 1) {
+                        await adicionarTempoManual({
+                            disciplinaId,
+                            horas: 0,
+                            minutos: deltaMinutos,
+                        })
+                    }
+                }
+
+                lastSavedElapsedSecondsRef.current = elapsed
+                setLastSavedElapsedSeconds(elapsed)
+                toast.success('Progresso salvo automaticamente')
+            } catch {}
+        }, 30000) // verifica a cada 30s
+
+        return () => clearInterval(interval)
+    }, [])
 
     // Salvar histórico de visualização ao sair da página
     useEffect(() => {
@@ -386,80 +436,41 @@ export default function VideoViewerPage({ params }: PageProps) {
         }
     }, [])
 
-    // Função para salvar progresso
-    const handleSaveProgress = async () => {
+    // Salvar sessão: adiciona o tempo ao ciclo de estudos e reinicia o cronômetro
+    const handleSalvarSessao = async () => {
         if (!materialId) return
 
-        // Calcular delta desde o último salvamento usando refs
         const currentElapsed = elapsedTimeRef.current
         const lastSaved = lastSavedElapsedSecondsRef.current
-        const deltaMinutos = Math.floor((currentElapsed - lastSaved) / 60)
+        const delta = Math.max(0, currentElapsed - lastSaved)
+        const disciplinaId = disciplinaIdRef.current
+        const deltaMinutos = Math.floor(delta / 60)
 
-        console.log('💾 Salvando progresso:', {
-            currentElapsed,
-            lastSaved,
-            deltaSegundos: currentElapsed - lastSaved,
-            deltaMinutos,
-            vaAbrirModal: deltaMinutos >= 1
-        })
-
-        // Se há tempo significativo (>=1 minuto), perguntar sobre adicionar ao ciclo
-        if (deltaMinutos >= 1) {
-            console.log('📋 Abrindo modal de tempo ao ciclo...')
-            setDialogTempoCicloOpen(true)
-        } else {
-            console.log('⏩ Salvando diretamente sem modal (tempo < 1 minuto)')
-            await executarSalvarProgresso()
+        if (deltaMinutos < 1) {
+            toast.info('Sessão menor que 1 minuto — continue estudando!')
+            return
         }
-    }
-
-    const executarSalvarProgresso = async () => {
-        if (!materialId) return
-
-        const videoTime = currentTimeRef.current
 
         setSavingProgress(true)
         try {
-            // Atualizar progresso no banco de dados (tempoAssistido)
-            await fetch(`/api/material/${materialId}/progress`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    tempoAssistido: Math.floor(videoTime)
+            if (disciplinaId) {
+                await adicionarTempoManual({
+                    disciplinaId,
+                    horas: 0,
+                    minutos: deltaMinutos,
                 })
-            })
-
-            // Salvar histórico de visualização apenas com o delta desde o último salvamento
-            const currentElapsed = elapsedTimeRef.current
-            const lastSaved = lastSavedElapsedSecondsRef.current
-            const deltaSeconds = Math.max(0, currentElapsed - lastSaved)
-
-            if (deltaSeconds > 0) {
-                await saveWatchHistory(deltaSeconds, videoTime)
             }
 
-            // Zerar e reiniciar o cronômetro
-            console.log('⏱️ Zerando e reiniciando cronômetro após salvar progresso')
-            setElapsedTime(0)
+            // Reiniciar cronômetro para a próxima sessão
+            lastSavedElapsedSecondsRef.current = 0
             setLastSavedElapsedSeconds(0)
+            setElapsedTime(0)
+            if (!isTimerRunning) setIsTimerRunning(true)
 
-            // Garantir que o timer está rodando
-            if (!isTimerRunning) {
-                setIsTimerRunning(true)
-            }
-
-            // Atualizar material local
-            setMaterial((prev: any) => ({
-                ...prev,
-                tempoAssistido: Math.floor(videoTime)
-            }))
-
-            toast.success('Progresso salvo com sucesso!')
+            toast.success('Sessão salva!')
         } catch (error) {
-            console.error('Erro ao salvar progresso:', error)
-            toast.error('Erro ao salvar progresso')
+            console.error('Erro ao salvar sessão:', error)
+            toast.error('Erro ao salvar sessão')
         } finally {
             setSavingProgress(false)
         }
@@ -858,6 +869,48 @@ export default function VideoViewerPage({ params }: PageProps) {
                             </div>
                         </div>
                     </div>
+                ) : youtubeVideoId ? (
+                    /* YouTube Player */
+                    <div className="flex flex-col h-full">
+                        <div className="flex-1">
+                            <YouTubePlayer
+                                videoId={youtubeVideoId}
+                                materialId={materialId}
+                                startTimeSeconds={youtubeStartTime}
+                                onPlayStateChange={handleYouTubePlayState}
+                                onTimeUpdate={handleVideoTimeUpdate}
+                                onDurationLoad={handleVideoDurationLoad}
+                            />
+                        </div>
+                        {/* Barra de controles inferior */}
+                        <div className="bg-gray-900 text-white px-4 py-3 flex items-center gap-3 shrink-0">
+                            {/* Indicador de estado */}
+                            <div className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${isTimerRunning ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+                                <span className="text-xs text-gray-400">{isTimerRunning ? 'Gravando' : 'Pausado'}</span>
+                            </div>
+
+                            <div className="w-px h-4 bg-gray-600" />
+
+                            {/* Cronômetro da sessão */}
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-gray-400">Sessão</span>
+                                <span className="font-mono text-sm font-semibold text-white tabular-nums">
+                                    {String(Math.floor(elapsedTime / 3600)).padStart(2, '0')}:{String(Math.floor((elapsedTime % 3600) / 60)).padStart(2, '0')}:{String(elapsedTime % 60).padStart(2, '0')}
+                                </span>
+                            </div>
+
+                            <div className="flex-1" />
+
+                            <button
+                                onClick={handleSalvarSessao}
+                                disabled={savingProgress || elapsedTime === 0}
+                                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {savingProgress ? 'Salvando...' : 'Salvar Sessão'}
+                            </button>
+                        </div>
+                    </div>
                 ) : videoUrl ? (
                     /* Video Player em tela cheia */
                     <VideoPlayer
@@ -865,7 +918,7 @@ export default function VideoViewerPage({ params }: PageProps) {
                         tempoProgressoSegundos={material.tempoAssistido || 0}
                         onTimeUpdate={handleVideoTimeUpdate}
                         onDurationLoad={handleVideoDurationLoad}
-                        onSave={handleSaveProgress}
+                        onSave={handleSalvarSessao}
                         savingProgress={savingProgress}
                     />
                 ) : (
@@ -874,18 +927,6 @@ export default function VideoViewerPage({ params }: PageProps) {
                     </div>
                 )}
             </div>
-
-            {/* Diálogo para adicionar tempo ao ciclo */}
-            {materialId && (
-                <AdicionarTempoCicloDialog
-                    open={dialogTempoCicloOpen}
-                    onOpenChange={setDialogTempoCicloOpen}
-                    materialId={materialId}
-                    disciplinaIdFromUrl={disciplinaIdFromUrl}
-                    tempoDecorridoMinutos={Math.floor((elapsedTime - lastSavedElapsedSeconds) / 60)}
-                    onConfirm={executarSalvarProgresso}
-                />
-            )}
         </>
     )
 }

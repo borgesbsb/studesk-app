@@ -45,11 +45,11 @@ export async function POST(
       )
     }
 
-    // 2. Verificar ownership do material
-    const material = await prisma.materialEstudo.findUnique({
+    // 2. Verificar que o material existe e pertence ao usuário ou é admin (userId: null)
+    const material = await prisma.materialEstudo.findFirst({
       where: {
         id: materialId,
-        userId: auth.userId
+        OR: [{ userId: auth.userId }, { userId: null }]
       },
       select: { id: true, tipo: true, duracaoSegundos: true }
     })

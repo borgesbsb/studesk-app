@@ -213,8 +213,9 @@ export async function POST(
         )
       }
     } else {
-      // Para PDFs, valida contra totalPaginas
-      if (!Number.isInteger(paginaAtual) || paginaAtual < 1 || paginaAtual > materialExistente.totalPaginas) {
+      // Para PDFs, valida contra totalPaginas (ignora limite superior se totalPaginas não foi definido)
+      const maxPagina = materialExistente.totalPaginas > 0 ? materialExistente.totalPaginas : Infinity
+      if (!Number.isInteger(paginaAtual) || paginaAtual < 1 || paginaAtual > maxPagina) {
         return NextResponse.json(
           { error: 'Página atual inválida' },
           { status: 400, headers: handleCors(request) }
@@ -306,10 +307,12 @@ export async function POST(
                 select: {
                   dataInicio: true,
                   dataFim: true,
+                  planoId: true,
                   plano: {
                     select: {
                       nome: true,
-                      ativo: true
+                      ativo: true,
+                      userId: true
                     }
                   }
                 }
@@ -356,7 +359,7 @@ export async function POST(
               data: {
                 disciplinaSemanaId: disciplinaSemanaAtiva.id,
                 dia: diaKey,
-                horasPlanejadas: 0,
+                minutosPlanejados: 0,
                 horasRealizadas: 0,
                 questoesPlanejadas: 0,
                 questoesRealizadas: 0
@@ -378,6 +381,30 @@ export async function POST(
           })
 
           console.log(`   ✅ +${horasAdicionar.toFixed(4)}h para ${disciplina.nome} - ${diaKey} (total: ${updated.horasRealizadas})`)
+
+          // Para planos compartilhados (userId=null), também atualizar ProgressoUsuarioDisciplinaDia
+          if (disciplinaSemanaAtiva.semana.plano.userId === null) {
+            try {
+              const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+                where: { planoId_userId: { planoId: disciplinaSemanaAtiva.semana.planoId, userId: auth.userId } }
+              })
+              if (planoUsuario) {
+                const progresso = await prisma.progressoUsuarioDisciplina.findFirst({
+                  where: { planoUsuarioId: planoUsuario.id, disciplinaSemanaId: disciplinaSemanaAtiva.id }
+                })
+                if (progresso) {
+                  await prisma.progressoUsuarioDisciplinaDia.upsert({
+                    where: { progressoId_dia: { progressoId: progresso.id, dia: diaKey } },
+                    create: { progressoId: progresso.id, dia: diaKey, horasRealizadas: horasAdicionar, questoesPlanejadas: 0, questoesRealizadas: 0 },
+                    update: { horasRealizadas: { increment: horasAdicionar } }
+                  })
+                  console.log(`   ✅ ProgressoUsuarioDisciplinaDia atualizado para plano compartilhado`)
+                }
+              }
+            } catch (sharedErr) {
+              console.error('⚠️ Erro ao atualizar ProgressoUsuarioDisciplinaDia:', sharedErr)
+            }
+          }
 
           horasAdicionadas += horasAdicionar
           disciplinasAtualizadas.push(disciplina.nome)

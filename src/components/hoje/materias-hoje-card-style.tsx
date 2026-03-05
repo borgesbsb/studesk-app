@@ -90,6 +90,15 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     return `${horasInt}h${minutos}m`;
   };
 
+  // Formata minutos diretamente (campo minutosPlanejados está em minutos)
+  const formatarMinutos = (min: number) => {
+    if (min < 60) return `${min}min`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (m === 0) return `${h}h`;
+    return `${h}h${m}m`;
+  };
+
   const getCorProgresso = (progresso: number) => {
     // Gradiente de vermelho (0%) até azul (100%)
     if (progresso >= 90) return "hsl(217, 91%, 60%)"; // Azul forte
@@ -389,7 +398,9 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
           {Object.values(materiasState)
             .sort((a, b) => a.prioridade - b.prioridade)
             .map((materia) => {
-            const progressoTempo = calcularProgressoHoras(materia.horasRealizadas, materia.horasPlanejadas);
+            // horasRealizadas em horas, minutosPlanejados em minutos → converter realizadas para minutos
+            const realizadasMinutos = materia.horasRealizadas * 60;
+            const progressoTempo = calcularProgressoHoras(realizadasMinutos, materia.minutosPlanejados);
             const progressoQuestoes = materia.questoesPlanejadas > 0
               ? Math.min((materia.questoesRealizadas / materia.questoesPlanejadas) * 100, 100)
               : 0;
@@ -432,7 +443,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                       </div>
                       {renderRadialChartOnly(progressoTempo, "Tempo")}
                       <div className="text-[10px] font-medium text-muted-foreground -mt-1">
-                        {formatarTempo(materia.horasRealizadas)} / {formatarTempo(materia.horasPlanejadas)}
+                        {formatarMinutos(Math.round(materia.horasRealizadas * 60))} / {formatarMinutos(materia.minutosPlanejados)}
                       </div>
                     </div>
                     {/* Coluna direita: botões */}
@@ -471,21 +482,41 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const path = mat.tipo === 'VIDEO'
-                                  ? `/${hash}/material/${mat.id}/video`
+                                  ? `/${hash}/material/${mat.id}/video?disciplinaId=${materia.disciplinaId}`
                                   : `/${hash}/material/${mat.id}/ler?mode=pdf`;
                                 router.push(path);
                               }}
+                              title={mat.tipo === 'VIDEO' && mat.paginasLidas > 0
+                                ? `Parou em ${String(Math.floor(mat.paginasLidas / 3600)).padStart(2,'0')}:${String(Math.floor((mat.paginasLidas % 3600) / 60)).padStart(2,'0')}:${String(mat.paginasLidas % 60).padStart(2,'0')}`
+                                : mat.tipo === 'PDF' && mat.paginasLidas > 0
+                                ? mat.totalPaginas > 0 ? `Página ${mat.paginasLidas} de ${mat.totalPaginas}` : `Página ${mat.paginasLidas}`
+                                : undefined}
                               className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-[10px] font-medium hover:bg-accent transition-colors text-left w-full overflow-hidden"
                             >
                               {/* Barra de progresso de fundo */}
                               {(() => {
-                                const progresso = mat.tipo === 'VIDEO'
-                                  ? (mat.duracaoSegundos && mat.duracaoSegundos > 0 ? Math.min((mat.tempoAssistido ?? 0) / mat.duracaoSegundos * 100, 100) : 0)
-                                  : (mat.totalPaginas > 0 ? Math.min(mat.paginasLidas / mat.totalPaginas * 100, 100) : 0);
+                                let progresso = 0;
+                                if (mat.tipo === 'VIDEO') {
+                                  if (mat.duracaoSegundos && mat.duracaoSegundos > 0 && mat.paginasLidas > 0) {
+                                    progresso = Math.min(mat.paginasLidas / mat.duracaoSegundos * 100, 100);
+                                  } else if (mat.paginasLidas > 0) {
+                                    // duracaoSegundos ainda não salvo: mostra 20% para indicar progresso iniciado
+                                    progresso = 20;
+                                  }
+                                } else {
+                                  if (mat.totalPaginas > 0) {
+                                    progresso = Math.min(mat.paginasLidas / mat.totalPaginas * 100, 100);
+                                  } else if (mat.paginasLidas > 0) {
+                                    progresso = 20; // totalPaginas não definido (ex: PDF do Google Drive)
+                                  }
+                                }
                                 return progresso > 0 ? (
                                   <span
-                                    className="absolute inset-y-0 left-0 pointer-events-none bg-primary"
-                                    style={{ width: `${progresso}%`, opacity: 0.2 }}
+                                    className="absolute inset-y-0 left-0 pointer-events-none"
+                                    style={{
+                                      width: `${progresso}%`,
+                                      backgroundColor: mat.tipo === 'VIDEO' ? 'rgba(59,130,246,0.2)' : 'rgba(239,68,68,0.2)'
+                                    }}
                                   />
                                 ) : null;
                               })()}

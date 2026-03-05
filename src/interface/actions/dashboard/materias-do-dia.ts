@@ -9,7 +9,7 @@ export interface MateriaDoDia {
   disciplinaId: string
   disciplinaNome: string
   disciplinaCor?: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   horasRealizadas: number
   tempoRealEstudo: number // Tempo controlado pelo usuário (em horas)
   tempoSessoesPdf: number // Tempo automático das sessões PDF (em horas)
@@ -272,14 +272,23 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
       const materiasDeProgressos: MateriaDoDia[] = await Promise.all(
         progressosDoDia.map(async (prog) => {
           const diaRec = prog.dias[0]
+          // Prioridade: valor por dia (ProgressoUsuarioDisciplinaDia) > semana admin > semana usuário
+          let minutosPlanejados: number
+          if (diaRec?.minutosPlanejados && diaRec.minutosPlanejados > 0) {
+            minutosPlanejados = diaRec.minutosPlanejados
+          } else {
+            const diasArray = prog.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
+            const numDias = diasArray.length || 1
+            const minutosSemana = prog.disciplinaSemana.minutosPlanejados || prog.minutosPlanejados
+            minutosPlanejados = Math.round((minutosSemana / numDias) * 100) / 100
+          }
           return {
             id: prog.disciplinaSemanaId,
             disciplinaId: prog.disciplinaSemana.disciplinaId,
             disciplinaNome: prog.disciplinaSemana.disciplina.nome,
             disciplinaCor: prog.disciplinaSemana.disciplina.cor || undefined,
-            // Usa as metas do dia específico; fallback para o valor compartilhado do ciclo
-            horasPlanejadas: diaRec?.horasPlanejadas ?? prog.horasPlanejadas,
-            horasRealizadas: diaRec?.horasRealizadas ?? 0,
+            minutosPlanejados,
+            horasRealizadas: diaRec?.horasRealizadas ?? 0, // Float em horas (de adicionarTempoManual)
             tempoRealEstudo: diaRec?.horasRealizadas ?? 0,
             tempoSessoesPdf: await calcTempoSessoesPdf(prog.disciplinaSemana.disciplinaId),
             concluida: prog.concluida,
@@ -308,7 +317,7 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           disciplinaId: extra.disciplinaId,
           disciplinaNome: extra.disciplina.nome,
           disciplinaCor: extra.disciplina.cor || undefined,
-          horasPlanejadas: extra.horasPlanejadas,
+          minutosPlanejados: extra.minutosPlanejados,
           // horasRealizadas armazenado em minutos (Int) → converter para horas
           horasRealizadas: Math.round((extra.horasRealizadas / 60) * 100) / 100,
           tempoRealEstudo: Math.round((extra.horasRealizadas / 60) * 100) / 100,
@@ -414,7 +423,7 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
         console.log(`   DisciplinaDia encontrado:`, disciplinaDia ? 'SIM' : 'NÃO')
         if (disciplinaDia) {
           console.log(`   ID: ${disciplinaDia.id}`)
-          console.log(`   Horas planejadas: ${disciplinaDia.horasPlanejadas}`)
+          console.log(`   Horas planejadas: ${disciplinaDia.minutosPlanejados}`)
           console.log(`   Horas realizadas: ${disciplinaDia.horasRealizadas}`)
           console.log(`   Questões planejadas: ${disciplinaDia.questoesPlanejadas}`)
           console.log(`   Questões realizadas: ${disciplinaDia.questoesRealizadas}`)
@@ -424,26 +433,25 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
         let horasPorDia: number
         let questoesPorDia: number
 
+        // minutosPlanejados do ciclo está em minutos → dividir por número de dias
+        const diasEstudo = disciplinaSemana.diasEstudo?.split(',').filter(d => d.trim()) || []
+        const diasNovos = diasEstudo.filter(dia => dia.match(/dia(\d+)/))
+        const numDias = diasNovos.length || 1
+        const horasPlanejadaPorDia = Math.round((disciplinaSemana.minutosPlanejados / numDias) * 100) / 100
+
         if (disciplinaDia) {
-          // Se existe DisciplinaDia, usar seus valores
-          horasPorDia = disciplinaDia.horasPlanejadas
+          // minutosPlanejados do DisciplinaDia é em minutos; se 0, usa o cálculo da semana
+          horasPorDia = disciplinaDia.minutosPlanejados || horasPlanejadaPorDia
           questoesPorDia = disciplinaDia.questoesPlanejadas
           console.log(`✅ Usando DisciplinaDia para ${disciplinaSemana.disciplina.nome} no ${diaIdAtual}:`, {
             horasPorDia,
             questoesPorDia
           })
         } else {
-          // Se não existe, calcular proporcionalmente
-          const diasEstudo = disciplinaSemana.diasEstudo?.split(',').filter(d => d.trim()) || []
-          const diasNovos = diasEstudo.filter(dia => {
-            const match = dia.match(/dia(\d+)/)
-            return match !== null
-          })
-          const numDias = diasNovos.length || 1
-          horasPorDia = Math.round((disciplinaSemana.horasPlanejadas / numDias) * 100) / 100
+          horasPorDia = horasPlanejadaPorDia
           questoesPorDia = disciplinaSemana.questoesPlanejadas
           console.log(`⚠️ DisciplinaDia não encontrado, calculando proporcionalmente para ${disciplinaSemana.disciplina.nome}:`, {
-            horasPlanejadas: disciplinaSemana.horasPlanejadas,
+            minutosPlanejados: disciplinaSemana.minutosPlanejados,
             numDias,
             horasPorDia,
             questoesPorDia
@@ -454,7 +462,7 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           disciplinaNome: disciplinaSemana.disciplina.nome,
           diaIdAtual,
           temDisciplinaDia: !!disciplinaDia,
-          horasPlanejadas: disciplinaSemana.horasPlanejadas, // Em horas (total)
+          minutosPlanejados: disciplinaSemana.minutosPlanejados, // Em horas (total)
           diasEstudo: disciplinaSemana.diasEstudo,
           horasPorDia, // Horas do dia específico
           questoesPorDia, // Questões do dia específico
@@ -486,7 +494,7 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           disciplinaId: disciplinaSemana.disciplina.id,
           disciplinaNome: disciplinaSemana.disciplina.nome,
           disciplinaCor: disciplinaSemana.disciplina.cor || undefined,
-          horasPlanejadas: horasPorDia, // Horas planejadas para o dia específico
+          minutosPlanejados: horasPorDia, // Horas planejadas para o dia específico
           horasRealizadas: horasRealizadasDia,
           tempoRealEstudo: horasRealizadasDia, // USAR O MESMO VALOR DE horasRealizadas
           tempoSessoesPdf,
@@ -501,6 +509,10 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
             id: m.material.id,
             nome: m.material.nome,
             tipo: m.material.tipo,
+            paginasLidas: m.material.historicoLeitura[0]?.paginaAtual ?? m.material.paginasLidas,
+            totalPaginas: m.material.totalPaginas,
+            tempoAssistido: m.material.tempoAssistido ?? null,
+            duracaoSegundos: m.material.duracaoSegundos ?? null,
           }))
         }
       })

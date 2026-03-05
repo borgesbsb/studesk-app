@@ -492,6 +492,9 @@ function formatarMinutos(min: number): string {
 function calcularDiasCiclo(dataInicio: Date | string, dataFim: Date | string): Array<{ id: string; label: string; data: Date }> {
   const inicio = new Date(dataInicio)
   const fim = new Date(dataFim)
+  // Usar UTC noon para tornar o cálculo timezone-independente
+  inicio.setUTCHours(12, 0, 0, 0)
+  fim.setUTCHours(12, 0, 0, 0)
 
   // Calcular número de dias
   const diffTime = Math.abs(fim.getTime() - inicio.getTime())
@@ -500,7 +503,7 @@ function calcularDiasCiclo(dataInicio: Date | string, dataFim: Date | string): A
   const dias = []
   for (let i = 0; i < diffDays; i++) {
     const data = new Date(inicio)
-    data.setDate(inicio.getDate() + i)
+    data.setUTCDate(inicio.getUTCDate() + i)
 
     dias.push({
       id: `dia${i + 1}`,

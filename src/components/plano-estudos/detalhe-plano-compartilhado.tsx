@@ -43,8 +43,11 @@ function getDiasCiclo(dataInicio: Date, dataFim: Date) {
   const dias: { id: string; label: string }[] = []
   const start = new Date(dataInicio)
   const end = new Date(dataFim)
-  start.setHours(12, 0, 0, 0)
-  end.setHours(12, 0, 0, 0)
+  // Usar UTC noon para evitar bug de timezone: setHours() usa hora local do browser,
+  // o que causa desalinhamento entre diaId do cliente e do servidor quando o browser
+  // está em timezone diferente de UTC-3 (ex: UTC-4 shifts dataInicio para o dia anterior)
+  start.setUTCHours(12, 0, 0, 0)
+  end.setUTCHours(12, 0, 0, 0)
   const current = new Date(start)
   let i = 1
   while (current <= end && i <= 7) {
@@ -52,7 +55,7 @@ function getDiasCiclo(dataInicio: Date, dataFim: Date) {
       id: `dia${i}`,
       label: format(current, "EEE, dd/MM", { locale: ptBR }),
     })
-    current.setDate(current.getDate() + 1)
+    current.setUTCDate(current.getUTCDate() + 1)
     i++
   }
   return dias

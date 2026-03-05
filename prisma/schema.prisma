@@ -282,7 +282,7 @@ model DisciplinaSemana {
   id                  String          @id @default(cuid())
   semanaId            String
   disciplinaId        String
-  horasPlanejadas     Int
+  minutosPlanejados     Int
   horasRealizadas     Int             @default(0)
   prioridade          Int             @default(1)
   observacoes         String?
@@ -316,7 +316,7 @@ model DisciplinaDia {
   id                  String           @id @default(cuid())
   disciplinaSemanaId  String
   dia                 String           // "dia1", "dia2", "dia3", "dia4", "dia5", "dia6", "dia7"
-  horasPlanejadas     Float            @default(0) // Horas específicas para este dia
+  minutosPlanejados     Float            @default(0) // Horas específicas para este dia
   horasRealizadas     Float            @default(0) // Horas realizadas neste dia
   questoesPlanejadas  Int              @default(0) // Questões planejadas para este dia
   questoesRealizadas  Int              @default(0) // Questões realizadas neste dia
@@ -370,7 +370,7 @@ model ProgressoUsuarioDisciplina {
   planoUsuarioId      String
   disciplinaSemanaId  String
   // Metas definidas pelo usuário
-  horasPlanejadas     Int      @default(0)
+  minutosPlanejados     Int      @default(0)
   questoesPlanejadas  Int      @default(0)
   tempoVideoPlanejado Int      @default(0)
   totalPaginas        Int      @default(0)
@@ -399,7 +399,7 @@ model ProgressoUsuarioDisciplinaDia {
   id                 String   @id @default(cuid())
   progressoId        String
   dia                String   // "dia1" ... "dia7"
-  horasPlanejadas    Float    @default(0)
+  minutosPlanejados    Float    @default(0)
   questoesPlanejadas Int      @default(0)
   horasRealizadas    Float    @default(0)
   questoesRealizadas Int      @default(0)
@@ -433,7 +433,7 @@ model ProgressoUsuarioDisciplinaExtra {
   semanaId           String
   disciplinaId       String
   dia                String   // "dia1", "dia2", etc.
-  horasPlanejadas    Int      @default(0)
+  minutosPlanejados    Int      @default(0)
   questoesPlanejadas Int      @default(0)
   horasRealizadas    Int      @default(0)
   questoesRealizadas Int      @default(0)

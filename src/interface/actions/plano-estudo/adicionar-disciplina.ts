@@ -7,7 +7,7 @@ import { requireAuth } from '@/lib/auth-helpers'
 interface AdicionarDisciplinaData {
   semanaId: string
   disciplinaId: string
-  horasPlanejadas?: number
+  minutosPlanejados?: number
   questoesPlanejadas?: number
   diasEstudo?: string
   tipoVeiculo?: string
@@ -23,7 +23,7 @@ export async function adicionarDisciplinaSemana(data: AdicionarDisciplinaData) {
     const resultado = await PlanoEstudoService.adicionarDisciplinaSemana(userId, {
       semanaId: data.semanaId,
       disciplinaId: data.disciplinaId,
-      horasPlanejadas: data.horasPlanejadas || 1,
+      minutosPlanejados: data.minutosPlanejados || 1,
       questoesPlanejadas: data.questoesPlanejadas || 0,
       diasEstudo: data.diasEstudo || '',
       tipoVeiculo: data.tipoVeiculo,

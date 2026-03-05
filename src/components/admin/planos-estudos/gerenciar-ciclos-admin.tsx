@@ -42,7 +42,7 @@ interface MaterialSemana {
 interface DisciplinaSemana {
   id: string
   disciplinaId: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   questoesPlanejadas: number
   assuntos: string | null
   disciplina: { id: string; nome: string; cor: string | null }
@@ -119,7 +119,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
   // ── Estado: horas/questões/assunto por disciplina (auto-save no blur) ─────────
   const [rowEdits, setRowEdits] = useState<Record<string, { horas: number; questoes: number; assunto: string }>>(
     () => Object.fromEntries(
-      ciclosIniciais.flatMap(c => c.disciplinas).map(d => [d.id, { horas: d.horasPlanejadas, questoes: d.questoesPlanejadas, assunto: d.assuntos ?? '' }])
+      ciclosIniciais.flatMap(c => c.disciplinas).map(d => [d.id, { horas: d.minutosPlanejados, questoes: d.questoesPlanejadas, assunto: d.assuntos ?? '' }])
     )
   )
   const [savingDiscId, setSavingDiscId] = useState<string | null>(null)
@@ -178,14 +178,14 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
   const handleBlurPlanejamento = async (discId: string) => {
     const disc = getDisc(discId)
     if (!disc) return
-    const { horas, questoes } = rowEdits[discId] ?? { horas: disc.horasPlanejadas, questoes: disc.questoesPlanejadas }
-    if (horas === disc.horasPlanejadas && questoes === disc.questoesPlanejadas) return
+    const { horas, questoes } = rowEdits[discId] ?? { horas: disc.minutosPlanejados, questoes: disc.questoesPlanejadas }
+    if (horas === disc.minutosPlanejados && questoes === disc.questoesPlanejadas) return
     setSavingDiscId(discId)
-    await adminAtualizarDisciplinaSemana(discId, planoId, { horasPlanejadas: horas, questoesPlanejadas: questoes })
+    await adminAtualizarDisciplinaSemana(discId, planoId, { minutosPlanejados: horas, questoesPlanejadas: questoes })
     setSavingDiscId(null)
     setSavedDiscId(discId)
     setTimeout(() => setSavedDiscId(d => d === discId ? null : d), 1500)
-    updateDisc(discId, { horasPlanejadas: horas, questoesPlanejadas: questoes })
+    updateDisc(discId, { minutosPlanejados: horas, questoesPlanejadas: questoes })
   }
 
   // ── Materiais ─────────────────────────────────────────────────────────────────
@@ -328,7 +328,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
       semanaId: modalDiscCicloId,
       planoId,
       disciplinaId: novaDiscId,
-      horasPlanejadas: novaDiscHoras,
+      minutosPlanejados: novaDiscHoras,
       questoesPlanejadas: novaDiscQuestoes,
     })
     setSalvandoDisc(false)
@@ -339,7 +339,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
       setCiclos(prev => prev.map(c =>
         c.id === modalDiscCicloId ? { ...c, disciplinas: [...c.disciplinas, novaDisc] } : c
       ))
-      setRowEdits(prev => ({ ...prev, [novaDisc.id]: { horas: novaDisc.horasPlanejadas, questoes: novaDisc.questoesPlanejadas, assunto: novaDisc.assuntos ?? '' } }))
+      setRowEdits(prev => ({ ...prev, [novaDisc.id]: { horas: novaDisc.minutosPlanejados, questoes: novaDisc.questoesPlanejadas, assunto: novaDisc.assuntos ?? '' } }))
       setModalDiscCicloId(null)
     }
   }
@@ -423,19 +423,19 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
 
                 {/* Tabela de disciplinas */}
                 <div className="overflow-x-auto">
-                    <table className="w-full table-fixed">
+                    <table style={{tableLayout:'fixed', width:'100%'}}>
                       <colgroup>
-                        <col className="w-44" />
-                        <col className="w-20" />
-                        <col className="w-24" />
-                        <col className="w-56" />
+                        <col style={{width:'176px'}} />
+                        <col style={{width:'80px'}} />
+                        <col style={{width:'96px'}} />
+                        <col style={{width:'500px'}} />
                         <col />
-                        <col className="w-10" />
+                        <col style={{width:'40px'}} />
                       </colgroup>
                       <thead>
                         <tr className="border-b bg-white">
                           <th className="text-left px-4 py-3 text-sm font-medium text-slate-500">Disciplina</th>
-                          <th className="text-left px-3 py-3 text-sm font-medium text-slate-500">Horas</th>
+                          <th className="text-left px-3 py-3 text-sm font-medium text-slate-500">Min</th>
                           <th className="text-left px-3 py-3 text-sm font-medium text-slate-500">Questões</th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-slate-500">Materiais</th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-slate-500">Assuntos</th>
@@ -511,12 +511,12 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                                 </div>
                               </td>
 
-                              {/* Horas */}
+                              {/* Min planejados */}
                               <td className="px-3 py-3">
                                 <Input
                                   type="number" min="0"
                                   className="h-9 w-full text-sm"
-                                  value={rowEdits[disc.id]?.horas ?? disc.horasPlanejadas}
+                                  value={rowEdits[disc.id]?.horas ?? disc.minutosPlanejados}
                                   onChange={e => setRowEdits(prev => ({ ...prev, [disc.id]: { ...prev[disc.id], horas: parseInt(e.target.value) || 0 } }))}
                                   onBlur={() => handleBlurPlanejamento(disc.id)}
                                 />
@@ -534,14 +534,15 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                               </td>
 
                               {/* Materiais */}
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-3" style={{overflow:'hidden'}}>
                                 <div className="space-y-2">
                                   <div className="flex flex-wrap gap-1.5">
                                     {disc.materiais.map(mat => (
                                       <span key={mat.id}
-                                        className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-100 text-xs px-2 py-1 rounded">
-                                        <MaterialIcon tipo={mat.material.tipo} />
-                                        <span className="max-w-[120px] truncate">{mat.material.nome}</span>
+                                        className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-100 text-xs px-2 py-1 rounded"
+                                        style={{maxWidth:'100%'}}>
+                                        <MaterialIcon tipo={mat.material.tipo} className="shrink-0" />
+                                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0}}>{mat.material.nome}</span>
                                         <button
                                           className="hover:text-red-500 transition-colors disabled:opacity-50 ml-0.5"
                                           disabled={removendoMatId === mat.id}
@@ -749,7 +750,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>Horas</Label>
+                  <Label>Min</Label>
                   <Input type="number" min="0" value={novaDiscHoras || ''}
                     onChange={e => setNovaDiscHoras(parseInt(e.target.value) || 0)} placeholder="0" />
                 </div>

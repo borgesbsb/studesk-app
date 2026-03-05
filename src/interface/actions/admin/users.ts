@@ -35,7 +35,7 @@ export async function getUsers(page = 1, limit = 20, search?: string) {
               disciplinas: true,
               materiaisEstudo: true,
               planosEstudo: true,
-              simulados: true
+              resultadosSimulado: true
             }
           }
         },
@@ -77,7 +77,7 @@ export async function getUserDetails(userId: string) {
             disciplinas: true,
             materiaisEstudo: true,
             planosEstudo: true,
-            simulados: true
+            resultadosSimulado: true
           }
         }
       }

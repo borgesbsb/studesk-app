@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       disciplinaId: string
       nome: string
       cor: string | null
-      horasPlanejadas: number
+      minutosPlanejados: number
       horasRealizadas: number
       questoesPlanejadas: number
       questoesRealizadas: number
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
               disciplinaId: ds.disciplina.id,
               nome: ds.disciplina.nome,
               cor: ds.disciplina.cor,
-              horasPlanejadas: dd.horasPlanejadas,
+              minutosPlanejados: dd.minutosPlanejados,
               horasRealizadas: dd.horasRealizadas,
               questoesPlanejadas: dd.questoesPlanejadas,
               questoesRealizadas: dd.questoesRealizadas,

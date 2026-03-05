@@ -194,7 +194,7 @@ export function PlanejamentoRapido({
         novasDisciplinas.push({
           disciplinaId: disciplina.id,
           disciplinaNome: disciplina.nome,
-          horasPlanejadas: configMassa.horasPorDisciplina,
+          minutosPlanejados: configMassa.horasPorDisciplina,
           tipoVeiculo: configMassa.tipoVeiculo,
           materialNome: configMassa.materialNome || `Material de ${disciplina.nome}`,
           questoesPlanejadas: valores.questoes,
@@ -208,7 +208,7 @@ export function PlanejamentoRapido({
   }
 
   const calcularTotalHoras = () => {
-    return disciplinasPlanejadas.reduce((total, disciplina) => total + disciplina.horasPlanejadas, 0)
+    return disciplinasPlanejadas.reduce((total, disciplina) => total + disciplina.minutosPlanejados, 0)
   }
 
   if (loading) {
@@ -440,7 +440,7 @@ export function PlanejamentoRapido({
                     <span className="font-medium">{disciplina.disciplinaNome}</span>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span>{disciplina.horasPlanejadas}h</span>
+                    <span>{disciplina.minutosPlanejados}h</span>
                     {disciplina.questoesPlanejadas > 0 && (
                       <span>{disciplina.questoesPlanejadas} questões</span>
                     )}

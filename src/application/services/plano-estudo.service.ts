@@ -22,7 +22,7 @@ export interface CreateSemanaEstudoData {
 
 export interface CreateDisciplinaSemanaData {
   disciplinaId: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   tipoVeiculo?: string
   materialNome?: string
   questoesPlanejadas?: number
@@ -37,7 +37,7 @@ export interface UpdateProgressoData {
   concluida?: boolean
   observacoes?: string
   questoesRealizadas?: number
-  horasPlanejadas?: number
+  minutosPlanejados?: number
   questoesPlanejadas?: number
   disciplinaId?: string
   diasEstudo?: string
@@ -47,7 +47,7 @@ export interface UpdateDisciplinaDiaData {
   disciplinaDiaId?: string
   disciplinaSemanaId: string
   dia: string
-  horasPlanejadas?: number
+  minutosPlanejados?: number
   horasRealizadas?: number
   questoesPlanejadas?: number
   questoesRealizadas?: number
@@ -136,7 +136,7 @@ export class PlanoEstudoService {
               disciplinas: {
                 create: semana.disciplinas.map(disciplina => ({
                   disciplinaId: disciplina.disciplinaId,
-                  horasPlanejadas: disciplina.horasPlanejadas,
+                  minutosPlanejados: disciplina.minutosPlanejados,
                   prioridade: 2, // Valor padrão
                   tipoVeiculo: disciplina.tipoVeiculo,
                   materialNome: disciplina.materialNome,
@@ -256,12 +256,12 @@ export class PlanoEstudoService {
 
   static async adicionarSemana(userId: string, planoId: string, semanaData: CreateSemanaEstudoData) {
     try {
-      // Verifica se o plano pertence ao usuário
+      // Verifica se o plano pertence ao usuário ou é um plano compartilhado atribuído
       const plano = await prisma.planoEstudo.findUnique({
-        where: { id: planoId, userId }
+        where: { id: planoId }
       })
 
-      if (!plano) {
+      if (!plano || (plano.userId !== null && plano.userId !== userId)) {
         throw new Error('Plano não encontrado ou sem permissão')
       }
 
@@ -276,7 +276,7 @@ export class PlanoEstudoService {
           disciplinas: {
             create: semanaData.disciplinas.map(disciplina => ({
               disciplinaId: disciplina.disciplinaId,
-              horasPlanejadas: disciplina.horasPlanejadas,
+              minutosPlanejados: disciplina.minutosPlanejados,
               prioridade: 2, // Valor padrão
               tipoVeiculo: disciplina.tipoVeiculo,
               materialNome: disciplina.materialNome,
@@ -315,7 +315,8 @@ export class PlanoEstudoService {
       }
     })
 
-    if (!disciplinaSemanaExistente || disciplinaSemanaExistente.semana.plano.userId !== userId) {
+    const planoUserId = disciplinaSemanaExistente?.semana.plano.userId
+    if (!disciplinaSemanaExistente || (planoUserId !== null && planoUserId !== userId)) {
       throw new Error('Disciplina não encontrada ou sem permissão')
     }
 
@@ -325,7 +326,7 @@ export class PlanoEstudoService {
     if (typeof data.concluida === 'boolean') updateData.concluida = data.concluida
     if (data.observacoes !== undefined) updateData.observacoes = data.observacoes
     if (typeof data.questoesRealizadas === 'number') updateData.questoesRealizadas = data.questoesRealizadas
-    if (typeof data.horasPlanejadas === 'number') updateData.horasPlanejadas = data.horasPlanejadas
+    if (typeof data.minutosPlanejados === 'number') updateData.minutosPlanejados = data.minutosPlanejados
     if (typeof data.questoesPlanejadas === 'number') updateData.questoesPlanejadas = data.questoesPlanejadas
     if (data.disciplinaId) updateData.disciplinaId = data.disciplinaId
     if (data.diasEstudo !== undefined) updateData.diasEstudo = data.diasEstudo
@@ -355,7 +356,7 @@ export class PlanoEstudoService {
           data: diasParaAdicionar.map(dia => ({
             disciplinaSemanaId: data.disciplinaSemanaId,
             dia,
-            horasPlanejadas: 1, // Valor padrão
+            minutosPlanejados: 1, // Valor padrão
             horasRealizadas: 0,
             questoesPlanejadas: 0,
             questoesRealizadas: 0
@@ -397,7 +398,7 @@ export class PlanoEstudoService {
       }),
       prisma.disciplinaSemana.aggregate({
         where: { semanaId: disciplinaSemana.semanaId },
-        _sum: { horasPlanejadas: true }
+        _sum: { minutosPlanejados: true }
       })
     ])
 
@@ -405,7 +406,7 @@ export class PlanoEstudoService {
       where: { id: disciplinaSemana.semanaId },
       data: {
         horasRealizadas: totalHorasRealizadas._sum.horasRealizadas || 0,
-        totalHoras: totalHorasPlanejadas._sum.horasPlanejadas || 0
+        totalHoras: totalHorasPlanejadas._sum.minutosPlanejados || 0
       }
     })
 
@@ -461,7 +462,7 @@ export class PlanoEstudoService {
         include: { plano: true }
       })
 
-      if (!semana || semana.plano.userId !== userId) {
+      if (!semana || (semana.plano.userId !== null && semana.plano.userId !== userId)) {
         throw new Error('Semana não encontrada ou sem permissão')
       }
 
@@ -493,7 +494,7 @@ export class PlanoEstudoService {
         data: {
           semanaId: data.semanaId,
           disciplinaId: data.disciplinaId,
-          horasPlanejadas: data.horasPlanejadas || 1,
+          minutosPlanejados: data.minutosPlanejados || 1,
           horasRealizadas: 0,
           prioridade: novaPrioridade,
           concluida: false,
@@ -533,7 +534,7 @@ export class PlanoEstudoService {
         }
       })
 
-      if (!disciplinaSemana || disciplinaSemana.semana.plano.userId !== userId) {
+      if (!disciplinaSemana || (disciplinaSemana.semana.plano.userId !== null && disciplinaSemana.semana.plano.userId !== userId)) {
         throw new Error('Disciplina não encontrada ou sem permissão')
       }
 
@@ -554,7 +555,7 @@ export class PlanoEstudoService {
         include: { plano: true }
       })
 
-      if (!semana || semana.plano.userId !== userId) {
+      if (!semana || (semana.plano.userId !== null && semana.plano.userId !== userId)) {
         throw new Error('Semana não encontrada ou sem permissão')
       }
 
@@ -605,12 +606,12 @@ export class PlanoEstudoService {
         }
       })
 
-      if (!disciplinaSemana || disciplinaSemana.semana.plano.userId !== userId) {
+      if (!disciplinaSemana || (disciplinaSemana.semana.plano.userId !== null && disciplinaSemana.semana.plano.userId !== userId)) {
         throw new Error('Disciplina não encontrada ou sem permissão')
       }
 
       const updateData: any = {}
-      if (data.horasPlanejadas !== undefined) updateData.horasPlanejadas = data.horasPlanejadas
+      if (data.minutosPlanejados !== undefined) updateData.minutosPlanejados = data.minutosPlanejados
       if (data.horasRealizadas !== undefined) updateData.horasRealizadas = data.horasRealizadas
       if (data.questoesPlanejadas !== undefined) updateData.questoesPlanejadas = data.questoesPlanejadas
       if (data.questoesRealizadas !== undefined) updateData.questoesRealizadas = data.questoesRealizadas
@@ -629,7 +630,7 @@ export class PlanoEstudoService {
         create: {
           disciplinaSemanaId: data.disciplinaSemanaId,
           dia: data.dia,
-          horasPlanejadas: data.horasPlanejadas || 0,
+          minutosPlanejados: data.minutosPlanejados || 0,
           horasRealizadas: data.horasRealizadas || 0,
           questoesPlanejadas: data.questoesPlanejadas || 0,
           questoesRealizadas: data.questoesRealizadas || 0,
@@ -680,7 +681,7 @@ export class PlanoEstudoService {
             data: {
               disciplinaSemanaId,
               dia: dia.trim(),
-              horasPlanejadas: 1, // Valor padrão inicial
+              minutosPlanejados: 1, // Valor padrão inicial
               questoesPlanejadas: 0
             }
           })
@@ -726,7 +727,7 @@ export class PlanoEstudoService {
       console.log('📚 Total de disciplinas na semana:', semana?.disciplinas?.length || 0)
       console.log('🔑 User match:', semana?.plano.userId === userId)
 
-      if (!semana || semana.plano.userId !== userId) {
+      if (!semana || (semana.plano.userId !== null && semana.plano.userId !== userId)) {
         throw new Error('Semana não encontrada ou sem permissão')
       }
 
@@ -761,7 +762,7 @@ export class PlanoEstudoService {
         console.log(`\n📖 Processando disciplina: ${discOrigem.disciplina.nome}`)
         console.log(`  - ID: ${discOrigem.id}`)
         console.log(`  - diasEstudo atual: "${discOrigem.diasEstudo}"`)
-        console.log(`  - Horas planejadas no dia origem: ${diaOrigemData.horasPlanejadas}`)
+        console.log(`  - Horas planejadas no dia origem: ${diaOrigemData.minutosPlanejados}`)
         console.log(`  - Questões planejadas no dia origem: ${diaOrigemData.questoesPlanejadas}`)
 
         // Verificar se o dia destino já está no diasEstudo
@@ -802,7 +803,7 @@ export class PlanoEstudoService {
           await prisma.disciplinaDia.update({
             where: { id: disciplinaDiaExistente.id },
             data: {
-              horasPlanejadas: diaOrigemData.horasPlanejadas,
+              minutosPlanejados: diaOrigemData.minutosPlanejados,
               questoesPlanejadas: diaOrigemData.questoesPlanejadas,
               observacoes: diaOrigemData.observacoes
             }
@@ -814,7 +815,7 @@ export class PlanoEstudoService {
             data: {
               disciplinaSemanaId: discOrigem.id,
               dia: data.diaDestino,
-              horasPlanejadas: diaOrigemData.horasPlanejadas,
+              minutosPlanejados: diaOrigemData.minutosPlanejados,
               horasRealizadas: 0,
               questoesPlanejadas: diaOrigemData.questoesPlanejadas,
               questoesRealizadas: 0,

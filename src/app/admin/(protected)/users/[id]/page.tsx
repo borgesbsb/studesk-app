@@ -146,7 +146,7 @@ export default async function UserDetailsPage({ params }: PageProps) {
                 </div>
               </div>
               <Badge variant="secondary" className="text-lg">
-                {user._count.simulados}
+                {user._count.resultadosSimulado}
               </Badge>
             </div>
           </CardContent>

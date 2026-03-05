@@ -3,17 +3,13 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { listarDisciplinas } from "@/interface/actions/disciplina/list"
-import { deletarDisciplina } from "@/interface/actions/disciplina/delete"
 import { listarMateriaisDaDisciplina } from "@/interface/actions/material-estudo/disciplina"
-import { useSaveStatus } from "@/contexts/save-status-context"
 import { useUserHash } from "@/contexts/user-hash-context"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Book, Trash2, ChevronLeft, ChevronRight, AlertTriangle, Pencil } from "lucide-react"
-import { EditarDisciplinaModal } from "./editar-disciplina-modal"
+import { Book, ChevronLeft, ChevronRight } from "lucide-react"
 
 // Componente de progresso circular
 function CircularProgress({ value, size = 48, strokeWidth = 4, className = "" }: {
@@ -102,15 +98,10 @@ interface DisciplinaComMateriais {
 
 export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
   const { hash } = useUserHash()
-  const { setSuccess, setError } = useSaveStatus()
   const router = useRouter()
   const [disciplinas, setDisciplinas] = useState<DisciplinaComMateriais[]>([])
   const [loading, setLoading] = useState(true)
   const [paginaAtual, setPaginaAtual] = useState(1)
-  const [disciplinaParaExcluir, setDisciplinaParaExcluir] = useState<DisciplinaComMateriais | null>(null)
-  const [excluindoDisciplinaId, setExcluindoDisciplinaId] = useState<string | null>(null)
-  const [disciplinaParaEditar, setDisciplinaParaEditar] = useState<any | null>(null)
-  const [modalEditarAberto, setModalEditarAberto] = useState(false)
   const itensPorPagina = 10
 
   useEffect(() => {
@@ -186,7 +177,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           setDisciplinas(disciplinasComMateriais)
         }
       } catch (error) {
-        setError("Erro ao carregar disciplinas e materiais")
+        console.error("Erro ao carregar disciplinas e materiais", error)
       } finally {
         setLoading(false)
       }
@@ -209,28 +200,6 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
   useEffect(() => {
     setPaginaAtual(1)
   }, [termoPesquisa])
-
-  const confirmarExclusaoDisciplina = async () => {
-    if (!disciplinaParaExcluir) return
-
-    try {
-      setExcluindoDisciplinaId(disciplinaParaExcluir.id)
-      
-      const response = await deletarDisciplina(disciplinaParaExcluir.disciplinaId)
-      if (response.success) {
-        setSuccess()
-        window.location.reload()
-      } else {
-        setError(response.error || "Erro ao excluir disciplina")
-      }
-      setDisciplinaParaExcluir(null)
-    } catch (error) {
-      console.error('Erro ao excluir disciplina:', error)
-      setError("Erro inesperado ao excluir disciplina")
-    } finally {
-      setExcluindoDisciplinaId(null)
-    }
-  }
 
   if (loading) {
     return (
@@ -361,25 +330,6 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                   <Book className="h-4 w-4 mr-2" />
                   Materiais
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setDisciplinaParaEditar(disciplina.disciplina)
-                    setModalEditarAberto(true)
-                  }}
-                  className="border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDisciplinaParaExcluir(disciplina)}
-                  className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           )
@@ -387,7 +337,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
 
         {disciplinasFiltradas.length === 0 && !loading && (
           <div className="text-center text-muted-foreground py-10 border border-border rounded-lg bg-card">
-            {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina cadastrada'}
+            {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina disponível no seu plano'}
           </div>
         )}
       </div>
@@ -403,7 +353,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
             <TableHead>PDFs</TableHead>
             <TableHead>Vídeos</TableHead>
             <TableHead>Progresso Geral</TableHead>
-            <TableHead className="text-center">Ações</TableHead>
+            <TableHead className="text-center">Ação</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -459,38 +409,15 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  <div className="flex items-center gap-2 justify-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/${hash}/disciplina/${disciplina.disciplinaId}/materiais`)}
-                      className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700"
-                      title="Materiais de Estudo"
-                    >
-                      <Book className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setDisciplinaParaEditar(disciplina.disciplina)
-                        setModalEditarAberto(true)
-                      }}
-                      className="border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 hover:border-green-300 dark:hover:border-green-700"
-                      title="Editar Disciplina"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDisciplinaParaExcluir(disciplina)}
-                      className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700"
-                      title="Excluir Disciplina"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/${hash}/disciplina/${disciplina.disciplinaId}/materiais`)}
+                    className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700"
+                    title="Materiais de Estudo"
+                  >
+                    <Book className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             )
@@ -499,7 +426,7 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
           {disciplinasFiltradas.length === 0 && !loading && (
             <TableRow>
               <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
-                {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina cadastrada'}
+                {termoPesquisa ? `Nenhuma disciplina encontrada para "${termoPesquisa}"` : 'Nenhuma disciplina disponível no seu plano'}
               </TableCell>
             </TableRow>
           )}
@@ -538,60 +465,6 @@ export function DisciplinasTable({ termoPesquisa }: DisciplinasTableProps) {
         </div>
       )}
 
-      {/* Modal de Confirmação de Exclusão */}
-      <Dialog open={!!disciplinaParaExcluir} onOpenChange={() => setDisciplinaParaExcluir(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Excluir Disciplina
-            </DialogTitle>
-            <DialogDescription>
-              Tem certeza de que deseja excluir permanentemente "{disciplinaParaExcluir?.disciplina.nome}"?
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <p className="text-sm text-red-700 dark:text-red-300 font-medium mb-2">
-                ⚠️ Esta ação é irreversível e irá:
-              </p>
-              <ul className="text-sm text-red-600 dark:text-red-400 space-y-1">
-                <li>• Excluir permanentemente a disciplina</li>
-                <li>• Excluir todos os {disciplinaParaExcluir?.materiais.length || 0} materiais associados</li>
-                <li>• Remover todo o progresso de estudos</li>
-              </ul>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDisciplinaParaExcluir(null)}
-              disabled={excluindoDisciplinaId === disciplinaParaExcluir?.id}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmarExclusaoDisciplina}
-              disabled={excluindoDisciplinaId === disciplinaParaExcluir?.id}
-            >
-              {excluindoDisciplinaId === disciplinaParaExcluir?.id ? "Excluindo..." : "Excluir"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal de Edição */}
-      <EditarDisciplinaModal
-        disciplina={disciplinaParaEditar}
-        open={modalEditarAberto}
-        onOpenChange={setModalEditarAberto}
-        onSuccess={() => {
-          window.location.reload()
-        }}
-      />
     </div>
   )
 }

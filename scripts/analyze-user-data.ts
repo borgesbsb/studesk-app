@@ -78,7 +78,7 @@ async function analyzeUser() {
   console.log(JSON.stringify(disciplinaDias.map(d => ({
     dia: d.dia,
     disciplina: d.disciplinaSemana.disciplina.nome,
-    horasPlanejadas: d.horasPlanejadas,
+    minutosPlanejados: d.minutosPlanejados,
     horasRealizadas: d.horasRealizadas,
     questoesPlanejadas: d.questoesPlanejadas,
     questoesRealizadas: d.questoesRealizadas
@@ -133,28 +133,22 @@ async function analyzeUser() {
   console.log('\n' + '='.repeat(80))
   console.log('8. SIMULADOS')
   console.log('='.repeat(80))
-  const simulados = await prisma.simulado.findMany({
+  const resultadosSimulado = await prisma.simuladoResultado.findMany({
     where: { userId: user.id },
     include: {
-      questoes: {
-        select: {
-          id: true,
-          acertou: true,
-          respostaUsuario: true
-        }
-      }
+      simulado: { select: { id: true, nome: true, dataRealizacao: true } },
+      disciplinas: { select: { disciplinaId: true, totalQuestoes: true, acertos: true, percentual: true } }
     },
-    orderBy: { dataRealizacao: 'desc' },
+    orderBy: { simulado: { dataRealizacao: 'desc' } },
     take: 5
   })
-  console.log(JSON.stringify(simulados.map(s => ({
-    id: s.id,
-    nome: s.nome,
-    status: s.status,
-    dataRealizacao: s.dataRealizacao,
-    tempoTotalSegundos: s.tempoTotalSegundos,
-    totalQuestoes: s.questoes.length,
-    acertos: s.questoes.filter(q => q.acertou).length
+  console.log(JSON.stringify(resultadosSimulado.map(r => ({
+    id: r.simulado.id,
+    nome: r.simulado.nome,
+    dataRealizacao: r.simulado.dataRealizacao,
+    totalQuestoes: r.totalQuestoes,
+    totalAcertos: r.totalAcertos,
+    percentualGeral: r.percentualGeral
   })), null, 2))
 
   console.log('\n' + '='.repeat(80))

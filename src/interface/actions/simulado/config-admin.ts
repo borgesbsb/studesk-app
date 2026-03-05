@@ -3,10 +3,7 @@
 import { requireAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export interface ConfigDisciplinaInput {
-  disciplinaId: string
-  totalQuestoes: number
-}
+// ─── ConfigSimulado (templates de disciplinas) ───────────────────────────────
 
 export async function listarConfigs() {
   try {
@@ -22,7 +19,6 @@ export async function listarConfigs() {
     })
     return { success: true, data: configs }
   } catch (error) {
-    console.error("[listarConfigs] Erro:", error)
     return { success: false, error: "Erro ao listar configurações" }
   }
 }
@@ -30,50 +26,30 @@ export async function listarConfigs() {
 export async function criarConfig(data: {
   nome: string
   totalQuestoes: number
-  disciplinas: ConfigDisciplinaInput[]
+  disciplinas: { disciplinaId: string; totalQuestoes: number }[]
 }) {
   try {
     await requireAdminAuth()
-
     const config = await prisma.configSimulado.create({
       data: {
         nome: data.nome,
         totalQuestoes: data.totalQuestoes,
-        disciplinas: {
-          create: data.disciplinas.map(d => ({
-            disciplinaId: d.disciplinaId,
-            totalQuestoes: d.totalQuestoes
-          }))
-        }
+        disciplinas: { create: data.disciplinas }
       },
-      include: {
-        disciplinas: { include: { disciplina: true } }
-      }
+      include: { disciplinas: { include: { disciplina: true } } }
     })
-
     return { success: true, data: config }
   } catch (error) {
-    console.error("[criarConfig] Erro:", error)
     return { success: false, error: "Erro ao criar configuração" }
   }
 }
 
-export async function atualizarConfig(id: string, data: {
-  nome?: string
-  totalQuestoes?: number
-  ativo?: boolean
-}) {
+export async function atualizarConfig(id: string, data: { nome?: string; totalQuestoes?: number; ativo?: boolean }) {
   try {
     await requireAdminAuth()
-
-    const config = await prisma.configSimulado.update({
-      where: { id },
-      data
-    })
-
+    const config = await prisma.configSimulado.update({ where: { id }, data })
     return { success: true, data: config }
   } catch (error) {
-    console.error("[atualizarConfig] Erro:", error)
     return { success: false, error: "Erro ao atualizar configuração" }
   }
 }
@@ -81,13 +57,70 @@ export async function atualizarConfig(id: string, data: {
 export async function deletarConfig(id: string) {
   try {
     await requireAdminAuth()
-
     await prisma.configSimulado.delete({ where: { id } })
-
     return { success: true }
   } catch (error) {
-    console.error("[deletarConfig] Erro:", error)
     return { success: false, error: "Erro ao deletar configuração" }
+  }
+}
+
+// ─── Simulados (eventos criados pelo admin) ───────────────────────────────────
+
+export async function listarSimuladosAdmin() {
+  try {
+    await requireAdminAuth()
+    const simulados = await prisma.simulado.findMany({
+      include: {
+        config: { select: { id: true, nome: true, totalQuestoes: true } },
+        _count: { select: { resultados: true } }
+      },
+      orderBy: { dataRealizacao: 'desc' }
+    })
+    return { success: true, data: simulados }
+  } catch (error) {
+    return { success: false, error: "Erro ao listar simulados" }
+  }
+}
+
+export async function criarSimuladoAdmin(data: {
+  nome: string
+  configSimuladoId?: string
+  dataRealizacao: Date
+}) {
+  try {
+    await requireAdminAuth()
+    const simulado = await prisma.simulado.create({
+      data: {
+        nome: data.nome,
+        configSimuladoId: data.configSimuladoId || null,
+        dataRealizacao: data.dataRealizacao,
+        ativo: true
+      },
+      include: { config: true }
+    })
+    return { success: true, data: simulado }
+  } catch (error) {
+    return { success: false, error: "Erro ao criar simulado" }
+  }
+}
+
+export async function atualizarSimuladoAdmin(id: string, data: { nome?: string; ativo?: boolean; dataRealizacao?: Date }) {
+  try {
+    await requireAdminAuth()
+    const simulado = await prisma.simulado.update({ where: { id }, data })
+    return { success: true, data: simulado }
+  } catch (error) {
+    return { success: false, error: "Erro ao atualizar simulado" }
+  }
+}
+
+export async function deletarSimuladoAdmin(id: string) {
+  try {
+    await requireAdminAuth()
+    await prisma.simulado.delete({ where: { id } })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: "Erro ao deletar simulado" }
   }
 }
 
@@ -106,7 +139,6 @@ export async function listarConfigsAtivas() {
     })
     return { success: true, data: configs }
   } catch (error) {
-    console.error("[listarConfigsAtivas] Erro:", error)
     return { success: false, error: "Erro ao listar configurações" }
   }
 }

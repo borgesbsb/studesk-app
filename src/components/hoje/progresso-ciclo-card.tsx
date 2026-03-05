@@ -27,8 +27,8 @@ export function ProgressoCicloCard({ progresso }: ProgressoCicloCardProps) {
     );
   }
 
-  const progressoHoras = progresso.horasPlanejadas > 0
-    ? Math.min((progresso.horasRealizadas / progresso.horasPlanejadas) * 100, 100)
+  const progressoHoras = progresso.minutosPlanejados > 0
+    ? Math.min((progresso.horasRealizadas * 60 / progresso.minutosPlanejados) * 100, 100)
     : 0;
 
   const progressoQuestoes = progresso.questoesPlanejadas > 0
@@ -174,7 +174,7 @@ export function ProgressoCicloCard({ progresso }: ProgressoCicloCardProps) {
                 {Math.round(progressoHoras)}%
               </p>
               <p className="text-xs text-muted-foreground">
-                {formatarTempo(progresso.horasRealizadas)} / {formatarTempo(progresso.horasPlanejadas)}
+                {formatarTempo(progresso.horasRealizadas)} / {formatarTempo(progresso.minutosPlanejados / 60)}
               </p>
             </div>
           </div>

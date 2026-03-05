@@ -311,7 +311,7 @@ export default function TodayScreen() {
           <Text style={styles.summaryLabel}>Tempo estudado hoje</Text>
           <GaugeChart
             realized={materiasDoDia.reduce((s, m) => s + m.horasRealizadas, 0)}
-            planned={materiasDoDia.reduce((s, m) => s + m.horasPlanejadas, 0)}
+            planned={materiasDoDia.reduce((s, m) => s + m.minutosPlanejados, 0)}
           />
           <View style={styles.summaryStats}>
             <View style={styles.summaryStatBadge}>
@@ -346,11 +346,11 @@ export default function TodayScreen() {
               contentContainerStyle={styles.cicloBarsContainer}>
               {evolucao.dias.map((dia, index) => {
                 const maxH = Math.max(
-                  ...evolucao.dias.map(d => Math.max(d.horasPlanejadas, d.horasRealizadas)),
+                  ...evolucao.dias.map(d => Math.max(d.minutosPlanejados, d.horasRealizadas)),
                   1,
                 );
                 const barMaxHeight = 60;
-                const planejadaH = (dia.horasPlanejadas / maxH) * barMaxHeight;
+                const planejadaH = (dia.minutosPlanejados / maxH) * barMaxHeight;
                 const realizadaH = (dia.horasRealizadas / maxH) * barMaxHeight;
                 const isToday = new Date(dia.data).toDateString() === new Date().toDateString();
                 return (
@@ -371,8 +371,8 @@ export default function TodayScreen() {
                             styles.cicloBar,
                             styles.cicloBarRealizada,
                             {height: Math.max(realizadaH, 3)},
-                            dia.horasRealizadas >= dia.horasPlanejadas &&
-                              dia.horasPlanejadas > 0 &&
+                            dia.horasRealizadas >= dia.minutosPlanejados &&
+                              dia.minutosPlanejados > 0 &&
                               styles.cicloBarConcluida,
                           ]}
                         />
@@ -412,9 +412,9 @@ export default function TodayScreen() {
         ) : (
           materiasDoDia.map(materia => {
             const horasPercent =
-              materia.horasPlanejadas > 0
+              materia.minutosPlanejados > 0
                 ? Math.min(
-                    (materia.horasRealizadas / materia.horasPlanejadas) * 100,
+                    (materia.horasRealizadas / materia.minutosPlanejados) * 100,
                     100,
                   )
                 : 0;
@@ -488,7 +488,7 @@ export default function TodayScreen() {
                             isFlashing && {color: '#10b981'},
                           ]}>
                             {formatTempo(materia.horasRealizadas)}/
-                            {formatTempo(materia.horasPlanejadas)}
+                            {formatTempo(materia.minutosPlanejados)}
                           </Text>
                         </>
                       );
@@ -663,7 +663,7 @@ export default function TodayScreen() {
               <>
                 <Text style={styles.modalTitle}>{tempoMateria.disciplinaNome}</Text>
                 <Text style={styles.tempoModalSub}>
-                  {formatTempo(tempoMateria.horasRealizadas)} / {formatTempo(tempoMateria.horasPlanejadas)}
+                  {formatTempo(tempoMateria.horasRealizadas)} / {formatTempo(tempoMateria.minutosPlanejados)}
                 </Text>
               </>
             )}

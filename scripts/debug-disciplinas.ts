@@ -31,7 +31,7 @@ async function debugDisciplinas() {
       console.log(`\n${index + 1}. ${disc.disciplina.nome}`)
       console.log(`   ID: ${disc.id}`)
       console.log(`   diasEstudo: "${disc.diasEstudo}"`)
-      console.log(`   Horas planejadas: ${disc.horasPlanejadas}`)
+      console.log(`   Horas planejadas: ${disc.minutosPlanejados}`)
       console.log(`   Questões planejadas: ${disc.questoesPlanejadas}`)
       console.log(`   Criada em: ${disc.createdAt.toLocaleString('pt-BR')}`)
       console.log(`   Atualizada em: ${disc.updatedAt.toLocaleString('pt-BR')}`)
@@ -39,7 +39,7 @@ async function debugDisciplinas() {
       if (disc.dias && disc.dias.length > 0) {
         console.log(`   DisciplinaDia (${disc.dias.length}):`)
         disc.dias.forEach(dia => {
-          console.log(`     - ${dia.dia}: ${dia.horasPlanejadas}h, ${dia.questoesPlanejadas}q`)
+          console.log(`     - ${dia.dia}: ${dia.minutosPlanejados}h, ${dia.questoesPlanejadas}q`)
         })
       } else {
         console.log(`   DisciplinaDia: (nenhum)`)

@@ -3,41 +3,23 @@
 import { requireAuth } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 
-export async function deletarSimulado(simuladoId: string) {
+export async function deletarResultado(resultadoId: string) {
   try {
     const { userId } = await requireAuth()
 
-    // Verificar se o simulado pertence ao usuário
-    const simulado = await prisma.simulado.findFirst({
-      where: {
-        id: simuladoId,
-        userId
-      }
+    const resultado = await prisma.simuladoResultado.findFirst({
+      where: { id: resultadoId, userId }
     })
 
-    if (!simulado) {
-      return {
-        success: false,
-        error: "Simulado não encontrado"
-      }
+    if (!resultado) {
+      return { success: false, error: "Resultado não encontrado" }
     }
 
-    // Deletar simulado (cascade vai deletar disciplinas e questões)
-    await prisma.simulado.delete({
-      where: { id: simuladoId }
-    })
+    await prisma.simuladoResultado.delete({ where: { id: resultadoId } })
 
-    console.log(`[Simulado] Simulado ${simuladoId} deletado com sucesso`)
-
-    return {
-      success: true,
-      message: "Simulado deletado com sucesso"
-    }
+    return { success: true }
   } catch (error) {
-    console.error("Erro ao deletar simulado:", error)
-    return {
-      success: false,
-      error: "Erro ao deletar simulado: " + (error as Error).message
-    }
+    console.error("Erro ao deletar resultado:", error)
+    return { success: false, error: "Erro ao deletar resultado: " + (error as Error).message }
   }
 }

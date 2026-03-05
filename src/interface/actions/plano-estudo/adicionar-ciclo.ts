@@ -44,10 +44,10 @@ export async function adicionarCicloAoPlano(
       numeroSemana,
       dataInicio: inicioDate,
       dataFim: fimDate,
-      totalHoras: Math.round(disciplinas.reduce((total, d) => total + (d.horasPlanejadas || 0), 0)),
+      totalHoras: Math.round(disciplinas.reduce((total, d) => total + (d.minutosPlanejados || 0), 0)),
       disciplinas: disciplinas.map(d => ({
         disciplinaId: d.disciplinaId,
-        horasPlanejadas: d.horasPlanejadas || 0, // Manter em horas
+        minutosPlanejados: d.minutosPlanejados || 0, // Manter em horas
         tipoVeiculo: d.tipoVeiculo,
         materialNome: d.materialNome,
         questoesPlanejadas: d.questoesPlanejadas || 0,

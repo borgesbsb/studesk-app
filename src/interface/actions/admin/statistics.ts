@@ -135,14 +135,14 @@ export async function getQuestionsStatistics() {
       usuariosComSimulados,
       agregadoSimulados
     ] = await Promise.all([
-      prisma.simulado.count(),
+      prisma.simuladoResultado.count(),
 
-      prisma.simulado.groupBy({
+      prisma.simuladoResultado.groupBy({
         by: ['userId'],
         _count: true
       }),
 
-      prisma.simulado.aggregate({
+      prisma.simuladoResultado.aggregate({
         _sum: { totalQuestoes: true, totalAcertos: true }
       })
     ])
@@ -167,18 +167,18 @@ export async function getQuestionsStatistics() {
         u.id as "userId",
         u.name as "userName",
         u.email as "userEmail",
-        COUNT(DISTINCT s.id) as "totalSimulados",
-        SUM(s."totalQuestoes") as "totalQuestoes",
-        SUM(s."totalAcertos") as "totalCorretas",
+        COUNT(DISTINCT sr.id) as "totalSimulados",
+        SUM(sr."totalQuestoes") as "totalQuestoes",
+        SUM(sr."totalAcertos") as "totalCorretas",
         CASE
-          WHEN SUM(s."totalQuestoes") > 0 THEN
-            ROUND((SUM(s."totalAcertos")::numeric / SUM(s."totalQuestoes")::numeric * 100), 2)::double precision
+          WHEN SUM(sr."totalQuestoes") > 0 THEN
+            ROUND((SUM(sr."totalAcertos")::numeric / SUM(sr."totalQuestoes")::numeric * 100), 2)::double precision
           ELSE 0
         END as "percentualAcerto"
       FROM "User" u
-      INNER JOIN "Simulado" s ON s."userId" = u.id
+      INNER JOIN "SimuladoResultado" sr ON sr."userId" = u.id
       GROUP BY u.id, u.name, u.email
-      HAVING SUM(s."totalQuestoes") > 0
+      HAVING SUM(sr."totalQuestoes") > 0
       ORDER BY "percentualAcerto" DESC
       LIMIT 10
     `
@@ -195,8 +195,8 @@ export async function getQuestionsStatistics() {
         const nextDate = new Date(date)
         nextDate.setDate(nextDate.getDate() + 1)
 
-        const simuladosCount = await prisma.simulado.count({
-          where: { dataRealizacao: { gte: date, lt: nextDate } }
+        const simuladosCount = await prisma.simuladoResultado.count({
+          where: { createdAt: { gte: date, lt: nextDate } }
         })
 
         return {
@@ -207,7 +207,7 @@ export async function getQuestionsStatistics() {
       })
     )
 
-    const disciplinasMaisPraticadas = await prisma.simuladoDisciplina.groupBy({
+    const disciplinasMaisPraticadas = await prisma.simuladoResultadoDisciplina.groupBy({
       by: ['disciplinaId'],
       _count: { id: true },
       orderBy: { _count: { id: 'desc' } },

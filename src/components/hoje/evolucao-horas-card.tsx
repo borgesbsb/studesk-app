@@ -10,6 +10,14 @@ interface EvolucaoHorasCardProps {
   evolucao: EvolucaoCiclo | null;
 }
 
+function formatMinutos(min: number): string {
+  if (min <= 0) return '0min';
+  if (min < 60) return `${min}min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h}h` : `${h}h${m}m`;
+}
+
 export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
   if (!evolucao) {
     return (
@@ -29,8 +37,8 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
 
   const chartData = evolucao.dias.map((dia, index) => ({
     dia: `Dia ${index + 1}`,
-    realizadas: Math.round(dia.horasRealizadas * 100) / 100,
-    planejadas: Math.round(dia.horasPlanejadas * 100) / 100,
+    realizadas: Math.round(dia.horasRealizadas * 60),
+    planejadas: Math.round(dia.minutosPlanejados),
   }));
 
   const chartConfig = {
@@ -78,11 +86,15 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => `${value}h`}
+              tickFormatter={(value) => formatMinutos(Number(value))}
             />
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent />}
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => [formatMinutos(Number(value)), name]}
+                />
+              }
             />
             <ChartLegend content={<ChartLegendContent />} />
             <Bar

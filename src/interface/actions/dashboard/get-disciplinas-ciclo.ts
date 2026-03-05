@@ -7,7 +7,7 @@ export interface DisciplinaCiclo {
   disciplinaId: string;
   nome: string;
   cor: string | null;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   horasRealizadas: number;
   questoesPlanejadas: number;
   questoesRealizadas: number;
@@ -79,15 +79,15 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
 
       const disciplinasDeProgressos: DisciplinaCiclo[] = progressos.map(p => {
         const ds = p.disciplinaSemana;
-        const horasPlanejadas = ds.horasPlanejadas;
-        const questoesPlanejadas = ds.questoesPlanejadas;
+        const minutosPlanejados = p.dias.reduce((acc, d) => acc + d.minutosPlanejados, 0);
+        const questoesPlanejadas = p.dias.reduce((acc, d) => acc + d.questoesPlanejadas, 0);
         const horasRealizadas = p.dias.reduce((acc, d) => acc + d.horasRealizadas, 0);
         const questoesRealizadas = p.dias.reduce((acc, d) => acc + d.questoesRealizadas, 0);
         return {
           disciplinaId: ds.disciplinaId,
           nome: ds.disciplina.nome.trim(),
           cor: ds.disciplina.cor,
-          horasPlanejadas: Math.round(horasPlanejadas * 100) / 100,
+          minutosPlanejados: Math.round(minutosPlanejados * 100) / 100,
           horasRealizadas: Math.round(horasRealizadas * 100) / 100,
           questoesPlanejadas,
           questoesRealizadas,
@@ -99,7 +99,7 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
       for (const e of extras) {
         const existing = extrasMap.get(e.disciplinaId)
         if (existing) {
-          existing.horasPlanejadas += e.horasPlanejadas / 60
+          existing.minutosPlanejados += e.minutosPlanejados
           existing.horasRealizadas += e.horasRealizadas / 60
           existing.questoesPlanejadas += e.questoesPlanejadas
           existing.questoesRealizadas += e.questoesRealizadas
@@ -108,7 +108,7 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
             disciplinaId: e.disciplinaId,
             nome: e.disciplina.nome.trim(),
             cor: e.disciplina.cor,
-            horasPlanejadas: e.horasPlanejadas / 60,
+            minutosPlanejados: e.minutosPlanejados,
             horasRealizadas: e.horasRealizadas / 60,
             questoesPlanejadas: e.questoesPlanejadas,
             questoesRealizadas: e.questoesRealizadas,
@@ -117,7 +117,7 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
       }
       const disciplinasDeExtras: DisciplinaCiclo[] = Array.from(extrasMap.values()).map(e => ({
         ...e,
-        horasPlanejadas: Math.round(e.horasPlanejadas * 100) / 100,
+        minutosPlanejados: Math.round(e.minutosPlanejados * 100) / 100,
         horasRealizadas: Math.round(e.horasRealizadas * 100) / 100,
       }))
 
@@ -126,13 +126,13 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
     // ── PLANO PESSOAL ─────────────────────────────────────────────────────────
 
     return semanaAtual.disciplinas.map(ds => {
-      let horasPlanejadas = 0;
+      let minutosPlanejados = 0;
       let horasRealizadas = 0;
       let questoesPlanejadas = 0;
       let questoesRealizadas = 0;
 
       ds.dias.forEach(dia => {
-        horasPlanejadas += dia.horasPlanejadas;
+        minutosPlanejados += dia.minutosPlanejados;
         horasRealizadas += dia.horasRealizadas;
         questoesPlanejadas += dia.questoesPlanejadas;
         questoesRealizadas += dia.questoesRealizadas;
@@ -142,7 +142,7 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
         disciplinaId: ds.disciplinaId,
         nome: ds.disciplina.nome.trim(),
         cor: ds.disciplina.cor,
-        horasPlanejadas: Math.round(horasPlanejadas * 100) / 100,
+        minutosPlanejados: Math.round(minutosPlanejados * 100) / 100,
         horasRealizadas: Math.round(horasRealizadas * 100) / 100,
         questoesPlanejadas,
         questoesRealizadas,

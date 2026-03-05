@@ -110,7 +110,7 @@ export function PlanejamentoSimples({
           novasDisciplinas.push({
             disciplinaId: disciplina.id,
             disciplinaNome: disciplina.nome,
-            horasPlanejadas: configPadrao.horasPorDisciplina,
+            minutosPlanejados: configPadrao.horasPorDisciplina,
             horasRealizadas: 0,
             tipoVeiculo: configPadrao.tipoVeiculo,
             materialNome: `Material de ${disciplina.nome}`,
@@ -134,7 +134,7 @@ export function PlanejamentoSimples({
         const disciplinaAtualizada = { ...disciplina, [campo]: valor }
         
         // Recalcular questões e tempo de vídeo baseado nas horas
-        if (campo === 'horasPlanejadas') {
+        if (campo === 'minutosPlanejados') {
           const horas = parseInt(valor) || 0
           disciplinaAtualizada.questoesPlanejadas = Math.round(horas * 10) // 10 questões por hora default
           if (disciplinaAtualizada.tipoVeiculo === 'video') {
@@ -208,7 +208,7 @@ export function PlanejamentoSimples({
   }
 
   const calcularTotalHoras = () => {
-    return disciplinasPlanejadas.reduce((total, disciplina) => total + disciplina.horasPlanejadas, 0)
+    return disciplinasPlanejadas.reduce((total, disciplina) => total + disciplina.minutosPlanejados, 0)
   }
 
   const obterIconeVeiculo = (tipo: string) => {
@@ -405,7 +405,7 @@ export function PlanejamentoSimples({
                           <div>
                             <h4 className="font-medium">{disciplina.disciplinaNome}</h4>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>{disciplina.horasPlanejadas}h planejadas</span>
+                              <span>{disciplina.minutosPlanejados}h planejadas</span>
                               <span>•</span>
                               <span>{formatarDiasEstudo(disciplina.diasEstudo)}</span>
                             </div>
@@ -480,8 +480,8 @@ export function PlanejamentoSimples({
                                 <Input
                                   type="number"
                                   min="0"
-                                  value={disciplina.horasPlanejadas}
-                                  onChange={(e) => atualizarDisciplina(index, 'horasPlanejadas', parseInt(e.target.value) || 0)}
+                                  value={disciplina.minutosPlanejados}
+                                  onChange={(e) => atualizarDisciplina(index, 'minutosPlanejados', parseInt(e.target.value) || 0)}
                                   className="h-8"
                                   disabled={!isEditing}
                                 />

@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         disciplinas: {
           create: disciplinas?.map((disciplina: any) => ({
             disciplinaId: disciplina.disciplinaId,
-            horasPlanejadas: disciplina.horasPlanejadas,
+            minutosPlanejados: disciplina.minutosPlanejados,
             prioridade: 2, // Valor padrão
             tipoVeiculo: disciplina.tipoVeiculo,
             materialNome: disciplina.materialNome,

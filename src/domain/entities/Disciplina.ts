@@ -15,6 +15,8 @@ export interface Disciplina {
   descricao?: string | null
   cargaHoraria: number
   peso: number
+  cor?: string | null
+  userId?: string
   createdAt: Date
   updatedAt: Date
   materiais?: DisciplinaMaterial[]

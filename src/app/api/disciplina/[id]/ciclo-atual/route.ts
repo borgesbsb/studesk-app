@@ -104,7 +104,7 @@ export async function GET(
       disciplinaSemanaId: disciplinaSemana.id,
       disciplinaNome: disciplinaSemana.disciplina.nome,
       numeroSemana: disciplinaSemana.semana.numeroSemana,
-      horasPlanejadas: disciplinaSemana.horasPlanejadas,
+      minutosPlanejados: disciplinaSemana.minutosPlanejados,
       horasRealizadas: disciplinaSemana.horasRealizadas,
       dataInicio: disciplinaSemana.semana.dataInicio,
       dataFim: disciplinaSemana.semana.dataFim

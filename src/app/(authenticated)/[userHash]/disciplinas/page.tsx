@@ -1,10 +1,9 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AdicionarDisciplinaModal } from "@/components/disciplina/adicionar-disciplina-modal"
 import { DisciplinasTable } from "@/components/disciplina/disciplinas-table"
 import { Input } from "@/components/ui/input"
-import { BookOpen, Users, Search, CheckCircle2, FileText, Video } from "lucide-react"
+import { BookOpen, Search, CheckCircle2, FileText, Video } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useHeader } from "@/contexts/header-context"
 import { listarDisciplinas } from "@/interface/actions/disciplina/list"
@@ -29,7 +28,7 @@ export default function DisciplinasPage() {
   const { setTitle } = useHeader()
 
   useEffect(() => {
-    setTitle("Gerenciar Disciplinas")
+    setTitle("Disciplinas")
     return () => {
       setTitle("Dashboard")
     }
@@ -176,36 +175,31 @@ export default function DisciplinasPage() {
               </div>
               <div>
                 <CardTitle className="text-lg font-semibold text-card-foreground">
-                  Todas as Disciplinas
+                  Disciplinas do Meu Plano
                 </CardTitle>
                 <p className="text-muted-foreground text-sm mt-1">
-                  Organize suas disciplinas e acompanhe o progresso
+                  Disciplinas disponíveis no seu plano de estudos
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-lg">
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground">
-                Área de estudos
+                Plano atribuído
               </span>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-6">
-          {/* Barra de pesquisa e botão adicionar */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-0 mb-6">
-            <AdicionarDisciplinaModal
-              onSuccess={() => {
-                window.location.reload()
-              }}
-            />
-            <div className="relative w-full md:w-auto">
+          {/* Barra de pesquisa */}
+          <div className="flex mb-6">
+            <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Pesquisar disciplinas..."
                 value={termoPesquisa}
                 onChange={(e) => setTermoPesquisa(e.target.value)}
-                className="pl-10 w-full md:w-80 h-10 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm transition-all duration-200"
+                className="pl-10 w-full h-10 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg shadow-sm transition-all duration-200"
               />
             </div>
           </div>

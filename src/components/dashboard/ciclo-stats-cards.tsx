@@ -23,7 +23,7 @@ export function CicloStatsCards({ progresso }: CicloStatsCardsProps) {
   const stats = [
     {
       label: "Horas Plan.",
-      value: progresso ? formatarTempo(progresso.horasPlanejadas) : "0h",
+      value: progresso ? formatarTempo(progresso.minutosPlanejados / 60) : "0h",
       icon: Target,
       color: "text-blue-600",
       bg: "bg-blue-50",

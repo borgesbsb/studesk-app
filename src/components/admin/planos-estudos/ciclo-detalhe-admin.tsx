@@ -36,7 +36,7 @@ interface MaterialSemana {
 interface DisciplinaSemana {
   id: string
   disciplinaId: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   questoesPlanejadas: number
   assuntos: string | null
   disciplina: { id: string; nome: string; cor: string | null }
@@ -83,7 +83,7 @@ export function CicloDetalheAdmin({ ciclo: cicloInicial, planoId }: Props) {
 
   // Horas / Questões: controlled inputs com auto-save no blur
   const [rowEdits, setRowEdits] = useState<Record<string, { horas: number; questoes: number }>>(
-    () => Object.fromEntries(cicloInicial.disciplinas.map(d => [d.id, { horas: d.horasPlanejadas, questoes: d.questoesPlanejadas }]))
+    () => Object.fromEntries(cicloInicial.disciplinas.map(d => [d.id, { horas: d.minutosPlanejados, questoes: d.questoesPlanejadas }]))
   )
   const [savingDiscId, setSavingDiscId] = useState<string | null>(null)
   const [savedDiscId, setSavedDiscId] = useState<string | null>(null)
@@ -123,15 +123,15 @@ export function CicloDetalheAdmin({ ciclo: cicloInicial, planoId }: Props) {
   const handleBlurPlanejamento = async (discId: string) => {
     const disc = disciplinas.find(d => d.id === discId)
     if (!disc) return
-    const { horas, questoes } = rowEdits[discId] ?? { horas: disc.horasPlanejadas, questoes: disc.questoesPlanejadas }
-    if (horas === disc.horasPlanejadas && questoes === disc.questoesPlanejadas) return
+    const { horas, questoes } = rowEdits[discId] ?? { horas: disc.minutosPlanejados, questoes: disc.questoesPlanejadas }
+    if (horas === disc.minutosPlanejados && questoes === disc.questoesPlanejadas) return
 
     setSavingDiscId(discId)
-    await adminAtualizarDisciplinaSemana(discId, planoId, { horasPlanejadas: horas, questoesPlanejadas: questoes })
+    await adminAtualizarDisciplinaSemana(discId, planoId, { minutosPlanejados: horas, questoesPlanejadas: questoes })
     setSavingDiscId(null)
     setSavedDiscId(discId)
     setTimeout(() => setSavedDiscId(null), 1500)
-    updateDisc(discId, { horasPlanejadas: horas, questoesPlanejadas: questoes })
+    updateDisc(discId, { minutosPlanejados: horas, questoesPlanejadas: questoes })
   }
 
   // ── Materiais ────────────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ export function CicloDetalheAdmin({ ciclo: cicloInicial, planoId }: Props) {
       semanaId: cicloInicial.id,
       planoId,
       disciplinaId: novaDiscId,
-      horasPlanejadas: novaDiscHoras,
+      minutosPlanejados: novaDiscHoras,
       questoesPlanejadas: novaDiscQuestoes,
     })
     setSalvandoDisc(false)
@@ -241,7 +241,7 @@ export function CicloDetalheAdmin({ ciclo: cicloInicial, planoId }: Props) {
       const d = res.data as Omit<DisciplinaSemana, 'assuntos'> & { assuntos?: string | null }
       const novaDisc: DisciplinaSemana = { ...d, assuntos: d.assuntos ?? null, materiais: (d as DisciplinaSemana).materiais ?? [] }
       setDisciplinas(prev => [...prev, novaDisc])
-      setRowEdits(prev => ({ ...prev, [novaDisc.id]: { horas: novaDisc.horasPlanejadas, questoes: novaDisc.questoesPlanejadas } }))
+      setRowEdits(prev => ({ ...prev, [novaDisc.id]: { horas: novaDisc.minutosPlanejados, questoes: novaDisc.questoesPlanejadas } }))
       setModalDisc(false)
     }
   }
@@ -305,7 +305,7 @@ export function CicloDetalheAdmin({ ciclo: cicloInicial, planoId }: Props) {
                             type="number"
                             min="0"
                             className="h-8 w-20 text-sm"
-                            value={rowEdits[disc.id]?.horas ?? disc.horasPlanejadas}
+                            value={rowEdits[disc.id]?.horas ?? disc.minutosPlanejados}
                             onChange={e => setRowEdits(prev => ({ ...prev, [disc.id]: { ...prev[disc.id], horas: parseInt(e.target.value) || 0 } }))}
                             onBlur={() => handleBlurPlanejamento(disc.id)}
                           />

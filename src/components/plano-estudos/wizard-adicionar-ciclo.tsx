@@ -174,7 +174,7 @@ export function WizardAdicionarCiclo({
       return {
         disciplinaId,
         disciplinaNome: disciplina.nome,
-        horasPlanejadas: horasPorDisciplina[disciplinaId] || 0,
+        minutosPlanejados: horasPorDisciplina[disciplinaId] || 0,
         horasRealizadas: 0,
         tipoVeiculo: veiculoPorDisciplina[disciplinaId] || 'pdf',
         questoesPlanejadas: questoesPorDisciplina[disciplinaId] || 0,

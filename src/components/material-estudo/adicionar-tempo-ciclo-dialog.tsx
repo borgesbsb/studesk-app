@@ -24,7 +24,7 @@ interface CicloAtual {
   disciplinaSemanaId: string
   disciplinaNome: string
   numeroSemana: number
-  horasPlanejadas: number
+  minutosPlanejados: number
   horasRealizadas: number
   dataInicio: string
   dataFim: string
@@ -125,7 +125,7 @@ export function AdicionarTempoCicloDialog({
       tempoDecorridoMinutos,
       cicloAtual: {
         horasRealizadasAtual: cicloAtual.horasRealizadas,
-        horasPlanejadas: cicloAtual.horasPlanejadas
+        minutosPlanejados: cicloAtual.minutosPlanejados
       }
     })
 
@@ -262,7 +262,7 @@ export function AdicionarTempoCicloDialog({
                   <div>
                     <div className="text-xs text-gray-600">Planejado</div>
                     <div className="text-sm font-semibold text-gray-900">
-                      {formatarHoras(cicloAtual.horasPlanejadas)}
+                      {formatarHoras(cicloAtual.minutosPlanejados)}
                     </div>
                   </div>
                 </div>

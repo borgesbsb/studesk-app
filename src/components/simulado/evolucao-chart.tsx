@@ -3,29 +3,20 @@
 import { useMemo } from "react"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-
-interface SimuladoDisciplina {
-  disciplina: { id: string; nome: string; cor: string | null }
-  percentual: number
-}
-
-interface Simulado {
-  id: string
-  nome: string
-  dataRealizacao: Date
-  percentualGeral: number
-  disciplinas: SimuladoDisciplina[]
-}
+import { SimuladoEvento } from "@/application/services/simulado.service"
 
 interface EvolucaoChartProps {
-  simulados: Simulado[]
+  simulados: SimuladoEvento[]
 }
 
 export function EvolucaoChart({ simulados }: EvolucaoChartProps) {
   const { disciplinasUnicas, pontos } = useMemo(() => {
+    // Apenas simulados com resultado do usuário
+    const comResultado = simulados.filter(s => s.meuResultado !== null)
+
     const discMap = new Map<string, { id: string; nome: string; cor: string }>()
-    for (const s of simulados) {
-      for (const d of s.disciplinas) {
+    for (const s of comResultado) {
+      for (const d of s.meuResultado!.disciplinas) {
         if (!discMap.has(d.disciplina.id)) {
           discMap.set(d.disciplina.id, {
             id: d.disciplina.id,
@@ -36,8 +27,8 @@ export function EvolucaoChart({ simulados }: EvolucaoChartProps) {
       }
     }
 
-    // Ordenar simulados por data crescente para o gráfico
-    const ordenados = [...simulados].sort(
+    // Ordenar por data crescente para o gráfico
+    const ordenados = [...comResultado].sort(
       (a, b) => new Date(a.dataRealizacao).getTime() - new Date(b.dataRealizacao).getTime()
     )
 
@@ -47,10 +38,10 @@ export function EvolucaoChart({ simulados }: EvolucaoChartProps) {
     }
   }, [simulados])
 
-  if (simulados.length < 2) {
+  if (pontos.length < 2) {
     return (
       <p className="text-sm text-muted-foreground text-center py-4">
-        Registre pelo menos 2 simulados para visualizar a evolução.
+        Registre acertos em pelo menos 2 simulados para visualizar a evolução.
       </p>
     )
   }
@@ -70,7 +61,7 @@ export function EvolucaoChart({ simulados }: EvolucaoChartProps) {
 
   const buildPath = (discId: string) => {
     const pts = pontos.map((s, i) => {
-      const d = s.disciplinas.find(d => d.disciplina.id === discId)
+      const d = s.meuResultado!.disciplinas.find(d => d.disciplina.id === discId)
       const pct = d?.percentual ?? null
       return { x: PADDING_LEFT + i * xStep, y: pct !== null ? toY(pct) : null }
     })
@@ -87,7 +78,7 @@ export function EvolucaoChart({ simulados }: EvolucaoChartProps) {
     let d = ''
     pontos.forEach((s, i) => {
       const x = PADDING_LEFT + i * xStep
-      const y = toY(s.percentualGeral)
+      const y = toY(s.meuResultado!.percentualGeral)
       d += d === '' ? `M${x},${y}` : ` L${x},${y}`
     })
     return d
@@ -162,7 +153,7 @@ export function EvolucaoChart({ simulados }: EvolucaoChartProps) {
           {/* Pontos */}
           {disciplinasUnicas.map(disc =>
             pontos.map((s, i) => {
-              const d = s.disciplinas.find(d => d.disciplina.id === disc.id)
+              const d = s.meuResultado!.disciplinas.find(d => d.disciplina.id === disc.id)
               if (!d) return null
               return (
                 <circle

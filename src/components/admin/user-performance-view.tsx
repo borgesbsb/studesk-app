@@ -378,13 +378,13 @@ export function UserPerformanceView({ data }: UserPerformanceViewProps) {
                                 <div
                                   className="absolute inset-y-0 left-0 bg-blue-600 rounded-full transition-all"
                                   style={{
-                                    width: `${Math.min((dia.horasRealizadas / Math.max(dia.horasPlanejadas, 1)) * 100, 100)}%`
+                                    width: `${Math.min((dia.horasRealizadas / Math.max(dia.minutosPlanejados, 1)) * 100, 100)}%`
                                   }}
                                 />
                               </div>
                             </div>
                             <div className="text-sm font-medium w-32 text-right">
-                              {dia.horasRealizadas.toFixed(1)}h / {dia.horasPlanejadas.toFixed(1)}h
+                              {dia.horasRealizadas.toFixed(1)}h / {dia.minutosPlanejados.toFixed(1)}h
                             </div>
                           </div>
                         ))}
@@ -437,7 +437,7 @@ export function UserPerformanceView({ data }: UserPerformanceViewProps) {
                       {data.evolucaoCiclo.dias.reduce((acc: number, dia: any) => acc + dia.horasRealizadas, 0).toFixed(1)}h
                     </div>
                     <p className="text-xs text-slate-500">
-                      de {data.evolucaoCiclo.dias.reduce((acc: number, dia: any) => acc + dia.horasPlanejadas, 0).toFixed(1)}h planejadas
+                      de {data.evolucaoCiclo.dias.reduce((acc: number, dia: any) => acc + dia.minutosPlanejados, 0).toFixed(1)}h planejadas
                     </p>
                   </CardContent>
                 </Card>
@@ -467,7 +467,7 @@ export function UserPerformanceView({ data }: UserPerformanceViewProps) {
                   <CardContent>
                     <div className="text-2xl font-bold">
                       {(() => {
-                        const totalPlanejadas = data.evolucaoCiclo.dias.reduce((acc: number, dia: any) => acc + dia.horasPlanejadas, 0)
+                        const totalPlanejadas = data.evolucaoCiclo.dias.reduce((acc: number, dia: any) => acc + dia.minutosPlanejados, 0)
                         const totalRealizadas = data.evolucaoCiclo.dias.reduce((acc: number, dia: any) => acc + dia.horasRealizadas, 0)
                         return totalPlanejadas > 0 ? ((totalRealizadas / totalPlanejadas) * 100).toFixed(1) : '0'
                       })()}%

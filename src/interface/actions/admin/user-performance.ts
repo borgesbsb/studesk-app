@@ -129,27 +129,27 @@ export async function getUserPerformance(userId: string) {
       })
     )
 
-    // Simulados com novo schema simplificado
-    const simulados = await prisma.simulado.findMany({
+    // Simulados: busca resultados do usuário (novo schema)
+    const resultadosSimulado = await prisma.simuladoResultado.findMany({
       where: { userId },
       include: {
-        config: { select: { id: true, nome: true } },
+        simulado: { select: { id: true, nome: true, dataRealizacao: true, config: { select: { id: true, nome: true } } } },
         disciplinas: {
           include: { disciplina: { select: { nome: true, cor: true } } }
         }
       },
-      orderBy: { dataRealizacao: 'desc' }
+      orderBy: { simulado: { dataRealizacao: 'desc' } }
     })
 
-    const simuladosComNotas = simulados.map(simulado => ({
-      id: simulado.id,
-      nome: simulado.nome,
-      dataRealizacao: simulado.dataRealizacao,
-      totalQuestoes: simulado.totalQuestoes,
-      totalAcertos: simulado.totalAcertos,
-      percentualGeral: simulado.percentualGeral,
-      config: simulado.config,
-      disciplinas: simulado.disciplinas.map(sd => ({
+    const simuladosComNotas = resultadosSimulado.map(r => ({
+      id: r.simulado.id,
+      nome: r.simulado.nome,
+      dataRealizacao: r.simulado.dataRealizacao,
+      totalQuestoes: r.totalQuestoes,
+      totalAcertos: r.totalAcertos,
+      percentualGeral: r.percentualGeral,
+      config: r.simulado.config,
+      disciplinas: r.disciplinas.map(sd => ({
         disciplinaId: sd.disciplinaId,
         disciplinaNome: sd.disciplina.nome,
         disciplinaCor: sd.disciplina.cor,
@@ -159,8 +159,8 @@ export async function getUserPerformance(userId: string) {
       }))
     }))
 
-    const totalQuestoesGeral = simulados.reduce((s, sim) => s + sim.totalQuestoes, 0)
-    const totalAcertosGeral = simulados.reduce((s, sim) => s + sim.totalAcertos, 0)
+    const totalQuestoesGeral = resultadosSimulado.reduce((s, r) => s + r.totalQuestoes, 0)
+    const totalAcertosGeral = resultadosSimulado.reduce((s, r) => s + r.totalAcertos, 0)
     const taxaAcertoGeral = totalQuestoesGeral > 0
       ? (totalAcertosGeral / totalQuestoesGeral) * 100
       : 0
@@ -208,14 +208,14 @@ export async function getUserPerformance(userId: string) {
         const diaId = `dia${i + 1}`
         const dataDia = new Date(inicioNormalizado)
         dataDia.setDate(dataDia.getDate() + i)
-        diasMap.set(diaId, { dia: diaId, data: dataDia, horasPlanejadas: 0, horasRealizadas: 0, questoesPlanejadas: 0, questoesRealizadas: 0 })
+        diasMap.set(diaId, { dia: diaId, data: dataDia, minutosPlanejados: 0, horasRealizadas: 0, questoesPlanejadas: 0, questoesRealizadas: 0 })
       }
 
       cicloAtual.disciplinas.forEach(ds => {
         ds.dias.forEach(dd => {
           const diaData = diasMap.get(dd.dia)
           if (diaData) {
-            diaData.horasPlanejadas += dd.horasPlanejadas
+            diaData.minutosPlanejados += dd.minutosPlanejados
             diaData.horasRealizadas += dd.horasRealizadas
             diaData.questoesPlanejadas += dd.questoesPlanejadas
             diaData.questoesRealizadas += dd.questoesRealizadas
@@ -251,7 +251,7 @@ export async function getUserPerformance(userId: string) {
           leiturasPorDia
         },
         questoes: {
-          totalSimulados: simulados.length,
+          totalSimulados: resultadosSimulado.length,
           totalQuestoes: totalQuestoesGeral,
           totalAcertos: totalAcertosGeral,
           taxaAcertoGeral,

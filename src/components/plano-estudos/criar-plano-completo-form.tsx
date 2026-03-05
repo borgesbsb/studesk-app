@@ -95,10 +95,10 @@ export function CriarPlanoCompletoForm() {
           numeroSemana: semana.numero,
           dataInicio: semana.dataInicio,
           dataFim: semana.dataFim,
-          totalHoras: semana.disciplinas.reduce((total, d) => total + d.horasPlanejadas, 0),
+          totalHoras: semana.disciplinas.reduce((total, d) => total + d.minutosPlanejados, 0),
           disciplinas: semana.disciplinas.map(d => ({
             disciplinaId: d.disciplinaId,
-            horasPlanejadas: d.horasPlanejadas,
+            minutosPlanejados: d.minutosPlanejados,
             tipoVeiculo: d.tipoVeiculo,
             materialNome: d.materialNome,
             questoesPlanejadas: d.questoesPlanejadas,
@@ -134,7 +134,7 @@ export function CriarPlanoCompletoForm() {
   }
 
   const totalHorasPlano = semanas.reduce((total, semana) => 
-    total + semana.disciplinas.reduce((totalSemana, d) => totalSemana + d.horasPlanejadas, 0), 0
+    total + semana.disciplinas.reduce((totalSemana, d) => totalSemana + d.minutosPlanejados, 0), 0
   )
 
   const totalDisciplinasUnicas = new Set(
@@ -340,7 +340,7 @@ export function CriarPlanoCompletoForm() {
                             </span>
                           </div>
                           <Badge variant="outline">
-                            {semana.disciplinas.reduce((total, d) => total + d.horasPlanejadas, 0)}h
+                            {semana.disciplinas.reduce((total, d) => total + d.minutosPlanejados, 0)}h
                           </Badge>
                         </div>
                       ))}

@@ -10,15 +10,25 @@ export async function deleteCiclo(cicloId: string, planoId: string) {
   try {
     const { userId } = await requireAuth()
 
-    // Verifica se o plano pertence ao usuário
+    // Verifica se o plano pertence ao usuário ou é um plano compartilhado atribuído ao usuário
     const plano = await prisma.planoEstudo.findUnique({
-      where: { id: planoId, userId }
+      where: { id: planoId }
     })
 
     if (!plano) {
-      return {
-        success: false,
-        error: 'Plano não encontrado ou sem permissão'
+      return { success: false, error: 'Plano não encontrado ou sem permissão' }
+    }
+
+    // Plano pessoal: verifica ownership. Plano compartilhado (userId null): verifica atribuição
+    if (plano.userId !== null && plano.userId !== userId) {
+      return { success: false, error: 'Plano não encontrado ou sem permissão' }
+    }
+    if (plano.userId === null) {
+      const atribuicao = await prisma.planoEstudoUsuario.findUnique({
+        where: { planoId_userId: { planoId, userId } }
+      })
+      if (!atribuicao) {
+        return { success: false, error: 'Plano não encontrado ou sem permissão' }
       }
     }
 

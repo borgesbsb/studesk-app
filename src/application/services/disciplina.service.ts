@@ -30,10 +30,28 @@ export class DisciplinaService {
 
   static async listarDisciplinas(userId: string): Promise<Disciplina[]> {
     try {
-      return await prisma.disciplina.findMany({
+      const planosUsuario = await prisma.planoEstudoUsuario.findMany({
         where: { userId },
-        orderBy: { nome: "asc" }
+        include: {
+          plano: {
+            include: {
+              disciplinasDisponiveis: {
+                include: { disciplina: true },
+                orderBy: { createdAt: 'asc' }
+              }
+            }
+          }
+        }
       })
+
+      const disciplinasMap = new Map<string, Disciplina>()
+      for (const pu of planosUsuario) {
+        for (const pd of pu.plano.disciplinasDisponiveis) {
+          disciplinasMap.set(pd.disciplina.id, pd.disciplina as unknown as Disciplina)
+        }
+      }
+
+      return Array.from(disciplinasMap.values()).sort((a, b) => a.nome.localeCompare(b.nome))
     } catch (error) {
       const errorLog = logError(error, 'listarDisciplinas')
       throw new Error(formatPrismaError(error))

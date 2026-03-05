@@ -261,7 +261,7 @@ export async function adminAdicionarDisciplina(data: {
   semanaId: string
   planoId: string
   disciplinaId: string
-  horasPlanejadas?: number
+  minutosPlanejados?: number
   questoesPlanejadas?: number
   tipoVeiculo?: string
   materialNome?: string
@@ -284,7 +284,7 @@ export async function adminAdicionarDisciplina(data: {
       data: {
         semanaId: data.semanaId,
         disciplinaId: data.disciplinaId,
-        horasPlanejadas: data.horasPlanejadas || 0,
+        minutosPlanejados: data.minutosPlanejados || 0,
         horasRealizadas: 0,
         prioridade: (maxPrioridade._max.prioridade || 0) + 1,
         questoesPlanejadas: data.questoesPlanejadas || 0,
@@ -315,7 +315,7 @@ export async function adminAtualizarDisciplinaSemana(
   id: string,
   planoId: string,
   data: {
-    horasPlanejadas?: number
+    minutosPlanejados?: number
     questoesPlanejadas?: number
     assuntos?: string
   }
@@ -325,7 +325,7 @@ export async function adminAtualizarDisciplinaSemana(
 
   try {
     const updateData: Record<string, unknown> = {}
-    if (data.horasPlanejadas !== undefined) updateData.horasPlanejadas = data.horasPlanejadas
+    if (data.minutosPlanejados !== undefined) updateData.minutosPlanejados = data.minutosPlanejados
     if (data.questoesPlanejadas !== undefined) updateData.questoesPlanejadas = data.questoesPlanejadas
     if (data.assuntos !== undefined) updateData.assuntos = data.assuntos || null
 

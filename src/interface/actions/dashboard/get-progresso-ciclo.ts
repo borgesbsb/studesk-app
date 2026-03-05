@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth-helpers';
 
 export interface ProgressoCiclo {
   horasRealizadas: number;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   questoesRealizadas: number;
   questoesPlanejadas: number;
   nomeCiclo: string;
@@ -21,8 +21,11 @@ export async function getProgressoCiclo(data?: Date): Promise<ProgressoCiclo | n
     // Buscar o plano ativo que contém o dia consultado
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
-        userId,
         ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ],
         dataInicio: {
           lte: diaConsultado
         },
@@ -60,9 +63,66 @@ export async function getProgressoCiclo(data?: Date): Promise<ProgressoCiclo | n
       return null;
     }
 
+    // ── PLANO COMPARTILHADO ────────────────────────────────────────────────────
+    if (planoAtivo.userId === null) {
+      const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+        where: { planoId_userId: { planoId: planoAtivo.id, userId } }
+      });
+      if (!planoUsuario) return null;
+
+      const [progressos, extras] = await Promise.all([
+        prisma.progressoUsuarioDisciplina.findMany({
+          where: {
+            planoUsuarioId: planoUsuario.id,
+            removida: false,
+            disciplinaSemana: { semanaId: semanaAtual.id }
+          },
+          include: {
+            disciplinaSemana: true,
+            dias: true
+          }
+        }),
+        prisma.progressoUsuarioDisciplinaExtra.findMany({
+          where: { planoUsuarioId: planoUsuario.id, semanaId: semanaAtual.id }
+        })
+      ]);
+
+      let horasRealizadasTotal = 0;
+      let minutosPlanejadosTotal = 0;
+      let questoesRealizadasTotal = 0;
+      let questoesPlanejadasTotal = 0;
+
+      progressos.forEach(p => {
+        p.dias.forEach(d => {
+          minutosPlanejadosTotal += d.minutosPlanejados;
+          questoesPlanejadasTotal += d.questoesPlanejadas;
+          horasRealizadasTotal += d.horasRealizadas;
+          questoesRealizadasTotal += d.questoesRealizadas;
+        });
+      });
+
+      extras.forEach(e => {
+        minutosPlanejadosTotal += e.minutosPlanejados;
+        horasRealizadasTotal += e.horasRealizadas / 60;
+        questoesPlanejadasTotal += e.questoesPlanejadas;
+        questoesRealizadasTotal += e.questoesRealizadas;
+      });
+
+      return {
+        horasRealizadas: Math.round(horasRealizadasTotal * 100) / 100,
+        minutosPlanejados: Math.round(minutosPlanejadosTotal * 100) / 100,
+        questoesRealizadas: questoesRealizadasTotal,
+        questoesPlanejadas: questoesPlanejadasTotal,
+        nomeCiclo: `Ciclo ${semanaAtual.numeroSemana || 1}`,
+        dataInicio: semanaAtual.dataInicio,
+        dataFim: semanaAtual.dataFim
+      };
+    }
+    // ── PLANO PESSOAL ─────────────────────────────────────────────────────────
+
     // Calcular totais do ciclo somando todos os DisciplinaDia
     let horasRealizadasTotal = 0;
-    let horasPlanejadasTotal = 0;
+    let minutosPlanejadosTotal = 0;
     let questoesRealizadasTotal = 0;
     let questoesPlanejadasTotal = 0;
 
@@ -70,7 +130,7 @@ export async function getProgressoCiclo(data?: Date): Promise<ProgressoCiclo | n
       // Somar horas e questões de todos os dias dessa disciplina
       disciplinaSemana.dias.forEach(disciplinaDia => {
         horasRealizadasTotal += disciplinaDia.horasRealizadas;
-        horasPlanejadasTotal += disciplinaDia.horasPlanejadas;
+        minutosPlanejadosTotal += disciplinaDia.minutosPlanejados;
         questoesRealizadasTotal += disciplinaDia.questoesRealizadas;
         questoesPlanejadasTotal += disciplinaDia.questoesPlanejadas;
       });
@@ -78,7 +138,7 @@ export async function getProgressoCiclo(data?: Date): Promise<ProgressoCiclo | n
 
     return {
       horasRealizadas: Math.round(horasRealizadasTotal * 100) / 100,
-      horasPlanejadas: Math.round(horasPlanejadasTotal * 100) / 100,
+      minutosPlanejados: Math.round(minutosPlanejadosTotal * 100) / 100,
       questoesRealizadas: questoesRealizadasTotal,
       questoesPlanejadas: questoesPlanejadasTotal,
       nomeCiclo: `Ciclo ${semanaAtual.numeroSemana || 1}`,

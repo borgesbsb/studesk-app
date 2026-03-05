@@ -37,7 +37,7 @@ interface User {
     disciplinas: number
     materiaisEstudo: number
     planosEstudo: number
-    simulados: number
+    resultadosSimulado: number
   }
 }
 
@@ -128,7 +128,7 @@ export function UsersTable({ initialUsers, initialTotal }: UsersTableProps) {
                       {user._count.planosEstudo} planos
                     </Badge>
                     <Badge variant="secondary" className="text-xs">
-                      {user._count.simulados} sim.
+                      {user._count.resultadosSimulado} sim.
                     </Badge>
                   </div>
                 </TableCell>

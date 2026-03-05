@@ -26,7 +26,7 @@ interface PlanoEstudo {
     horasRealizadas: number
     disciplinas: Array<{
       id: string
-      horasPlanejadas: number
+      minutosPlanejados: number
       horasRealizadas: number
       concluida: boolean
       disciplina: {

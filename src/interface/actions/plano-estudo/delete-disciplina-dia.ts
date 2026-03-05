@@ -26,7 +26,8 @@ export async function deleteDisciplinaDia(disciplinaDiaId: string) {
       }
     })
 
-    if (!disciplinaDia || disciplinaDia.disciplinaSemana.semana.plano.userId !== userId) {
+    const planoUserId = disciplinaDia?.disciplinaSemana.semana.plano.userId
+    if (!disciplinaDia || (planoUserId !== null && planoUserId !== userId)) {
       throw new Error('DisciplinaDia não encontrado ou sem permissão')
     }
 

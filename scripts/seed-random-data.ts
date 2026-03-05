@@ -176,7 +176,7 @@ async function createUserWithData(
       }
       const diasArray = Array.from(diasSet)
 
-      const horasPlanejadas = randomInt(1, 3)
+      const minutosPlanejados = randomInt(1, 3)
       const questoesPlanejadas = randomInt(5, 20)
 
       // Para semanas passadas, adicionar progresso realizado
@@ -185,11 +185,11 @@ async function createUserWithData(
 
       if (semana.numeroSemana === 1) {
         // Semana passada - completou a maior parte
-        horasRealizadas = Math.floor(horasPlanejadas * (0.7 + Math.random() * 0.3))
+        horasRealizadas = Math.floor(minutosPlanejados * (0.7 + Math.random() * 0.3))
         questoesRealizadas = Math.floor(questoesPlanejadas * (0.6 + Math.random() * 0.4))
       } else if (semana.numeroSemana === 2) {
         // Semana atual - progresso parcial
-        horasRealizadas = Math.floor(horasPlanejadas * Math.random() * 0.6)
+        horasRealizadas = Math.floor(minutosPlanejados * Math.random() * 0.6)
         questoesRealizadas = Math.floor(questoesPlanejadas * Math.random() * 0.5)
       }
 
@@ -197,19 +197,19 @@ async function createUserWithData(
         data: {
           semanaId: semana.id,
           disciplinaId: disciplina.id,
-          horasPlanejadas,
+          minutosPlanejados,
           horasRealizadas,
           questoesPlanejadas,
           questoesRealizadas,
           prioridade: i + 1,
           diasEstudo: diasArray.join(','),
-          concluida: semana.numeroSemana === 1 && horasRealizadas >= horasPlanejadas
+          concluida: semana.numeroSemana === 1 && horasRealizadas >= minutosPlanejados
         }
       })
 
       // Criar DisciplinaDia para cada dia
       for (const dia of diasArray) {
-        const horasPorDia = Math.ceil(horasPlanejadas / diasArray.length)
+        const horasPorDia = Math.ceil(minutosPlanejados / diasArray.length)
         const questoesPorDia = Math.ceil(questoesPlanejadas / diasArray.length)
 
         let horasRealizadasDia = 0
@@ -227,7 +227,7 @@ async function createUserWithData(
           data: {
             disciplinaSemanaId: disciplinaSemana.id,
             dia,
-            horasPlanejadas: horasPorDia,
+            minutosPlanejados: horasPorDia,
             horasRealizadas: horasRealizadasDia,
             questoesPlanejadas: questoesPorDia,
             questoesRealizadas: questoesRealizadasDia
@@ -331,11 +331,20 @@ async function createUserWithData(
       const totalQuestoesSim = questoesPorDisciplina * numDisciplinasSimulado
       const percentualGeralSim = Math.round((totalAcertosSim / totalQuestoesSim) * 1000) / 10
 
-      await prisma.simulado.create({
+      // Cria o evento do simulado (sem userId – pertence ao admin)
+      const simuladoEvento = await prisma.simulado.create({
         data: {
-          userId: user.id,
-          nome: `Simulado ${i + 1} - ${randomDate(dataInicio, new Date()).toLocaleDateString('pt-BR')}`,
+          nome: `Simulado ${i + 1} - ${dataRealizacao.toLocaleDateString('pt-BR')}`,
           dataRealizacao,
+          ativo: true
+        }
+      })
+
+      // Cria o resultado do usuário para esse simulado
+      await prisma.simuladoResultado.create({
+        data: {
+          simuladoId: simuladoEvento.id,
+          userId: user.id,
           totalQuestoes: totalQuestoesSim,
           totalAcertos: totalAcertosSim,
           percentualGeral: percentualGeralSim,

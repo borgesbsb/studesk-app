@@ -89,10 +89,10 @@ export class MaterialEstudoService {
 
   static async buscarMaterialEstudoPorId(userId: string, id: string): Promise<MaterialEstudo | null> {
     try {
-      return await prisma.materialEstudo.findUnique({
+      return await prisma.materialEstudo.findFirst({
         where: {
           id,
-          userId
+          OR: [{ userId }, { userId: null }]
         },
         include: {
           disciplinas: {
@@ -112,7 +112,7 @@ export class MaterialEstudoService {
     try {
       return await prisma.materialEstudo.findMany({
         where: {
-          userId,
+          OR: [{ userId }, { userId: null }],
           disciplinas: {
             some: {
               disciplinaId
@@ -300,9 +300,6 @@ export class MaterialEstudoService {
       return await prisma.disciplinaMaterial.findMany({
         where: {
           disciplinaId,
-          disciplina: {
-            userId
-          }
         },
         include: {
           material: true
@@ -374,7 +371,7 @@ export class MaterialEstudoService {
   ) {
     try {
       const where = {
-        userId,
+        OR: [{ userId }, { userId: null }],
         tipo,
         disciplinas: { some: { disciplinaId } }
       }

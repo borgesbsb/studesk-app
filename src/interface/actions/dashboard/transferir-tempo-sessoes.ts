@@ -20,8 +20,11 @@ export async function transferirTempoSessoes(disciplinaId: string, data?: Date) 
     // Busca o plano de estudo ativo do usuário que contenha o dia consultado
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
-        userId,
         ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ],
         dataInicio: {
           lte: diaConsultado
         },

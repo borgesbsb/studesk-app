@@ -59,7 +59,7 @@ async function fixDisciplinaDia() {
         data: diasFaltando.map(dia => ({
           disciplinaSemanaId: discSemana.id,
           dia,
-          horasPlanejadas: 1, // Valor padrão
+          minutosPlanejados: 1, // Valor padrão
           horasRealizadas: 0,
           questoesPlanejadas: 0,
           questoesRealizadas: 0

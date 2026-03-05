@@ -51,8 +51,8 @@ export async function GET(
     // O primeiro segmento do path deve ser o userId do dono do arquivo
     const fileOwnerId = pathSegments[0]
 
-    // Verificar se o usuário está tentando acessar seus próprios arquivos
-    if (fileOwnerId !== session.user.id) {
+    // Arquivos admin (fileOwnerId === 'admin') são acessíveis por qualquer usuário autenticado
+    if (fileOwnerId !== 'admin' && fileOwnerId !== session.user.id) {
       return new NextResponse('Acesso negado', {
         status: 403,
         headers: getCorsHeaders(request)

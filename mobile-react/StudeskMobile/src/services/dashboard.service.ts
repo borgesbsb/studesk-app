@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 export interface DiaEvolucao {
   dia: string;
   data: string;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   horasRealizadas: number;
   questoesPlanejadas: number;
   questoesRealizadas: number;
@@ -15,7 +15,7 @@ export interface DisciplinaCiclo {
   id: string;
   nome: string;
   cor?: string;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   horasRealizadas: number;
   questoesPlanejadas: number;
   questoesRealizadas: number;
@@ -46,7 +46,7 @@ export interface DisciplinaAgenda {
   disciplinaId: string;
   nome: string;
   cor: string | null;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   horasRealizadas: number;
   questoesPlanejadas: number;
   questoesRealizadas: number;
@@ -64,7 +64,7 @@ export interface MateriaDoDia {
   disciplinaId: string;
   disciplinaNome: string;
   disciplinaCor?: string;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   horasRealizadas: number;
   tempoRealEstudo: number;
   tempoSessoesPdf: number;

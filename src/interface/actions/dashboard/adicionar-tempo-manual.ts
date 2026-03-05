@@ -202,7 +202,7 @@ export async function adicionarTempoManual(params: AdicionarTempoManualParams) {
         data: {
           disciplinaSemanaId: disciplinaSemana.id,
           dia: diaIdAtual,
-          horasPlanejadas: 0,
+          minutosPlanejados: 0,
           horasRealizadas: 0,
           questoesPlanejadas: 0,
           questoesRealizadas: 0

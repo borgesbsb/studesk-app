@@ -101,7 +101,7 @@ export function GerenciarCiclos({ semanas, onSemanasChange }: GerenciarCiclosPro
 
       <div className="grid gap-6">
         {semanas.map((semana) => {
-          const totalHoras = semana.disciplinas.reduce((total, d) => total + d.horasPlanejadas, 0)
+          const totalHoras = semana.disciplinas.reduce((total, d) => total + d.minutosPlanejados, 0)
           
           return (
             <Card key={semana.numero}>
@@ -152,7 +152,7 @@ export function GerenciarCiclos({ semanas, onSemanasChange }: GerenciarCiclosPro
                             <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                               <div className="flex items-center space-x-1">
                                 <Clock className="h-3 w-3" />
-                                <span>{disciplina.horasPlanejadas}h/semana</span>
+                                <span>{disciplina.minutosPlanejados}h/semana</span>
                               </div>
                               {diasFormatados && (
                                 <div className="flex items-center space-x-1">

@@ -8,34 +8,31 @@ export async function getDisciplinasDoSimulado(simuladoId: string) {
   try {
     const { userId } = await requireAuth()
 
-    const simulado = await prisma.simulado.findFirst({
-      where: { id: simuladoId, userId },
+    const resultado = await prisma.simuladoResultado.findUnique({
+      where: { simuladoId_userId: { simuladoId, userId } },
       include: {
         disciplinas: {
-          include: {
-            disciplina: { select: { id: true, nome: true, cor: true } }
-          },
+          include: { disciplina: { select: { id: true, nome: true, cor: true } } },
           orderBy: { disciplina: { nome: 'asc' } }
         }
       }
     })
 
-    if (!simulado) {
-      return { success: false, error: "Simulado não encontrado" }
+    if (!resultado) return { success: false, error: "Resultado não encontrado" }
+
+    return {
+      success: true,
+      data: resultado.disciplinas.map(d => ({
+        id: d.id,
+        disciplina: d.disciplina,
+        totalQuestoes: d.totalQuestoes,
+        acertos: d.acertos,
+        percentual: d.percentual,
+        statusCor: SimuladoService.getStatusCor(d.percentual)
+      }))
     }
-
-    const disciplinas = simulado.disciplinas.map(d => ({
-      id: d.id,
-      disciplina: d.disciplina,
-      totalQuestoes: d.totalQuestoes,
-      acertos: d.acertos,
-      percentual: d.percentual,
-      statusCor: SimuladoService.getStatusCor(d.percentual)
-    }))
-
-    return { success: true, data: disciplinas }
   } catch (error) {
-    console.error("Erro ao buscar disciplinas do simulado:", error)
-    return { success: false, error: "Erro ao buscar disciplinas do simulado" }
+    console.error("Erro ao buscar disciplinas:", error)
+    return { success: false, error: "Erro ao buscar disciplinas" }
   }
 }

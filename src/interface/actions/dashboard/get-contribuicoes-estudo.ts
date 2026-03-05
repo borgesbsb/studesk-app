@@ -14,7 +14,13 @@ export async function getContribuicoesEstudo(): Promise<ContribuicaoDia[]> {
 
     // Buscar o plano ativo
     const planoAtivo = await prisma.planoEstudo.findFirst({
-      where: { userId, ativo: true },
+      where: {
+        ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ]
+      },
       include: {
         semanas: {
           include: {

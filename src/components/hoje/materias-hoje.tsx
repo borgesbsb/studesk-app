@@ -129,7 +129,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
     }
   };
 
-  const totalHorasPlanejadas = materias.reduce((acc, materia) => acc + materia.horasPlanejadas, 0);
+  const totalHorasPlanejadas = materias.reduce((acc, materia) => acc + materia.minutosPlanejados, 0);
   const totalHorasReais = materias.reduce((acc, materia) => acc + materia.tempoRealEstudo, 0);
   const materiasCompletas = materias.filter(materia => materia.concluida).length;
 
@@ -190,7 +190,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                     {formatarTempo(totalHorasReais)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    de {formatarTempo(totalHorasPlanejadas)} planejadas
+                    de {formatarTempo(totalHorasPlanejadas / 60)} planejadas
                   </p>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                 <div>
                   <p className="text-sm font-medium">Progresso</p>
                   <p className="text-2xl font-bold">
-                    {totalHorasPlanejadas > 0 ? Math.round((totalHorasReais / totalHorasPlanejadas) * 100) : 0}%
+                    {totalHorasPlanejadas > 0 ? Math.round((totalHorasReais * 60 / totalHorasPlanejadas) * 100) : 0}%
                   </p>
                 </div>
               </div>
@@ -219,7 +219,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                   </TableHeader>
                   <TableBody>
                     {materias.map((materia) => {
-                      const progressoTempo = calcularProgressoHoras(materia.tempoRealEstudo, materia.horasPlanejadas);
+                      const progressoTempo = calcularProgressoHoras(materia.tempoRealEstudo * 60, materia.minutosPlanejados);
                       const progressoQuestoes = calcularProgressoQuestoes(materia.questoesRealizadas, materia.questoesPlanejadas);
                       const rowClasses = materia.concluida
                         ? "bg-green-50 dark:bg-green-950/20"
@@ -307,7 +307,7 @@ export function MateriasHoje({ materias, onTempoAdicionado }: MateriasHojeProps)
                                 </div>
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                {formatarTempo(materia.tempoRealEstudo)} / {formatarTempo(materia.horasPlanejadas)}
+                                {formatarTempo(materia.tempoRealEstudo)} / {formatarTempo(materia.minutosPlanejados / 60)}
                               </div>
                             </div>
                           </TableCell>

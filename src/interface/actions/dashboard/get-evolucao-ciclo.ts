@@ -6,7 +6,7 @@ import { requireAuth } from '@/lib/auth-helpers';
 export interface DiaEvolucao {
   dia: string; // "dia1", "dia2", etc.
   data: Date;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   horasRealizadas: number;
   questoesPlanejadas: number;
   questoesRealizadas: number;
@@ -16,7 +16,7 @@ export interface DisciplinaCiclo {
   id: string;
   nome: string;
   cor?: string;
-  horasPlanejadas: number;
+  minutosPlanejados: number;
   horasRealizadas: number;
   questoesPlanejadas: number;
   questoesRealizadas: number;
@@ -134,7 +134,7 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
         diasMapShared.set(diaId, {
           dia: diaId,
           data: dataDia,
-          horasPlanejadas: 0,
+          minutosPlanejados: 0,
           horasRealizadas: 0,
           questoesPlanejadas: 0,
           questoesRealizadas: 0
@@ -143,35 +143,47 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
 
       // Admin progressos: distribui planejadas pelos dias de estudo; realizadas por ProgressoUsuarioDisciplinaDia
       progressos.forEach(p => {
-        const diasEstudo = p.diasEstudo
-          ? p.diasEstudo.split(',').map(d => d.trim()).filter(Boolean)
-          : []
-        const numDias = diasEstudo.length || 1
-        const horasPorDia = p.disciplinaSemana.horasPlanejadas / numDias
-        const questoesPorDia = p.disciplinaSemana.questoesPlanejadas / numDias
-
-        diasEstudo.forEach(diaId => {
-          const entry = diasMapShared.get(diaId)
-          if (entry) {
-            entry.horasPlanejadas += horasPorDia
-            entry.questoesPlanejadas += questoesPorDia
-          }
-        })
-
-        p.dias.forEach(d => {
-          const entry = diasMapShared.get(d.dia)
-          if (entry) {
-            entry.horasRealizadas += d.horasRealizadas
-            entry.questoesRealizadas += d.questoesRealizadas
-          }
-        })
+        // Usa os valores por dia de ProgressoUsuarioDisciplinaDia quando disponíveis;
+        // distribui proporcionalmente como fallback
+        const diasComMetas = p.dias.filter(d => d.minutosPlanejados > 0 || d.questoesPlanejadas > 0)
+        if (diasComMetas.length > 0) {
+          p.dias.forEach(d => {
+            const entry = diasMapShared.get(d.dia)
+            if (entry) {
+              entry.minutosPlanejados += d.minutosPlanejados
+              entry.questoesPlanejadas += d.questoesPlanejadas
+              entry.horasRealizadas += d.horasRealizadas
+              entry.questoesRealizadas += d.questoesRealizadas
+            }
+          })
+        } else {
+          // Fallback: distribui pelo diasEstudo
+          const diasEstudo = p.diasEstudo
+            ? p.diasEstudo.split(',').map(d => d.trim()).filter(Boolean)
+            : []
+          const numDias = diasEstudo.length || 1
+          diasEstudo.forEach(diaId => {
+            const entry = diasMapShared.get(diaId)
+            if (entry) {
+              entry.minutosPlanejados += p.disciplinaSemana.minutosPlanejados / numDias
+              entry.questoesPlanejadas += p.disciplinaSemana.questoesPlanejadas / numDias
+            }
+          })
+          p.dias.forEach(d => {
+            const entry = diasMapShared.get(d.dia)
+            if (entry) {
+              entry.horasRealizadas += d.horasRealizadas
+              entry.questoesRealizadas += d.questoesRealizadas
+            }
+          })
+        }
       });
 
       // Extras: cada registro tem dia e valores corretos por dia
       extras.forEach(e => {
         const entry = diasMapShared.get(e.dia);
         if (entry) {
-          entry.horasPlanejadas += e.horasPlanejadas / 60;
+          entry.minutosPlanejados += e.minutosPlanejados;
           entry.questoesPlanejadas += e.questoesPlanejadas;
           entry.horasRealizadas += e.horasRealizadas / 60;
           entry.questoesRealizadas += e.questoesRealizadas;
@@ -184,7 +196,7 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
         id: p.disciplinaSemana.disciplina.id,
         nome: p.disciplinaSemana.disciplina.nome,
         cor: p.disciplinaSemana.disciplina.cor || undefined,
-        horasPlanejadas: p.disciplinaSemana.horasPlanejadas,
+        minutosPlanejados: p.disciplinaSemana.minutosPlanejados,
         horasRealizadas: p.dias.reduce((acc, d) => acc + d.horasRealizadas, 0),
         questoesPlanejadas: p.disciplinaSemana.questoesPlanejadas,
         questoesRealizadas: p.dias.reduce((acc, d) => acc + d.questoesRealizadas, 0),
@@ -194,7 +206,7 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
         id: e.disciplina.id,
         nome: e.disciplina.nome,
         cor: e.disciplina.cor || undefined,
-        horasPlanejadas: Math.round((e.horasPlanejadas / 60) * 100) / 100,
+        minutosPlanejados: e.minutosPlanejados,
         horasRealizadas: Math.round((e.horasRealizadas / 60) * 100) / 100,
         questoesPlanejadas: e.questoesPlanejadas,
         questoesRealizadas: e.questoesRealizadas,
@@ -219,13 +231,6 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
     const diffTime = diaConsultadoNormalizado.getTime() - inicioNormalizado.getTime();
     const diasDecorridos = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir o dia atual
 
-    console.log('📅 [DEBUG] Cálculo de dias:', {
-      inicioNormalizado: inicioNormalizado.toISOString(),
-      diaConsultado: diaConsultadoNormalizado.toISOString(),
-      diffTime,
-      diasDecorridos
-    });
-
     // Criar array de dias com dados agregados
     const diasMap = new Map<string, DiaEvolucao>();
 
@@ -238,48 +243,23 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
       diasMap.set(diaId, {
         dia: diaId,
         data: dataDia,
-        horasPlanejadas: 0,
+        minutosPlanejados: 0,
         horasRealizadas: 0,
         questoesPlanejadas: 0,
         questoesRealizadas: 0,
       });
     }
 
-    console.log('🔍 [DEBUG EVOLUCAO] Dias decorridos:', diasDecorridos);
-    console.log('🔍 [DEBUG EVOLUCAO] Dias no map:', Array.from(diasMap.keys()));
-
     // Agregar dados de todas as disciplinas por dia
     semanaAtual.disciplinas.forEach(disciplinaSemana => {
-      console.log('📚 [DEBUG] Disciplina:', disciplinaSemana.disciplina?.nome || 'N/A');
-      console.log('📚 [DEBUG] Dias da disciplina:', disciplinaSemana.dias.map(d => d.dia));
-
       disciplinaSemana.dias.forEach(disciplinaDia => {
         const diaData = diasMap.get(disciplinaDia.dia);
         if (diaData) {
-          console.log(`📊 [DEBUG] Agregando ${disciplinaDia.dia}:`, {
-            horasPlanejadas: disciplinaDia.horasPlanejadas,
-            horasRealizadas: disciplinaDia.horasRealizadas,
-            questoesPlanejadas: disciplinaDia.questoesPlanejadas,
-            questoesRealizadas: disciplinaDia.questoesRealizadas
-          });
-
-          diaData.horasPlanejadas += disciplinaDia.horasPlanejadas;
+          diaData.minutosPlanejados += disciplinaDia.minutosPlanejados;
           diaData.horasRealizadas += disciplinaDia.horasRealizadas;
           diaData.questoesPlanejadas += disciplinaDia.questoesPlanejadas;
           diaData.questoesRealizadas += disciplinaDia.questoesRealizadas;
-        } else {
-          console.log(`⚠️ [DEBUG] Dia ${disciplinaDia.dia} não encontrado no map`);
         }
-      });
-    });
-
-    console.log('📊 [DEBUG] Resultado final por dia:');
-    diasMap.forEach((dia, key) => {
-      console.log(`  ${key}:`, {
-        horasPlanejadas: dia.horasPlanejadas,
-        horasRealizadas: dia.horasRealizadas,
-        questoesPlanejadas: dia.questoesPlanejadas,
-        questoesRealizadas: dia.questoesRealizadas
       });
     });
 
@@ -295,7 +275,7 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
       id: ds.disciplina.id,
       nome: ds.disciplina.nome,
       cor: ds.disciplina.cor || undefined,
-      horasPlanejadas: ds.horasPlanejadas,
+      minutosPlanejados: ds.minutosPlanejados,
       horasRealizadas: ds.horasRealizadas,
       questoesPlanejadas: ds.questoesPlanejadas,
       questoesRealizadas: ds.questoesRealizadas,

@@ -29,11 +29,11 @@ async function updateProgress(
 
     const { paginasLidas, tempoAssistido } = body
 
-    // 2. Buscar o material e verificar ownership
-    const material = await prisma.materialEstudo.findUnique({
+    // 2. Buscar o material (próprio ou admin)
+    const material = await prisma.materialEstudo.findFirst({
       where: {
         id,
-        userId: auth.userId
+        OR: [{ userId: auth.userId }, { userId: null }]
       }
     })
 
@@ -44,13 +44,18 @@ async function updateProgress(
       )
     }
 
-    // Atualizar o progresso baseado no tipo
+    // Materiais admin (userId: null) têm campos compartilhados — não atualizar
+    // O progresso per-usuário é rastreado via HistoricoLeitura
+    if (material.userId === null) {
+      return NextResponse.json({ success: true }, { headers: handleCors(request) })
+    }
+
+    // Atualizar o progresso baseado no tipo (apenas materiais do próprio usuário)
     const updateData: any = {}
 
     if (material.tipo === 'VIDEO' && tempoAssistido !== undefined) {
       updateData.tempoAssistido = tempoAssistido
     } else if (material.tipo === 'PDF' && paginasLidas !== undefined) {
-      // Atualizar paginasLidas se for array
       if (Array.isArray(paginasLidas)) {
         updateData.paginasLidas = Math.max(...paginasLidas, 0)
       } else {

@@ -22,7 +22,7 @@ export interface DisciplinaPlanejada {
   id?: string
   disciplinaId: string
   disciplinaNome: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   horasRealizadas?: number
   tipoVeiculo: string
   materialNome?: string
@@ -77,7 +77,7 @@ export function PlanejamentoDisciplinas({
     const novaDisciplina: DisciplinaPlanejada = {
       disciplinaId: '',
       disciplinaNome: '',
-      horasPlanejadas: 0,
+      minutosPlanejados: 0,
       tipoVeiculo: 'pdf',
       questoesPlanejadas: 0,
       tempoVideoPlanejado: 0
@@ -116,7 +116,7 @@ export function PlanejamentoDisciplinas({
 
 
   const calcularTotalHoras = () => {
-    return disciplinasPlanejadas.reduce((total, disciplina) => total + disciplina.horasPlanejadas, 0)
+    return disciplinasPlanejadas.reduce((total, disciplina) => total + disciplina.minutosPlanejados, 0)
   }
 
   if (loading) {
@@ -219,8 +219,8 @@ export function PlanejamentoDisciplinas({
                       <Input
                         type="number"
                         min="0"
-                        value={disciplina.horasPlanejadas}
-                        onChange={(e) => atualizarDisciplina(index, 'horasPlanejadas', parseInt(e.target.value) || 0)}
+                        value={disciplina.minutosPlanejados}
+                        onChange={(e) => atualizarDisciplina(index, 'minutosPlanejados', parseInt(e.target.value) || 0)}
                         placeholder="Ex: 8"
                       />
                     </div>

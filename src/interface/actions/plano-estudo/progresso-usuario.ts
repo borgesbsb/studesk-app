@@ -46,11 +46,65 @@ export async function getProgressoUsuarioPlano(planoId: string) {
       }
     })
 
-    if (!planoUsuario) return { error: 'Plano não encontrado ou sem acesso' }
+    if (!planoUsuario) {
+      return { error: 'Plano não encontrado ou sem acesso' }
+    }
     return { success: true, data: planoUsuario }
   } catch (error) {
-    console.error('Erro ao buscar progresso do usuário:', error)
+    console.error('[getProgressoUsuarioPlano]', error)
     return { error: 'Erro ao buscar progresso' }
+  }
+}
+
+// Salva as metas planejadas (horas/questões) de uma disciplina admin para um dia específico
+export async function salvarMetasDiaDisciplina(data: {
+  planoId: string
+  disciplinaSemanaId: string
+  dia: string
+  minutosPlanejados: number
+  questoesPlanejadas: number
+}) {
+  try {
+    const { userId } = await requireAuth()
+
+    const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+      where: { planoId_userId: { planoId: data.planoId, userId } }
+    })
+    if (!planoUsuario) return { error: 'Plano não encontrado ou sem acesso' }
+
+    // Garante que o ProgressoUsuarioDisciplina existe
+    const progresso = await prisma.progressoUsuarioDisciplina.upsert({
+      where: {
+        planoUsuarioId_disciplinaSemanaId: {
+          planoUsuarioId: planoUsuario.id,
+          disciplinaSemanaId: data.disciplinaSemanaId
+        }
+      },
+      update: {},
+      create: { planoUsuarioId: planoUsuario.id, disciplinaSemanaId: data.disciplinaSemanaId }
+    })
+
+    // Salva as metas no registro do dia
+    await prisma.progressoUsuarioDisciplinaDia.upsert({
+      where: { progressoId_dia: { progressoId: progresso.id, dia: data.dia } },
+      update: { minutosPlanejados: data.minutosPlanejados, questoesPlanejadas: data.questoesPlanejadas },
+      create: {
+        progressoId: progresso.id,
+        dia: data.dia,
+        minutosPlanejados: data.minutosPlanejados,
+        questoesPlanejadas: data.questoesPlanejadas
+      }
+    })
+
+    // Retorna o progresso atualizado com todos os dias
+    const progressoAtualizado = await prisma.progressoUsuarioDisciplina.findUnique({
+      where: { id: progresso.id },
+      include: { dias: { orderBy: { dia: 'asc' } } }
+    })
+    return { success: true, data: progressoAtualizado }
+  } catch (error) {
+    console.error('Erro ao salvar metas do dia:', error)
+    return { error: 'Erro ao salvar' }
   }
 }
 
@@ -58,7 +112,7 @@ export async function getProgressoUsuarioPlano(planoId: string) {
 export async function upsertProgressoUsuarioDisciplina(data: {
   planoId: string
   disciplinaSemanaId: string
-  horasPlanejadas?: number
+  minutosPlanejados?: number
   questoesPlanejadas?: number
   tempoVideoPlanejado?: number
   totalPaginas?: number
@@ -80,7 +134,7 @@ export async function upsertProgressoUsuarioDisciplina(data: {
     if (!planoUsuario) return { error: 'Plano não encontrado ou sem acesso' }
 
     const updateData: Record<string, unknown> = {}
-    if (data.horasPlanejadas !== undefined) updateData.horasPlanejadas = data.horasPlanejadas
+    if (data.minutosPlanejados !== undefined) updateData.minutosPlanejados = data.minutosPlanejados
     if (data.questoesPlanejadas !== undefined) updateData.questoesPlanejadas = data.questoesPlanejadas
     if (data.tempoVideoPlanejado !== undefined) updateData.tempoVideoPlanejado = data.tempoVideoPlanejado
     if (data.totalPaginas !== undefined) updateData.totalPaginas = data.totalPaginas
@@ -103,7 +157,7 @@ export async function upsertProgressoUsuarioDisciplina(data: {
       create: {
         planoUsuarioId: planoUsuario.id,
         disciplinaSemanaId: data.disciplinaSemanaId,
-        horasPlanejadas: data.horasPlanejadas || 0,
+        minutosPlanejados: data.minutosPlanejados || 0,
         questoesPlanejadas: data.questoesPlanejadas || 0,
         tempoVideoPlanejado: data.tempoVideoPlanejado || 0,
         totalPaginas: data.totalPaginas || 0,
@@ -176,7 +230,7 @@ export async function adicionarDisciplinaCicloUsuario(data: {
 // Atualiza horas/questões planejadas de uma disciplina extra
 export async function atualizarMetasExtraCicloUsuario(data: {
   extraId: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   questoesPlanejadas: number
 }) {
   try {
@@ -190,7 +244,7 @@ export async function atualizarMetasExtraCicloUsuario(data: {
     const updated = await prisma.progressoUsuarioDisciplinaExtra.update({
       where: { id: data.extraId },
       data: {
-        horasPlanejadas: data.horasPlanejadas,
+        minutosPlanejados: data.minutosPlanejados,
         questoesPlanejadas: data.questoesPlanejadas,
       },
       include: { disciplina: { select: { id: true, nome: true, cor: true } } }
@@ -348,5 +402,111 @@ export async function upsertProgressoUsuarioDisciplinaDia(data: {
   } catch (error) {
     console.error('Erro ao salvar progresso diário:', error)
     return { error: 'Erro ao salvar progresso diário' }
+  }
+}
+
+// Copia todas as disciplinas (admin + extras) de um dia para outro dentro do mesmo ciclo
+export async function copiarDiaCiclo(data: {
+  planoId: string
+  semanaId: string
+  diaOrigem: string
+  diaDestino: string
+}) {
+  try {
+    const { userId } = await requireAuth()
+
+    const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+      where: { planoId_userId: { planoId: data.planoId, userId } }
+    })
+    if (!planoUsuario) return { error: 'Plano não encontrado ou sem acesso' }
+
+    // Progressos do ciclo onde diasEstudo inclui o diaOrigem
+    const progressos = await prisma.progressoUsuarioDisciplina.findMany({
+      where: {
+        planoUsuarioId: planoUsuario.id,
+        removida: false,
+        disciplinaSemana: { semanaId: data.semanaId }
+      },
+      include: { dias: true }
+    })
+
+    const progressosNoDia = progressos.filter(p => {
+      const dias = p.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
+      return dias.includes(data.diaOrigem)
+    })
+
+    const updatedProgressos = []
+    for (const prog of progressosNoDia) {
+      // Adiciona diaDestino ao diasEstudo
+      const diasAtuais = prog.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
+      if (!diasAtuais.includes(data.diaDestino)) diasAtuais.push(data.diaDestino)
+      await prisma.progressoUsuarioDisciplina.update({
+        where: { id: prog.id },
+        data: { diasEstudo: [...new Set(diasAtuais)].join(',') }
+      })
+
+      // Copia valores planejados do diaOrigem para diaDestino
+      const diaOrigemRec = prog.dias.find(d => d.dia === data.diaOrigem)
+      if (diaOrigemRec) {
+        await prisma.progressoUsuarioDisciplinaDia.upsert({
+          where: { progressoId_dia: { progressoId: prog.id, dia: data.diaDestino } },
+          update: {
+            minutosPlanejados: diaOrigemRec.minutosPlanejados,
+            questoesPlanejadas: diaOrigemRec.questoesPlanejadas,
+          },
+          create: {
+            progressoId: prog.id,
+            dia: data.diaDestino,
+            minutosPlanejados: diaOrigemRec.minutosPlanejados,
+            questoesPlanejadas: diaOrigemRec.questoesPlanejadas,
+          }
+        })
+      }
+
+      const updated = await prisma.progressoUsuarioDisciplina.findUnique({
+        where: { id: prog.id },
+        include: { dias: true }
+      })
+      if (updated) updatedProgressos.push(updated)
+    }
+
+    // Extras do diaOrigem
+    const extrasOrigem = await prisma.progressoUsuarioDisciplinaExtra.findMany({
+      where: { planoUsuarioId: planoUsuario.id, semanaId: data.semanaId, dia: data.diaOrigem },
+      include: { disciplina: { select: { id: true, nome: true, cor: true } } }
+    })
+
+    const newExtras = []
+    for (const extra of extrasOrigem) {
+      const newExtra = await prisma.progressoUsuarioDisciplinaExtra.upsert({
+        where: {
+          planoUsuarioId_semanaId_disciplinaId_dia: {
+            planoUsuarioId: planoUsuario.id,
+            semanaId: data.semanaId,
+            disciplinaId: extra.disciplinaId,
+            dia: data.diaDestino
+          }
+        },
+        update: {
+          minutosPlanejados: extra.minutosPlanejados,
+          questoesPlanejadas: extra.questoesPlanejadas,
+        },
+        create: {
+          planoUsuarioId: planoUsuario.id,
+          semanaId: data.semanaId,
+          disciplinaId: extra.disciplinaId,
+          dia: data.diaDestino,
+          minutosPlanejados: extra.minutosPlanejados,
+          questoesPlanejadas: extra.questoesPlanejadas,
+        },
+        include: { disciplina: { select: { id: true, nome: true, cor: true } } }
+      })
+      newExtras.push(newExtra)
+    }
+
+    return { success: true, data: { progressos: updatedProgressos, extras: newExtras } }
+  } catch (error) {
+    console.error('Erro ao copiar dia:', error)
+    return { error: 'Erro ao copiar dia' }
   }
 }

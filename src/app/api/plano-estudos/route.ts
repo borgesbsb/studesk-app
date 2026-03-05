@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
             disciplinas: {
               create: semana.disciplinas.map((disc: any) => ({
                 disciplinaId: disc.disciplinaId,
-                horasPlanejadas: disc.horasPlanejadas,
+                minutosPlanejados: disc.minutosPlanejados,
                 prioridade: disc.prioridade,
                 observacoes: disc.observacoes
               }))

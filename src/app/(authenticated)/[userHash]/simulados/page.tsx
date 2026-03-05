@@ -2,18 +2,16 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SimuladosTable } from "@/components/simulado/simulados-table"
-import { AdicionarSimuladoModal } from "@/components/simulado/adicionar-simulado-modal"
 import { EvolucaoChart } from "@/components/simulado/evolucao-chart"
 import { Input } from "@/components/ui/input"
 import { ClipboardList, Search, TrendingUp, Award, BarChart2 } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { useHeader } from "@/contexts/header-context"
-import { SimuladoComMetrics } from "@/application/services/simulado.service"
+import { SimuladoEvento } from "@/application/services/simulado.service"
 
 export default function SimuladosPage() {
   const [termoPesquisa, setTermoPesquisa] = useState('')
-  const [simulados, setSimulados] = useState<SimuladoComMetrics[]>([])
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [simulados, setSimulados] = useState<SimuladoEvento[]>([])
   const { setTitle } = useHeader()
 
   useEffect(() => {
@@ -21,13 +19,15 @@ export default function SimuladosPage() {
     return () => setTitle("Dashboard")
   }, [setTitle])
 
-  const handleLoad = useCallback((data: SimuladoComMetrics[]) => {
+  const handleLoad = useCallback((data: SimuladoEvento[]) => {
     setSimulados(data)
   }, [])
 
-  const totalSimulados = simulados.length
-  const totalQuestoes = simulados.reduce((s, sim) => s + sim.totalQuestoes, 0)
-  const totalAcertos = simulados.reduce((s, sim) => s + sim.totalAcertos, 0)
+  // Métricas apenas dos simulados onde o usuário registrou resultado
+  const comResultado = simulados.filter(s => s.meuResultado !== null)
+  const totalSimulados = comResultado.length
+  const totalQuestoes = comResultado.reduce((s, sim) => s + sim.meuResultado!.totalQuestoes, 0)
+  const totalAcertos = comResultado.reduce((s, sim) => s + sim.meuResultado!.totalAcertos, 0)
   const mediaGeral = totalQuestoes > 0
     ? Math.round((totalAcertos / totalQuestoes) * 1000) / 10
     : 0
@@ -42,7 +42,7 @@ export default function SimuladosPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total de Simulados</p>
+                  <p className="text-sm font-medium text-muted-foreground">Simulados Realizados</p>
                   <h3 className="text-3xl font-bold text-card-foreground mt-2">{totalSimulados}</h3>
                 </div>
                 <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -88,7 +88,7 @@ export default function SimuladosPage() {
         </div>
 
         {/* Gráfico de Evolução */}
-        {simulados.length >= 2 && (
+        {comResultado.length >= 2 && (
           <Card className="border border-border shadow-sm bg-card">
             <CardHeader className="pb-3 border-b border-border">
               <div className="flex items-center gap-3">
@@ -114,20 +114,13 @@ export default function SimuladosPage() {
                 </div>
                 <div>
                   <CardTitle className="text-lg font-semibold text-card-foreground">
-                    Todos os Simulados
+                    Simulados Disponíveis
                   </CardTitle>
                   <p className="text-muted-foreground text-sm mt-1">
-                    Acompanhe seu desempenho e evolução por disciplinas
+                    Registre seus acertos nos simulados criados pelo administrador
                   </p>
                 </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-0 mb-6">
-              <AdicionarSimuladoModal
-                onSuccess={() => setRefreshKey(k => k + 1)}
-              />
               <div className="relative w-full md:w-auto">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -138,8 +131,9 @@ export default function SimuladosPage() {
                 />
               </div>
             </div>
+          </CardHeader>
+          <CardContent className="p-6">
             <SimuladosTable
-              key={refreshKey}
               termoPesquisa={termoPesquisa}
               onLoad={handleLoad}
             />

@@ -70,7 +70,7 @@ interface DisciplinaDia {
   id: string
   disciplinaSemanaId: string
   dia: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   horasRealizadas: number
   questoesPlanejadas: number
   questoesRealizadas: number
@@ -86,7 +86,7 @@ interface DisciplinaSemana {
   updatedAt: Date
   disciplinaId: string
   semanaId: string
-  horasPlanejadas: number
+  minutosPlanejados: number
   horasRealizadas: number
   prioridade: number
   concluida: boolean
@@ -335,14 +335,14 @@ function SortableDisciplinaRow({
 
       {/* Horas planejadas - editável */}
       <TableCell className="text-center">
-        {estaEditando === 'horasPlanejadas' ? (
+        {estaEditando === 'minutosPlanejados' ? (
           <Input
             className="w-20 text-center"
             type="text"
-            value={valoresEditadosDisciplina.horasPlanejadas || disciplina.horasPlanejadas}
+            value={valoresEditadosDisciplina.minutosPlanejados || disciplina.minutosPlanejados}
             onChange={(e) => {
               const valor = e.target.value.replace(/[^0-9]/g, '')
-              onDisciplinaActions.atualizarValorEditado(disciplina.id, 'horasPlanejadas', parseInt(valor) || 0)
+              onDisciplinaActions.atualizarValorEditado(disciplina.id, 'minutosPlanejados', parseInt(valor) || 0)
             }}
             onBlur={() => onDisciplinaActions.salvarEdicao(disciplina)}
             onKeyDown={(e) => {
@@ -355,13 +355,13 @@ function SortableDisciplinaRow({
           <div className="flex flex-col items-center gap-1">
             <span
               className="text-sm cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
-              onDoubleClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'horasPlanejadas', disciplina.horasPlanejadas)}
+              onDoubleClick={() => onDisciplinaActions.iniciarEdicao(disciplina.id, 'minutosPlanejados', disciplina.minutosPlanejados)}
             >
-              {disciplina.horasPlanejadas}h
+              {disciplina.minutosPlanejados}h
             </span>
             {disciplina.diasEstudo && (
               <Badge variant="secondary" className="text-xs">
-                {calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)}h/dia
+                {calcularHorasPorDia(disciplina.minutosPlanejados, disciplina.diasEstudo)}h/dia
               </Badge>
             )}
           </div>
@@ -475,6 +475,14 @@ function formatarTempo(horas: number): string {
   }
 }
 
+function formatarMinutos(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}min`
+}
+
 /**
  * Calcular dias do ciclo baseado nas datas de início e fim
  * @param dataInicio - Data de início do ciclo
@@ -506,12 +514,12 @@ function calcularDiasCiclo(dataInicio: Date | string, dataFim: Date | string): A
 
 /**
  * Calcula quantas horas por dia uma disciplina deve ser estudada
- * @param horasPlanejadas - Total de horas planejadas para a semana
+ * @param minutosPlanejados - Total de horas planejadas para a semana
  * @param diasEstudo - String CSV com dias selecionados (ex: "seg,qua,sex")
  * @returns Horas por dia (arredondado para 1 casa decimal)
  */
-function calcularHorasPorDia(horasPlanejadas: number, diasEstudo: string | null): number {
-  if (!diasEstudo || horasPlanejadas === 0) return 0
+function calcularHorasPorDia(minutosPlanejados: number, diasEstudo: string | null): number {
+  if (!diasEstudo || minutosPlanejados === 0) return 0
 
   const diasSelecionados = diasEstudo.split(',').filter(d => d.trim())
   // Filtrar apenas dias do formato novo (dia1, dia2, etc), ignorar formato antigo (seg, ter, etc)
@@ -519,7 +527,7 @@ function calcularHorasPorDia(horasPlanejadas: number, diasEstudo: string | null)
 
   if (diasNovos.length === 0) return 0
 
-  return Math.round((horasPlanejadas / diasNovos.length) * 10) / 10
+  return Math.round((minutosPlanejados / diasNovos.length) * 10) / 10
 }
 
 /**
@@ -550,10 +558,10 @@ function calcularDistribuicaoPorDia(disciplinas: DisciplinaSemana[]): Record<str
 
       if (disciplinaDia) {
         // Usar valor específico do dia
-        distribuicao[dia] += disciplinaDia.horasPlanejadas
+        distribuicao[dia] += disciplinaDia.minutosPlanejados
       } else {
         // Calcular proporcionalmente se não existe valor específico
-        const horasPorDia = calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+        const horasPorDia = calcularHorasPorDia(disciplina.minutosPlanejados, disciplina.diasEstudo)
         distribuicao[dia] += horasPorDia
       }
     })
@@ -609,8 +617,8 @@ function agruparDisciplinasPorDia(disciplinas: DisciplinaSemana[]): Record<strin
         const disciplinaDia = disciplina.dias?.find(d => d.dia === dia)
 
         const horasPorDia = disciplinaDia
-          ? disciplinaDia.horasPlanejadas
-          : calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+          ? disciplinaDia.minutosPlanejados
+          : calcularHorasPorDia(disciplina.minutosPlanejados, disciplina.diasEstudo)
 
         agrupamento[dia].push({
           nome: disciplina.disciplina?.nome || 'Sem nome',
@@ -646,8 +654,8 @@ function DisciplinaCardItem({
 
   // Se existe DisciplinaDia, usar seus valores, senão calcular proporcionalmente
   const horasPorDia = disciplinaDia
-    ? disciplinaDia.horasPlanejadas
-    : calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+    ? disciplinaDia.minutosPlanejados
+    : calcularHorasPorDia(disciplina.minutosPlanejados, disciplina.diasEstudo)
 
   const questoesPorDia = disciplinaDia
     ? disciplinaDia.questoesPlanejadas
@@ -655,8 +663,8 @@ function DisciplinaCardItem({
 
   const corDisciplina = disciplina.disciplina?.cor || '#3b82f6'
 
-  // Formatar tempo usando a função helper
-  const tempoFormatado = formatarTempo(horasPorDia)
+  // Formatar tempo: horasPorDia está em minutos
+  const tempoFormatado = formatarMinutos(Math.round(horasPorDia))
 
   return (
     <div
@@ -741,7 +749,7 @@ interface ModalEditarDisciplinaDiaProps {
   aberto: boolean
   onFechar: () => void
   onSalvar: (disciplina: DisciplinaSemana, dia: string, dados: {
-    horasPlanejadas: number
+    minutosPlanejados: number
     questoesPlanejadas: number
     observacoes: string
   }) => Promise<void>
@@ -754,7 +762,7 @@ function ModalEditarDisciplina({
   onFechar,
   onSalvar
 }: ModalEditarDisciplinaDiaProps) {
-  const [horasPlanejadas, setHorasPlanejadas] = useState(0)
+  const [minutosPlanejados, setHorasPlanejadas] = useState(0)
   const [questoesPlanejadas, setQuestoesPlanejadas] = useState(0)
   const [observacoes, setObservacoes] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -766,12 +774,12 @@ function ModalEditarDisciplina({
 
       if (disciplinaDia) {
         // Se já existe entrada para este dia, usar os valores dela
-        setHorasPlanejadas(Number(disciplinaDia.horasPlanejadas))
+        setHorasPlanejadas(Number(disciplinaDia.minutosPlanejados))
         setQuestoesPlanejadas(Number(disciplinaDia.questoesPlanejadas))
         setObservacoes(String(disciplinaDia.observacoes || ''))
       } else {
         // Se não existe, calcular valor padrão (distribuição uniforme)
-        const horasPorDia = calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+        const horasPorDia = calcularHorasPorDia(disciplina.minutosPlanejados, disciplina.diasEstudo)
         const diasSelecionados = disciplina.diasEstudo?.split(',').filter(d => d.trim()) || []
         const questoesPorDia = Math.floor(disciplina.questoesPlanejadas / (diasSelecionados.length || 1))
 
@@ -789,7 +797,7 @@ function ModalEditarDisciplina({
     try {
       // Agora salva apenas para o dia específico
       await onSalvar(disciplina, dia, {
-        horasPlanejadas: Number(horasPlanejadas),
+        minutosPlanejados: Number(minutosPlanejados),
         questoesPlanejadas: Number(questoesPlanejadas),
         observacoes: String(observacoes)
       })
@@ -827,9 +835,7 @@ function ModalEditarDisciplina({
                 size="icon"
                 className="h-10 w-10 rounded-full"
                 onClick={() => {
-                  // Decrementa 1 minuto (1/60 de hora)
-                  const novoValor = Math.max(0, horasPlanejadas - 1/60)
-                  setHorasPlanejadas(Math.round(novoValor * 60) / 60) // Arredonda para minutos
+                  setHorasPlanejadas(Math.max(0, Math.round(minutosPlanejados) - 1))
                 }}
               >
                 <span className="text-lg font-bold">−</span>
@@ -837,7 +843,7 @@ function ModalEditarDisciplina({
 
               <div className="flex items-center justify-center min-w-[120px]">
                 <span className="text-3xl font-bold text-primary">
-                  {formatarTempo(horasPlanejadas)}
+                  {formatarMinutos(Math.round(minutosPlanejados))}
                 </span>
               </div>
 
@@ -847,9 +853,7 @@ function ModalEditarDisciplina({
                 size="icon"
                 className="h-10 w-10 rounded-full"
                 onClick={() => {
-                  // Incrementa 1 minuto (1/60 de hora)
-                  const novoValor = horasPlanejadas + 1/60
-                  setHorasPlanejadas(Math.round(novoValor * 60) / 60) // Arredonda para minutos
+                  setHorasPlanejadas(Math.round(minutosPlanejados) + 1)
                 }}
               >
                 <span className="text-lg font-bold">+</span>
@@ -862,8 +866,8 @@ function ModalEditarDisciplina({
                 <div
                   className="h-full transition-all duration-300 rounded-full"
                   style={{
-                    width: `${Math.min((horasPlanejadas / 4) * 100, 100)}%`,
-                    backgroundColor: horasPlanejadas <= 1 ? '#10b981' : horasPlanejadas <= 2 ? '#3b82f6' : '#f59e0b'
+                    width: `${Math.min((minutosPlanejados / 240) * 100, 100)}%`,
+                    backgroundColor: minutosPlanejados <= 60 ? '#10b981' : minutosPlanejados <= 120 ? '#3b82f6' : '#f59e0b'
                   }}
                 />
               </div>
@@ -876,16 +880,16 @@ function ModalEditarDisciplina({
 
             {/* Atalhos */}
             <div className="flex flex-wrap gap-2">
-              {[0.5, 1, 1.5, 2, 3].map((valor) => (
+              {[30, 60, 90, 120, 180].map((valor) => (
                 <Button
                   key={valor}
                   type="button"
-                  variant={horasPlanejadas === valor ? "default" : "outline"}
+                  variant={minutosPlanejados === valor ? "default" : "outline"}
                   size="sm"
                   className="text-xs"
                   onClick={() => setHorasPlanejadas(valor)}
                 >
-                  {formatarTempo(valor)}
+                  {formatarMinutos(valor)}
                 </Button>
               ))}
             </div>
@@ -972,21 +976,21 @@ function ModalEditarDisciplina({
                   <span className="text-lg">⏳</span>
                   <span className="font-medium text-blue-900">Estimativa por dia:</span>
                   <span className="font-bold text-blue-700">
-                    {formatarTempo(horasPlanejadas)} leitura
+                    {formatarMinutos(Math.round(minutosPlanejados))} leitura
                     {questoesPlanejadas > 0 && ` + ${Math.round(questoesPlanejadas * 1.5)}min questões`}
                     {' = '}
-                    ~{formatarTempo(horasPlanejadas + (questoesPlanejadas * 1.5 / 60))}
+                    ~{formatarMinutos(Math.round(minutosPlanejados + questoesPlanejadas * 1.5))}
                   </span>
                 </div>
                 {(() => {
                   const diasSelecionados = disciplina.diasEstudo?.split(',').filter(d => d.trim()) || []
                   const numDias = diasSelecionados.length || 1
-                  const tempoTotalSemana = horasPlanejadas * numDias
+                  const tempoTotalSemana = Math.round(minutosPlanejados) * numDias
                   return numDias > 1 && (
                     <div className="flex items-center gap-2 text-xs text-blue-600 pl-7">
                       <span>Total na semana ({numDias} dias):</span>
                       <span className="font-semibold">
-                        ~{formatarTempo(tempoTotalSemana + (questoesPlanejadas * numDias * 1.5 / 60))}
+                        ~{formatarMinutos(tempoTotalSemana + Math.round(questoesPlanejadas * numDias * 1.5))}
                       </span>
                     </div>
                   )
@@ -1069,10 +1073,10 @@ function VisualizacaoSemanal({
 
           if (disciplinaDia) {
             // Usar valor específico do dia
-            distribuicao[dia] += disciplinaDia.horasPlanejadas
+            distribuicao[dia] += disciplinaDia.minutosPlanejados
           } else {
             // Calcular proporcionalmente se não existe valor específico
-            const horasPorDia = calcularHorasPorDia(disciplina.horasPlanejadas, disciplina.diasEstudo)
+            const horasPorDia = calcularHorasPorDia(disciplina.minutosPlanejados, disciplina.diasEstudo)
             distribuicao[dia] += horasPorDia
           }
         }
@@ -1102,14 +1106,14 @@ function VisualizacaoSemanal({
   const salvarEdicaoDisciplina = async (
     disciplina: DisciplinaSemana,
     dia: string,
-    dados: { horasPlanejadas: number; questoesPlanejadas: number; observacoes: string }
+    dados: { minutosPlanejados: number; questoesPlanejadas: number; observacoes: string }
   ) => {
     try {
       // Usar a action updateDisciplinaDia para salvar dados específicos do dia
       const resultado = await updateDisciplinaDia({
         disciplinaSemanaId: disciplina.id,
         dia: dia,
-        horasPlanejadas: dados.horasPlanejadas,
+        minutosPlanejados: dados.minutosPlanejados,
         questoesPlanejadas: dados.questoesPlanejadas,
         observacoes: dados.observacoes
       })
@@ -1548,8 +1552,8 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
       }
 
       // Aplicar apenas os valores que foram editados
-      if ('horasPlanejadas' in valoresParaSalvar) {
-        dadosAtualizacao.horasPlanejadas = valoresParaSalvar.horasPlanejadas
+      if ('minutosPlanejados' in valoresParaSalvar) {
+        dadosAtualizacao.minutosPlanejados = valoresParaSalvar.minutosPlanejados
       }
       if ('questoesPlanejadas' in valoresParaSalvar) {
         dadosAtualizacao.questoesPlanejadas = valoresParaSalvar.questoesPlanejadas
@@ -1612,11 +1616,11 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
           }))
           
           // Recalcular totais da semana se necessário
-          if ('horasPlanejadas' in valoresParaSalvar) {
+          if ('minutosPlanejados' in valoresParaSalvar) {
             novoPlano.semanas = novoPlano.semanas.map(semana => {
               const semanaAtualizada = semana.disciplinas.find(d => d.id === disciplina.id)
               if (semanaAtualizada) {
-                const totalHoras = semana.disciplinas.reduce((acc, d) => acc + d.horasPlanejadas, 0)
+                const totalHoras = semana.disciplinas.reduce((acc, d) => acc + d.minutosPlanejados, 0)
                 return { ...semana, totalHoras }
               }
               return semana
@@ -1674,7 +1678,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
   const salvarEdicaoCompleta = async (
     disciplina: DisciplinaSemana,
-    dados: { horasPlanejadas: number; questoesPlanejadas: number; observacoes: string }
+    dados: { minutosPlanejados: number; questoesPlanejadas: number; observacoes: string }
   ) => {
     try {
       setSalvandoId(disciplina.id)
@@ -1682,7 +1686,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
       const dadosParaEnviar = {
         disciplinaSemanaId: disciplina.id,
-        horasPlanejadas: Number(dados.horasPlanejadas),
+        minutosPlanejados: Number(dados.minutosPlanejados),
         questoesPlanejadas: Number(dados.questoesPlanejadas),
         observacoes: String(dados.observacoes)
       }
@@ -1702,7 +1706,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
               if (disc.id === disciplina.id) {
                 return {
                   ...disc,
-                  horasPlanejadas: dados.horasPlanejadas,
+                  minutosPlanejados: dados.minutosPlanejados,
                   questoesPlanejadas: dados.questoesPlanejadas,
                   observacoes: dados.observacoes
                 }
@@ -1757,7 +1761,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
     }
     
     // Verificar se é uma disciplina recém-adicionada sem disciplina definida
-    const isRecemAdicionada = disciplinaSemana.horasPlanejadas === 1 && 
+    const isRecemAdicionada = disciplinaSemana.minutosPlanejados === 1 && 
                              disciplinaSemana.questoesPlanejadas === 0 && 
                              disciplinaSemana.diasEstudo === '[]' &&
                              disciplinaSemana.horasRealizadas === 0 &&
@@ -1963,7 +1967,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
               await updateDisciplinaDia({
                 disciplinaSemanaId: disciplinaExistente.id,
                 dia: diaParaAdicionar,
-                horasPlanejadas: primeiroDia.horasPlanejadas,
+                minutosPlanejados: primeiroDia.minutosPlanejados,
                 questoesPlanejadas: primeiroDia.questoesPlanejadas,
                 observacoes: primeiroDia.observacoes || undefined
               })
@@ -1983,7 +1987,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
         // Se tem disciplina origem selecionada, buscar seus dados para copiar
         let dadosParaCopiar: any = {
-          horasPlanejadas: 1,
+          minutosPlanejados: 1,
           questoesPlanejadas: 0
         }
 
@@ -1995,7 +1999,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
           if (disciplinaOrigem) {
             dadosParaCopiar = {
-              horasPlanejadas: disciplinaOrigem.horasPlanejadas,
+              minutosPlanejados: disciplinaOrigem.minutosPlanejados,
               questoesPlanejadas: disciplinaOrigem.questoesPlanejadas,
               tipoVeiculo: disciplinaOrigem.tipoVeiculo || undefined,
               materialNome: disciplinaOrigem.materialNome || undefined,
@@ -2027,7 +2031,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                 await updateDisciplinaDia({
                   disciplinaSemanaId: disciplinaSemanaId,
                   dia: diaOrigem.dia,
-                  horasPlanejadas: diaOrigem.horasPlanejadas,
+                  minutosPlanejados: diaOrigem.minutosPlanejados,
                   questoesPlanejadas: diaOrigem.questoesPlanejadas,
                   observacoes: diaOrigem.observacoes || undefined
                 })
@@ -2077,7 +2081,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
         console.log(`      - dias.length:`, disc.dias?.length || 0)
         if (disc.dias && disc.dias.length > 0) {
           disc.dias.forEach(d => {
-            console.log(`        → dia: "${d.dia}", horas: ${d.horasPlanejadas}, questões: ${d.questoesPlanejadas}`)
+            console.log(`        → dia: "${d.dia}", horas: ${d.minutosPlanejados}, questões: ${d.questoesPlanejadas}`)
           })
         }
       })
@@ -2399,7 +2403,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
         ? cicloOrigem.disciplinas.map(disciplina => ({
             disciplinaId: disciplina.disciplinaId,
             disciplinaNome: disciplina.disciplina.nome,
-            horasPlanejadas: disciplina.horasPlanejadas,
+            minutosPlanejados: disciplina.minutosPlanejados,
             questoesPlanejadas: disciplina.questoesPlanejadas,
             tipoVeiculo: disciplina.tipoVeiculo || 'pdf',
             materialNome: disciplina.materialNome || '',
@@ -2665,7 +2669,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                           : 'Todos os dias'
 
                         // Calcular total de horas e questões dos dias alocados
-                        const totalHoras = disc.dias?.reduce((sum, dia) => sum + dia.horasPlanejadas, 0) || disc.horasPlanejadas || 0
+                        const totalHoras = disc.dias?.reduce((sum, dia) => sum + dia.minutosPlanejados, 0) || disc.minutosPlanejados || 0
                         const totalQuestoes = disc.dias?.reduce((sum, dia) => sum + dia.questoesPlanejadas, 0) || disc.questoesPlanejadas || 0
 
                         return {
@@ -3127,7 +3131,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
 
           // Calcular total de horas planejadas da semana (somando as horas de cada dia alocado)
           const totalHorasPlanejadas = semana.disciplinas.reduce((acc, disciplina) => {
-            const horasDisciplina = disciplina.dias?.reduce((accDias, dia) => accDias + dia.horasPlanejadas, 0) || 0
+            const horasDisciplina = disciplina.dias?.reduce((accDias, dia) => accDias + dia.minutosPlanejados, 0) || 0
             return acc + horasDisciplina
           }, 0)
 
@@ -3324,7 +3328,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{formatarTempo(totalHorasPlanejadas)}</div>
+                        <div className="text-2xl font-bold">{formatarMinutos(Math.round(totalHorasPlanejadas))}</div>
                         <p className="text-xs text-muted-foreground">
                           planejadas para o ciclo
                         </p>
@@ -3338,7 +3342,7 @@ export function DetalhePlanoEstudo({ planoId }: DetalhePlanoEstudoProps) {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          {formatarTempo(mediaHorasPorDia)}
+                          {formatarMinutos(Math.round(mediaHorasPorDia))}
                         </div>
                         <p className="text-xs text-muted-foreground">
                           por dia de estudo

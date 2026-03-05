@@ -20,7 +20,7 @@ export async function reordenarDisciplinas(disciplinaIds: string[]) {
         }
       })
 
-      if (!primeiraDisc || primeiraDisc.semana.plano.userId !== userId) {
+      if (!primeiraDisc || (primeiraDisc.semana.plano.userId !== null && primeiraDisc.semana.plano.userId !== userId)) {
         return {
           success: false,
           error: 'Disciplinas não encontradas ou sem permissão'

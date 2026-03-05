@@ -47,8 +47,8 @@ export function DisciplinasCicloCard({ disciplinas }: DisciplinasCicloCardProps)
       <CardContent className="px-3 pb-3">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
           {disciplinas.map((disc) => {
-            const progressoHoras = disc.horasPlanejadas > 0
-              ? Math.min((disc.horasRealizadas / disc.horasPlanejadas) * 100, 100)
+            const progressoHoras = disc.minutosPlanejados > 0
+              ? Math.min((disc.horasRealizadas / disc.minutosPlanejados) * 100, 100)
               : 0;
             const cor = disc.cor || "#6366f1";
 
@@ -63,7 +63,7 @@ export function DisciplinasCicloCard({ disciplinas }: DisciplinasCicloCardProps)
                 </p>
                 <div className="flex justify-between text-[9px] text-muted-foreground">
                   <span>{formatarTempo(disc.horasRealizadas)}</span>
-                  <span>{formatarTempo(disc.horasPlanejadas)}</span>
+                  <span>{formatarTempo(disc.minutosPlanejados / 60)}</span>
                 </div>
                 <div className="h-1 bg-muted rounded-full overflow-hidden">
                   <div

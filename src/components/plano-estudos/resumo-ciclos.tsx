@@ -143,7 +143,7 @@ export function ResumoCiclos({ ciclos, onCopiarCiclo }: ResumoCiclosProps) {
                           <div key={idx} className="flex items-center gap-2 text-xs">
                             <IconeVeiculo className="h-3 w-3 text-muted-foreground" />
                             <span className="truncate flex-1">{disciplina.disciplinaNome}</span>
-                            <span className="text-muted-foreground">{disciplina.horasPlanejadas}h</span>
+                            <span className="text-muted-foreground">{disciplina.minutosPlanejados}h</span>
                           </div>
                         )
                       })}

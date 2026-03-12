@@ -110,31 +110,41 @@ export class MaterialEstudoService {
 
   static async listarMateriaisPorDisciplina(userId: string, disciplinaId: string): Promise<MaterialEstudo[]> {
     try {
+      const include = {
+        disciplinas: { include: { disciplina: true } },
+        mobileText: { select: { processingStatus: true } },
+      }
+
       return await prisma.materialEstudo.findMany({
         where: {
-          OR: [{ userId }, { userId: null }],
-          disciplinas: {
-            some: {
-              disciplinaId
-            }
-          }
+          OR: [
+            // Materiais do próprio usuário ou compartilhados (userId=null) via DisciplinaMaterial
+            {
+              OR: [{ userId }, { userId: null }],
+              disciplinas: { some: { disciplinaId } },
+            },
+            // Materiais vinculados via DisciplinaSemanaMateria em planos atribuídos ao usuário
+            {
+              disciplinasSemana: {
+                some: {
+                  disciplinaSemana: {
+                    disciplinaId,
+                    semana: {
+                      plano: {
+                        usuarios: { some: { userId } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
         },
-        orderBy: { nome: "asc" },
-        include: {
-          disciplinas: {
-            include: {
-              disciplina: true
-            }
-          },
-          mobileText: {
-            select: {
-              processingStatus: true,
-            }
-          }
-        }
+        orderBy: { nome: 'asc' },
+        include,
       })
     } catch (error) {
-      const errorLog = logError(error, 'listarMateriaisPorDisciplina')
+      logError(error, 'listarMateriaisPorDisciplina')
       throw new Error(formatPrismaError(error))
     }
   }

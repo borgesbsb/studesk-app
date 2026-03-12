@@ -40,9 +40,32 @@ export async function GET(
       return NextResponse.json({ error: 'Material não encontrado' }, { status: 404 })
     }
 
-    // Verificar se é do usuário
-    if (material.user.email !== session.user.email) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+    // Verificar acesso: dono, material compartilhado (userId=null), ou via plano
+    const isOwner = material.user?.email === session.user.email
+    const isShared = material.userId === null
+
+    if (!isOwner && !isShared) {
+      const sessionUser = await prisma.user.findUnique({ where: { email: session.user.email! } })
+      if (!sessionUser) {
+        return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+      }
+
+      const accessViaPlano = await prisma.disciplinaSemanaMateria.findFirst({
+        where: {
+          materialId: material.id,
+          disciplinaSemana: {
+            semana: {
+              plano: {
+                usuarios: { some: { userId: sessionUser.id } },
+              },
+            },
+          },
+        },
+      })
+
+      if (!accessViaPlano) {
+        return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+      }
     }
 
     // 3. Verificar se é vídeo do Google Drive

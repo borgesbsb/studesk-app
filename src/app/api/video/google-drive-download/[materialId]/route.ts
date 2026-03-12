@@ -95,9 +95,30 @@ export async function GET(
       return NextResponse.json({ error: 'Material não encontrado' }, { status: 404 })
     }
 
-    // Verificar se é do usuário
-    if (material.userId !== auth.userId) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+    // Verificar acesso:
+    // 1. Material pertence ao usuário, OU
+    // 2. Material é admin/compartilhado (userId = null), OU
+    // 3. Material está vinculado a um plano compartilhado do qual o usuário é participante
+    const isOwner = material.userId === auth.userId
+    const isShared = material.userId === null
+
+    if (!isOwner && !isShared) {
+      const accessViaPlano = await prisma.disciplinaSemanaMateria.findFirst({
+        where: {
+          materialId: material.id,
+          disciplinaSemana: {
+            semana: {
+              plano: {
+                usuarios: { some: { userId: auth.userId } },
+              },
+            },
+          },
+        },
+      })
+
+      if (!accessViaPlano) {
+        return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+      }
     }
 
     // 3. Verificar se é vídeo do Google Drive
@@ -115,8 +136,8 @@ export async function GET(
       process.env.GOOGLE_REDIRECT_URI
     )
 
-    // Verificar se usuário tem tokens do Google Drive
-    if (!material.user.googleDriveAccessToken || !material.user.googleDriveRefreshToken) {
+    // Verificar se o dono do material tem tokens do Google Drive
+    if (!material.user || !material.user.googleDriveAccessToken || !material.user.googleDriveRefreshToken) {
       return NextResponse.json(
         { error: 'Usuário não autorizou acesso ao Google Drive' },
         { status: 403 }

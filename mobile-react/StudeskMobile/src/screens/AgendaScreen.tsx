@@ -236,7 +236,7 @@ export default function AgendaScreen() {
                       <Text style={styles.discName}>{disc.nome}</Text>
                       <View style={styles.discMeta}>
                         <Text style={styles.discMetaText}>
-                          {disc.horasRealizadas.toFixed(1)}/{disc.minutosPlanejados.toFixed(1)}h
+                          {disc.horasRealizadas.toFixed(1)}h/{disc.minutosPlanejados}min
                         </Text>
                         {disc.questoesPlanejadas > 0 && (
                           <Text style={styles.discMetaText}>

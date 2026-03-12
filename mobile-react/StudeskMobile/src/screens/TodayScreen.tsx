@@ -19,6 +19,7 @@ import {useAuth} from '../contexts/AuthContext';
 import dashboardService, {
   DashboardStats,
   MateriaDoDia,
+  MaterialAdmin,
   EvolucaoCiclo,
 } from '../services/dashboard.service';
 import {api} from '../services/api';
@@ -112,6 +113,18 @@ type RootStackParamList = {
     disciplinaId: string;
     disciplinaNome: string;
     disciplinaCor?: string;
+  };
+  MaterialReader: {
+    materialId: string;
+    materialNome: string;
+    disciplinaCor?: string;
+  };
+  VideoPlayer: {
+    materialId: string;
+    materialNome: string;
+    disciplinaId?: string;
+    tempoAssistido?: number;
+    duracao?: number;
   };
 };
 
@@ -311,7 +324,7 @@ export default function TodayScreen() {
           <Text style={styles.summaryLabel}>Tempo estudado hoje</Text>
           <GaugeChart
             realized={materiasDoDia.reduce((s, m) => s + m.horasRealizadas, 0)}
-            planned={materiasDoDia.reduce((s, m) => s + m.minutosPlanejados, 0)}
+            planned={materiasDoDia.reduce((s, m) => s + m.minutosPlanejados / 60, 0)}
           />
           <View style={styles.summaryStats}>
             <View style={styles.summaryStatBadge}>
@@ -411,10 +424,11 @@ export default function TodayScreen() {
           </View>
         ) : (
           materiasDoDia.map(materia => {
+            const horasPlanejadas = materia.minutosPlanejados / 60;
             const horasPercent =
-              materia.minutosPlanejados > 0
+              horasPlanejadas > 0
                 ? Math.min(
-                    (materia.horasRealizadas / materia.minutosPlanejados) * 100,
+                    (materia.horasRealizadas / horasPlanejadas) * 100,
                     100,
                   )
                 : 0;
@@ -488,7 +502,7 @@ export default function TodayScreen() {
                             isFlashing && {color: '#10b981'},
                           ]}>
                             {formatTempo(materia.horasRealizadas)}/
-                            {formatTempo(materia.minutosPlanejados)}
+                            {formatTempo(horasPlanejadas)}
                           </Text>
                         </>
                       );
@@ -547,6 +561,81 @@ export default function TodayScreen() {
 
                 {materia.observacoes && (
                   <Text style={styles.observacoes}>{materia.observacoes}</Text>
+                )}
+
+                {materia.materiaisAdmin && materia.materiaisAdmin.length > 0 && (
+                  <View style={styles.materiaisSection}>
+                    {materia.materiaisAdmin.map((mat: MaterialAdmin) => {
+                      const isPdf = mat.tipo === 'PDF';
+                      const progressPercent = isPdf
+                        ? mat.totalPaginas > 0
+                          ? Math.min((mat.paginasLidas / mat.totalPaginas) * 100, 100)
+                          : 0
+                        : mat.duracaoSegundos && mat.duracaoSegundos > 0
+                          ? Math.min(((mat.tempoAssistido || 0) / mat.duracaoSegundos) * 100, 100)
+                          : 0;
+                      const progressLabel = isPdf
+                        ? `${mat.paginasLidas}/${mat.totalPaginas} pág.`
+                        : mat.duracaoSegundos
+                          ? `${Math.floor((mat.tempoAssistido || 0) / 60)}/${Math.floor(mat.duracaoSegundos / 60)} min`
+                          : '';
+
+                      return (
+                        <TouchableOpacity
+                          key={mat.id}
+                          style={styles.materialItem}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            if (isPdf) {
+                              navigation.navigate('MaterialReader', {
+                                materialId: mat.id,
+                                materialNome: mat.nome,
+                                disciplinaCor: corDisciplina,
+                              });
+                            } else {
+                              navigation.navigate('VideoPlayer', {
+                                materialId: mat.id,
+                                materialNome: mat.nome,
+                                disciplinaId: materia.disciplinaId,
+                                tempoAssistido: mat.tempoAssistido || 0,
+                                duracao: mat.duracaoSegundos || undefined,
+                              });
+                            }
+                          }}>
+                          <View style={styles.materialItemLeft}>
+                            <Text style={styles.materialItemIcon}>
+                              {isPdf ? '📄' : '🎬'}
+                            </Text>
+                            <View style={styles.materialItemInfo}>
+                              <Text style={styles.materialItemNome} numberOfLines={1}>
+                                {mat.nome}
+                              </Text>
+                              <View style={styles.materialProgressRow}>
+                                <View style={styles.materialProgressBg}>
+                                  <View
+                                    style={[
+                                      styles.materialProgressFill,
+                                      {
+                                        width: `${progressPercent}%`,
+                                        backgroundColor:
+                                          progressPercent >= 100
+                                            ? '#10b981'
+                                            : corDisciplina,
+                                      },
+                                    ]}
+                                  />
+                                </View>
+                                <Text style={styles.materialProgressLabel}>
+                                  {progressLabel}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <Text style={styles.materialArrow}>›</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 )}
               </View>
             );
@@ -663,7 +752,7 @@ export default function TodayScreen() {
               <>
                 <Text style={styles.modalTitle}>{tempoMateria.disciplinaNome}</Text>
                 <Text style={styles.tempoModalSub}>
-                  {formatTempo(tempoMateria.horasRealizadas)} / {formatTempo(tempoMateria.minutosPlanejados)}
+                  {formatTempo(tempoMateria.horasRealizadas)} / {formatTempo(tempoMateria.minutosPlanejados / 60)}
                 </Text>
               </>
             )}
@@ -1100,6 +1189,69 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontStyle: 'italic',
     paddingLeft: 14,
+  },
+
+  // ========== Materiais do Dia ==========
+  materiaisSection: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2d35',
+    paddingTop: 10,
+    gap: 8,
+  },
+  materialItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1e2028',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  materialItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  materialItemIcon: {
+    fontSize: 16,
+  },
+  materialItemInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  materialItemNome: {
+    fontSize: 12,
+    color: '#d1d5db',
+    fontWeight: '500',
+  },
+  materialProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  materialProgressBg: {
+    flex: 1,
+    height: 3,
+    backgroundColor: '#2a2d35',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  materialProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  materialProgressLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    minWidth: 60,
+    textAlign: 'right',
+  },
+  materialArrow: {
+    fontSize: 18,
+    color: '#4b5563',
+    marginLeft: 6,
   },
 
 

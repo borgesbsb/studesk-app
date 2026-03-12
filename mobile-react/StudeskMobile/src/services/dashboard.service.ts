@@ -59,6 +59,16 @@ export interface AgendaMensal {
   dias: Record<string, DisciplinaAgenda[]>;
 }
 
+export interface MaterialAdmin {
+  id: string;
+  nome: string;
+  tipo: 'PDF' | 'VIDEO';
+  paginasLidas: number;
+  totalPaginas: number;
+  tempoAssistido: number | null;
+  duracaoSegundos: number | null;
+}
+
 export interface MateriaDoDia {
   id: string;
   disciplinaId: string;
@@ -74,6 +84,8 @@ export interface MateriaDoDia {
   questoesRealizadas: number;
   prioridade: number;
   observacoes?: string;
+  assuntos?: string;
+  materiaisAdmin: MaterialAdmin[];
 }
 
 class DashboardService {

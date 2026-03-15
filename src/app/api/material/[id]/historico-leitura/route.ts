@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { handleCors } from '@/lib/cors'
 import { requireAuth } from '@/lib/auth-helpers'
+import { revalidatePath } from 'next/cache'
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -508,6 +509,10 @@ export async function POST(
       console.log(`✅ Horas adicionadas: ${horasAdicionadas.toFixed(4)}h`)
       console.log(`📚 Disciplinas atualizadas: ${disciplinasAtualizadas.join(', ') || 'Nenhuma'}`)
       console.log(`====================================\n`)
+
+      if (disciplinasAtualizadas.length > 0) {
+        revalidatePath('/[userHash]/hoje', 'page')
+      }
 
     } catch (error) {
       // Não falhar a request se houver erro ao atualizar plano

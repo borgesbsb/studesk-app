@@ -75,6 +75,20 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
     const inicioDia = startOfDay(diaConsultado)
     const fimDia = endOfDay(diaConsultado)
 
+    // Datas em UTC puro para comparar com os registros do banco (armazenados como UTC midnight).
+    // Usar fimDia (local) causaria bug: em BRT (UTC-3), fimDia = 23:59 BRT = 02:59 UTC do dia
+    // seguinte, fazendo o dataInicio do próximo ciclo (00:00 UTC) cair dentro do range de hoje.
+    const todayUTC = new Date(Date.UTC(
+      diaConsultado.getUTCFullYear(),
+      diaConsultado.getUTCMonth(),
+      diaConsultado.getUTCDate()
+    ))
+    const tomorrowUTC = new Date(Date.UTC(
+      diaConsultado.getUTCFullYear(),
+      diaConsultado.getUTCMonth(),
+      diaConsultado.getUTCDate() + 1
+    ))
+
     console.log('🔍 DEBUG getMateriasDoDia - Início:', {
       dataRecebida: typeof data === 'string' ? data : data?.toISOString(),
       diaConsultado: diaConsultado.toISOString(),
@@ -126,16 +140,8 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           { userId: null, usuarios: { some: { userId } } }
         ],
         AND: [
-          {
-            dataInicio: {
-              lte: fimDia
-            }
-          },
-          {
-            dataFim: {
-              gte: inicioDia
-            }
-          }
+          { dataInicio: { lt: tomorrowUTC } },
+          { dataFim: { gte: todayUTC } }
         ]
       }
     })
@@ -154,12 +160,8 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
     const semanaAtual = await prisma.semanaEstudo.findFirst({
       where: {
         planoId: planoAtivo.id,
-        dataInicio: {
-          lte: fimDia
-        },
-        dataFim: {
-          gte: inicioDia
-        }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: todayUTC }
       },
       include: {
         disciplinas: {

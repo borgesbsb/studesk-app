@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { startOfDay, endOfDay } from 'date-fns'
+import { startOfDay } from 'date-fns'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
@@ -22,7 +22,10 @@ export async function GET(
     const disciplinaId = params.id
     const hoje = new Date()
     const inicioDia = startOfDay(hoje)
-    const fimDia = endOfDay(hoje)
+    // UTC puro para comparar com datas armazenadas como UTC midnight
+    // (evita bug de timezone BRT: endOfDay local = 02:59 UTC do dia seguinte)
+    const todayUTC = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()))
+    const tomorrowUTC = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate() + 1))
 
     // 2. Buscar plano ativo do usuário que contenha hoje
     const planoAtivo = await prisma.planoEstudo.findFirst({
@@ -30,16 +33,8 @@ export async function GET(
         userId: session.user.id,
         ativo: true,
         AND: [
-          {
-            dataInicio: {
-              lte: fimDia
-            }
-          },
-          {
-            dataFim: {
-              gte: inicioDia
-            }
-          }
+          { dataInicio: { lt: tomorrowUTC } },
+          { dataFim: { gte: todayUTC } }
         ]
       }
     })
@@ -55,12 +50,8 @@ export async function GET(
     const semanaAtual = await prisma.semanaEstudo.findFirst({
       where: {
         planoId: planoAtivo.id,
-        dataInicio: {
-          lte: fimDia
-        },
-        dataFim: {
-          gte: inicioDia
-        }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: todayUTC }
       }
     })
 

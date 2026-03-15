@@ -105,8 +105,8 @@ export function RegistrarAcertosModal({ simulado, onSuccess }: RegistrarAcertosM
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <form onSubmit={handleSubmit}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
           <DialogHeader>
             <DialogTitle>{simulado.nome}</DialogTitle>
             <DialogDescription>
@@ -119,12 +119,12 @@ export function RegistrarAcertosModal({ simulado, onSuccess }: RegistrarAcertosM
               Este simulado não tem disciplinas configuradas.
             </p>
           ) : (
-            <div className="py-4">
-              {/* Cabeçalho */}
-              <div className="flex items-center gap-10 pb-2 border-b">
-                <p className="flex-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">Disciplina</p>
-                <p className="w-20 text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">Acertos</p>
-                <p className="w-16 text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">%</p>
+            <div className="py-4 overflow-y-auto flex-1">
+              {/* Grid: [disciplina] [input acertos] [%] */}
+              <div className="grid grid-cols-[1fr_80px_60px] gap-x-3 pb-2 border-b">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Disciplina</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">Acertos</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center">%</p>
               </div>
 
               {/* Linhas */}
@@ -134,8 +134,8 @@ export function RegistrarAcertosModal({ simulado, onSuccess }: RegistrarAcertosM
                     ? Math.round((linha.acertos / linha.totalQuestoes) * 1000) / 10
                     : 0
                   return (
-                    <div key={linha.disciplinaId} className="flex items-center gap-10 py-3">
-                      <div className="flex flex-1 items-center gap-2 min-w-0">
+                    <div key={linha.disciplinaId} className="grid grid-cols-[1fr_80px_60px] gap-x-3 items-center py-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
                         {linha.cor && (
                           <span
                             className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -151,12 +151,12 @@ export function RegistrarAcertosModal({ simulado, onSuccess }: RegistrarAcertosM
                         type="number"
                         min="0"
                         max={linha.totalQuestoes}
-                        className="w-20 text-center flex-shrink-0"
+                        className="text-center"
                         value={linha.acertos}
                         onChange={(e) => setAcertos(i, parseInt(e.target.value) || 0)}
                       />
 
-                      <p className={`w-16 text-center text-sm font-bold flex-shrink-0 ${
+                      <p className={`text-center text-sm font-bold ${
                         pctLinha >= 70 ? "text-green-600" : pctLinha >= 50 ? "text-yellow-600" : "text-red-500"
                       }`}>
                         {pctLinha.toFixed(1)}%
@@ -167,10 +167,10 @@ export function RegistrarAcertosModal({ simulado, onSuccess }: RegistrarAcertosM
               </div>
 
               {/* Total */}
-              <div className="flex items-center gap-10 border-t pt-3 mt-1">
-                <p className="flex-1 text-sm font-semibold">Total</p>
-                <p className="w-20 text-center text-sm font-medium">{totalA}/{totalQ}</p>
-                <p className={`w-16 text-center text-sm font-bold flex-shrink-0 ${
+              <div className="grid grid-cols-[1fr_80px_60px] gap-x-3 items-center border-t pt-3 mt-1">
+                <p className="text-sm font-semibold">Total</p>
+                <p className="text-center text-sm font-medium">{totalA}/{totalQ}</p>
+                <p className={`text-center text-sm font-bold ${
                   pct >= 70 ? "text-green-600" : pct >= 50 ? "text-yellow-600" : "text-red-500"
                 }`}>
                   {pct.toFixed(1)}%

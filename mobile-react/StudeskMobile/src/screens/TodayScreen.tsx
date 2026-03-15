@@ -22,6 +22,7 @@ import dashboardService, {
   MaterialAdmin,
   EvolucaoCiclo,
 } from '../services/dashboard.service';
+import videoService, {DownloadProgress} from '../services/video.service';
 import {api} from '../services/api';
 
 /** Formata horas decimais: <1h → "45min", >=1h → "1h 30min" */
@@ -196,6 +197,58 @@ export default function TodayScreen() {
     setRefreshing(true);
     await loadData();
   }, [loadData]);
+
+  // Download de vídeos
+  const [downloadingVideos, setDownloadingVideos] = useState<Set<string>>(new Set());
+  const [videoDownloadProgress, setVideoDownloadProgress] = useState<Record<string, number>>({});
+
+  const handleOpenVideo = useCallback(async (mat: MaterialAdmin, disciplinaId: string, corDisciplina?: string) => {
+    const isDownloaded = await videoService.isDownloaded(mat.id);
+    if (isDownloaded) {
+      navigation.navigate('VideoPlayer', {
+        materialId: mat.id,
+        materialNome: mat.nome,
+        disciplinaId,
+        tempoAssistido: mat.tempoAssistido || 0,
+        duracao: mat.duracaoSegundos || undefined,
+      });
+      return;
+    }
+
+    Alert.alert(
+      'Vídeo não baixado',
+      'Baixe o vídeo primeiro para poder assisti-lo.',
+      [
+        {text: 'Cancelar', style: 'cancel'},
+        {
+          text: 'Baixar agora',
+          onPress: async () => {
+            setDownloadingVideos(prev => new Set(prev).add(mat.id));
+            setVideoDownloadProgress(prev => ({...prev, [mat.id]: 0}));
+            try {
+              await videoService.downloadVideo(mat.id, (progress: DownloadProgress) => {
+                setVideoDownloadProgress(prev => ({...prev, [mat.id]: progress.percent}));
+              });
+              setDownloadingVideos(prev => {
+                const s = new Set(prev);
+                s.delete(mat.id);
+                return s;
+              });
+              Alert.alert('Sucesso', `"${mat.nome}" baixado! Toque para assistir.`);
+              await loadData();
+            } catch (error: any) {
+              setDownloadingVideos(prev => {
+                const s = new Set(prev);
+                s.delete(mat.id);
+                return s;
+              });
+              Alert.alert('Erro', `Não foi possível baixar o vídeo: ${error.message}`);
+            }
+          },
+        },
+      ],
+    );
+  }, [navigation, loadData]);
 
   // Modal de tempo
   const [tempoModalVisible, setTempoModalVisible] = useState(false);
@@ -580,11 +633,15 @@ export default function TodayScreen() {
                           ? `${Math.floor((mat.tempoAssistido || 0) / 60)}/${Math.floor(mat.duracaoSegundos / 60)} min`
                           : '';
 
+                      const isDownloading = downloadingVideos.has(mat.id);
+                      const dlProgress = videoDownloadProgress[mat.id] ?? 0;
+
                       return (
                         <TouchableOpacity
                           key={mat.id}
                           style={styles.materialItem}
                           activeOpacity={0.7}
+                          disabled={isDownloading}
                           onPress={() => {
                             if (isPdf) {
                               navigation.navigate('MaterialReader', {
@@ -593,13 +650,7 @@ export default function TodayScreen() {
                                 disciplinaCor: corDisciplina,
                               });
                             } else {
-                              navigation.navigate('VideoPlayer', {
-                                materialId: mat.id,
-                                materialNome: mat.nome,
-                                disciplinaId: materia.disciplinaId,
-                                tempoAssistido: mat.tempoAssistido || 0,
-                                duracao: mat.duracaoSegundos || undefined,
-                              });
+                              handleOpenVideo(mat, materia.disciplinaId, corDisciplina);
                             }
                           }}>
                           <View style={styles.materialItemLeft}>
@@ -616,9 +667,12 @@ export default function TodayScreen() {
                                     style={[
                                       styles.materialProgressFill,
                                       {
-                                        width: `${progressPercent}%`,
-                                        backgroundColor:
-                                          progressPercent >= 100
+                                        width: isDownloading
+                                          ? `${dlProgress}%`
+                                          : `${progressPercent}%`,
+                                        backgroundColor: isDownloading
+                                          ? '#f59e0b'
+                                          : progressPercent >= 100
                                             ? '#10b981'
                                             : corDisciplina,
                                       },
@@ -626,12 +680,16 @@ export default function TodayScreen() {
                                   />
                                 </View>
                                 <Text style={styles.materialProgressLabel}>
-                                  {progressLabel}
+                                  {isDownloading
+                                    ? `${dlProgress}%`
+                                    : progressLabel}
                                 </Text>
                               </View>
                             </View>
                           </View>
-                          <Text style={styles.materialArrow}>›</Text>
+                          <Text style={styles.materialArrow}>
+                            {isDownloading ? '⬇' : '›'}
+                          </Text>
                         </TouchableOpacity>
                       );
                     })}

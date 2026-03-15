@@ -18,6 +18,7 @@ import Video, {
   OnProgressData,
   OnLoadData,
   OnPlaybackStateChangedData,
+  OnVideoErrorData,
 } from 'react-native-video';
 import videoService from '../services/video.service';
 import {api} from '../services/api';
@@ -51,6 +52,9 @@ export default function VideoPlayerScreen() {
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [seeked, setSeeked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Error state
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   // Timer state
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -187,6 +191,26 @@ export default function VideoPlayerScreen() {
   const onBuffer = useCallback(({isBuffering}: {isBuffering: boolean}) => {
     setLoading(isBuffering);
   }, []);
+
+  const onError = useCallback(async (error: OnVideoErrorData) => {
+    const errorCode = error?.error?.errorCode;
+    const msg = error?.error?.errorString || error?.error?.localizedDescription || 'Erro ao reproduzir vídeo';
+    console.error('❌ Video error:', JSON.stringify(error));
+    setLoading(false);
+
+    // Arquivo não encontrado: limpar metadados para forçar novo download
+    if (errorCode === '22005' || msg.includes('FILE_NOT_FOUND') || msg.includes('ENOENT')) {
+      await videoService.deleteVideo(materialId);
+      Alert.alert(
+        'Arquivo não encontrado',
+        'O vídeo não está mais no dispositivo. Faça o download novamente.',
+        [{text: 'OK', onPress: () => navigation.goBack()}],
+      );
+      return;
+    }
+
+    setVideoError(msg);
+  }, [materialId, navigation]);
 
   // Sync React state with notification/lock screen controls
   const onPlaybackStateChanged = useCallback((data: OnPlaybackStateChangedData) => {
@@ -413,6 +437,7 @@ export default function VideoPlayerScreen() {
           onLoad={onLoad}
           onProgress={onProgress}
           onBuffer={onBuffer}
+          onError={onError}
           onPlaybackStateChanged={onPlaybackStateChanged}
           onEnd={() => {
             setPaused(true);
@@ -433,9 +458,33 @@ export default function VideoPlayerScreen() {
           onPress={handleScreenTap}>
 
           {/* Loading */}
-          {loading && (
+          {loading && !videoError && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#fff" />
+            </View>
+          )}
+
+          {/* Error */}
+          {videoError && (
+            <View style={styles.loadingOverlay}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorText}>{videoError}</Text>
+              <TouchableOpacity
+                style={styles.errorBtn}
+                onPress={async () => {
+                  try {
+                    await videoService.deleteVideo(materialId);
+                    Alert.alert(
+                      'Vídeo removido',
+                      'O arquivo corrompido foi removido. Baixe o vídeo novamente.',
+                      [{text: 'OK', onPress: () => navigation.goBack()}],
+                    );
+                  } catch {
+                    navigation.goBack();
+                  }
+                }}>
+                <Text style={styles.errorBtnText}>Remover e voltar</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -625,6 +674,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  errorIcon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    marginHorizontal: 32,
+    marginBottom: 20,
+  },
+  errorBtn: {
+    backgroundColor: '#e50914',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  errorBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 
   // Center controls (YouTube-style)

@@ -26,7 +26,6 @@ ssh $SERVER << 'ENDSSH'
     # Atualiza repositório git e instala dependências
     echo "🔄 Atualizando código no repositório..."
     cd /var/www/studesk-app
-    git stash
     git pull origin main
 
     echo "📦 Instalando dependências..."

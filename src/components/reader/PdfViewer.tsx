@@ -312,6 +312,31 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
         `
       } as CustomToolbarItemModel,
       {
+        id: 'mark_progress',
+        tooltipText: 'Salvar Progresso de Leitura',
+        align: 'Right',
+        template: `
+          <button id="mark_progress_btn" style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: rgba(0,0,0,0.87);
+            border-radius: 4px;
+            transition: background-color 0.2s;
+          " onmouseover="this.style.backgroundColor='rgba(0,0,0,0.04)'" onmouseout="this.style.backgroundColor='transparent'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Salvar Progresso</span>
+          </button>
+        `
+      } as CustomToolbarItemModel,
+      {
         id: 'fullscreen_toggle',
         tooltipText: 'Ativar/Desativar Tela Cheia',
         align: 'Right',
@@ -335,13 +360,6 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
             <span id="fullscreen_text">Tela Cheia</span>
           </button>
         `
-      } as CustomToolbarItemModel,
-      {
-        prefixIcon: 'e-icons e-check',
-        id: 'mark_progress',
-        text: 'Marcar Progresso',
-        tooltipText: 'Salvar Progresso de Leitura',
-        align: 'Right'
       } as CustomToolbarItemModel,
       {
         id: 'theme_selector',

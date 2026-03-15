@@ -264,32 +264,122 @@ export async function POST(
     console.log('⏱️  Tempo lido (horas):', (tempoLeituraSegundos / 3600).toFixed(4))
 
     try {
-      // 1. Buscar disciplinas associadas ao material
+      // Usar data enviada pelo cliente (dia selecionado no /hoje) ou data atual do servidor
+      const agora = dataEstudo ? new Date(`${dataEstudo}T12:00:00Z`) : new Date()
+      const todayUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()))
+      const tomorrowUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate() + 1))
+
+      console.log(`📅 dataEstudo recebido: ${dataEstudo ?? 'nenhum (usando agora)'}`)
+      console.log(`📅 todayUTC: ${todayUTC.toISOString()} | tomorrowUTC: ${tomorrowUTC.toISOString()}`)
+
+      // 1a. Buscar via DisciplinaMaterial (planos pessoais)
       const disciplinasDoMaterial = await prisma.disciplinaMaterial.findMany({
         where: { materialId },
-        select: {
-          disciplinaId: true,
-          disciplina: {
-            select: { nome: true }
-          }
-        }
+        select: { disciplinaId: true, disciplina: { select: { nome: true } } }
       })
 
-      console.log('📚 Disciplinas associadas ao material:', disciplinasDoMaterial.length)
-      disciplinasDoMaterial.forEach(d => {
-        console.log(`   - ${d.disciplina.nome} (ID: ${d.disciplinaId})`)
-      })
+      // 1b. Buscar via DisciplinaSemanaMateria (planos compartilhados/admin)
+      // — direto na DisciplinaSemana ativa para o período consultado
+      const semanaMateriasAdmin = disciplinasDoMaterial.length === 0
+        ? await prisma.disciplinaSemanaMateria.findMany({
+            where: { materialId },
+            include: {
+              disciplinaSemana: {
+                include: {
+                  disciplina: { select: { id: true, nome: true } },
+                  semana: {
+                    select: {
+                      dataInicio: true,
+                      dataFim: true,
+                      planoId: true,
+                      plano: { select: { nome: true, ativo: true, userId: true } }
+                    }
+                  },
+                  dias: true
+                }
+              }
+            }
+          })
+        : []
+
+      console.log(`📚 Via DisciplinaMaterial: ${disciplinasDoMaterial.length} | Via DisciplinaSemanaMateria: ${semanaMateriasAdmin.length}`)
+
+      // — Processar materiais admin direto (caminho curto, sem re-buscar DisciplinaSemana)
+      if (semanaMateriasAdmin.length > 0) {
+        for (const { disciplinaSemana } of semanaMateriasAdmin) {
+          const semana = disciplinaSemana.semana
+          // Verificar se a semana contém o dia consultado
+          const semanaInicio = new Date(Date.UTC(
+            new Date(semana.dataInicio).getUTCFullYear(),
+            new Date(semana.dataInicio).getUTCMonth(),
+            new Date(semana.dataInicio).getUTCDate()
+          ))
+          const semanaFim = new Date(Date.UTC(
+            new Date(semana.dataFim).getUTCFullYear(),
+            new Date(semana.dataFim).getUTCMonth(),
+            new Date(semana.dataFim).getUTCDate()
+          ))
+          if (todayUTC < semanaInicio || todayUTC > semanaFim) {
+            console.log(`   ⚠️ DisciplinaSemana fora do período consultado, pulando`)
+            continue
+          }
+          if (!semana.plano.ativo) continue
+
+          const diffDays = Math.round((todayUTC.getTime() - semanaInicio.getTime()) / (1000 * 60 * 60 * 24))
+          const diaKey = `dia${diffDays + 1}`
+          console.log(`   📆 Admin: ${disciplinaSemana.disciplina.nome} → ${diaKey}`)
+
+          const horasAdicionar = tempoLeituraSegundos / 3600
+          let diaHoje = disciplinaSemana.dias.find(d => d.dia === diaKey)
+          if (!diaHoje) {
+            diaHoje = await prisma.disciplinaDia.create({
+              data: { disciplinaSemanaId: disciplinaSemana.id, dia: diaKey, minutosPlanejados: 0, horasRealizadas: 0, questoesPlanejadas: 0, questoesRealizadas: 0 }
+            })
+          }
+          await prisma.disciplinaDia.update({
+            where: { id: diaHoje.id },
+            data: { horasRealizadas: { increment: horasAdicionar } }
+          })
+
+          // Plano compartilhado: upsert ProgressoUsuarioDisciplinaDia
+          if (semana.plano.userId === null) {
+            try {
+              const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+                where: { planoId_userId: { planoId: semana.planoId, userId: auth.userId } }
+              })
+              if (planoUsuario) {
+                const progresso = await prisma.progressoUsuarioDisciplina.upsert({
+                  where: { planoUsuarioId_disciplinaSemanaId: { planoUsuarioId: planoUsuario.id, disciplinaSemanaId: disciplinaSemana.id } },
+                  create: {
+                    planoUsuarioId: planoUsuario.id,
+                    disciplinaSemanaId: disciplinaSemana.id,
+                    minutosPlanejados: disciplinaSemana.minutosPlanejados,
+                    questoesPlanejadas: disciplinaSemana.questoesPlanejadas,
+                    horasRealizadas: 0,
+                    questoesRealizadas: 0,
+                    concluida: false,
+                    removida: false,
+                  },
+                  update: {}
+                })
+                await prisma.progressoUsuarioDisciplinaDia.upsert({
+                  where: { progressoId_dia: { progressoId: progresso.id, dia: diaKey } },
+                  create: { progressoId: progresso.id, dia: diaKey, horasRealizadas: horasAdicionar, questoesPlanejadas: 0, questoesRealizadas: 0 },
+                  update: { horasRealizadas: { increment: horasAdicionar } }
+                })
+                console.log(`   ✅ ProgressoUsuarioDisciplinaDia atualizado (admin path)`)
+              }
+            } catch (sharedErr) {
+              console.error('⚠️ Erro ao atualizar progresso compartilhado:', sharedErr)
+            }
+          }
+
+          horasAdicionadas += horasAdicionar
+          disciplinasAtualizadas.push(disciplinaSemana.disciplina.nome)
+        }
+      }
 
       if (disciplinasDoMaterial.length > 0) {
-        // Usar data enviada pelo cliente (dia selecionado no /hoje) ou data atual do servidor
-        const agora = dataEstudo ? new Date(`${dataEstudo}T12:00:00Z`) : new Date()
-        const todayUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()))
-        const tomorrowUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate() + 1))
-
-        console.log(`\n📅 Data/Hora atual: ${agora.toISOString()}`)
-        console.log(`📅 todayUTC: ${todayUTC.toISOString()}`)
-        console.log(`📅 tomorrowUTC: ${tomorrowUTC.toISOString()}`)
-
         // 2. Para cada disciplina, buscar DisciplinaSemana ativa para a semana atual
         for (const { disciplinaId, disciplina } of disciplinasDoMaterial) {
           console.log(`\n🔍 Processando disciplina: ${disciplina.nome}`)

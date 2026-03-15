@@ -114,6 +114,7 @@ model Disciplina {
   configSimulados         ConfigSimuladoDisciplina[]
   planosDisponiveis       PlanoEstudoDisciplina[]
   progressosExtras        ProgressoUsuarioDisciplinaExtra[]
+  buildDisciplinas        BuildPlanoDisciplina[]
 
   @@index([userId])
   @@index([nome])
@@ -266,6 +267,7 @@ model SemanaEstudo {
   horasRealizadas Int                @default(0)
   simuladoId      String?            // Simulado associado a este ciclo
   simuladoHoras   Int                @default(3) // Horas planejadas para o simulado
+  simuladoDia     String?            // Dia do ciclo em que o simulado ocorre (ex: 'dia7')
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   disciplinas     DisciplinaSemana[]
@@ -537,6 +539,56 @@ model SimuladoResultado {
   @@unique([simuladoId, userId])
   @@index([simuladoId])
   @@index([userId])
+}
+
+// ============================================================
+// Construtor de Planos com IA (Build Planos)
+// ============================================================
+
+model BuildPlano {
+  id           String   @id @default(cuid())
+  nome         String
+  descricao    String?
+  numeroCiclos Int      @default(10)
+  status       String   @default("rascunho") // rascunho | processando | gerado
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  disciplinas  BuildPlanoDisciplina[]
+}
+
+model BuildPlanoDisciplina {
+  id             String   @id @default(cuid())
+  buildPlanoId   String
+  disciplinaId   String?  // link opcional para Disciplina existente no BD
+  nome           String
+  tipo           String   @default("P1") // P1 | P2
+  conteudoEdital String?  @db.Text       // conteúdo do edital colado pelo admin
+  cargaHoraria   Int      @default(0)    // horas previstas
+  cor            String?
+  ordem          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  buildPlano   BuildPlano  @relation(fields: [buildPlanoId], references: [id], onDelete: Cascade)
+  disciplina   Disciplina? @relation(fields: [disciplinaId], references: [id], onDelete: SetNull)
+  assuntos     BuildPlanoAssunto[]
+
+  @@index([buildPlanoId])
+  @@index([disciplinaId])
+}
+
+model BuildPlanoAssunto {
+  id                     String   @id @default(cuid())
+  buildPlanoDisciplinaId String
+  nome                   String
+  ciclo                  Int?     // número do ciclo (1-based)
+  ordem                  Int      @default(0)
+  createdAt              DateTime @default(now())
+
+  buildPlanoDisciplina BuildPlanoDisciplina @relation(fields: [buildPlanoDisciplinaId], references: [id], onDelete: Cascade)
+
+  @@index([buildPlanoDisciplinaId])
 }
 
 // Resultado por disciplina de um usuário em um simulado

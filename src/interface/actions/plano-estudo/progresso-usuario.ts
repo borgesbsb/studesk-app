@@ -26,6 +26,9 @@ export async function getProgressoUsuarioPlano(planoId: string) {
                     dias: { orderBy: { dia: 'asc' } }
                   },
                   orderBy: { prioridade: 'asc' }
+                },
+                simulado: {
+                  select: { id: true, nome: true, dataRealizacao: true, config: { select: { totalQuestoes: true } } }
                 }
               },
               orderBy: { numeroSemana: 'asc' }

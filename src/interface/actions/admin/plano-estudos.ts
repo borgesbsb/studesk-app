@@ -704,3 +704,27 @@ export async function adminAtualizarHorasSimuladoCiclo(
     return { error: 'Erro ao salvar horas' }
   }
 }
+
+export async function adminAtualizarDiaSimuladoCiclo(
+  semanaId: string,
+  dia: string | null,
+  planoId: string
+) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const semana = await prisma.semanaEstudo.findFirst({ where: { id: semanaId, planoId } })
+    if (!semana) return { error: 'Ciclo não encontrado neste plano' }
+
+    await prisma.semanaEstudo.update({
+      where: { id: semanaId },
+      data: { simuladoDia: dia },
+    })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao atualizar dia do simulado:', error)
+    return { error: 'Erro ao salvar dia' }
+  }
+}

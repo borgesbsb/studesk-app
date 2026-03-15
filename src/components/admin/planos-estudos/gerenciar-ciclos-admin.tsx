@@ -28,6 +28,7 @@ import {
   adminRemoverMaterialDoCiclo,
   adminAssociarSimuladoAoCiclo,
   adminAtualizarHorasSimuladoCiclo,
+  adminAtualizarDiaSimuladoCiclo,
 } from '@/interface/actions/admin/plano-estudos'
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ interface Ciclo {
   observacoes: string | null
   simuladoId: string | null
   simuladoHoras: number
+  simuladoDia: string | null
   simulado: SimuladoRef | null
   disciplinas: DisciplinaSemana[]
 }
@@ -145,6 +147,10 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
   )
   const [salvandoSimHorasId, setSalvandoSimHorasId] = useState<string | null>(null)
   const [savedSimHorasId, setSavedSimHorasId] = useState<string | null>(null)
+  const [simDia, setSimDia] = useState<Record<string, string>>(
+    () => Object.fromEntries(ciclosIniciais.map(c => [c.id, c.simuladoDia ?? '']))
+  )
+  const [salvandoSimDiaId, setSalvandoSimDiaId] = useState<string | null>(null)
 
   // ── Estado: collapse por ciclo (todos fechados exceto o da semana atual) ──────
   const [ciclosColapsados, setCiclosColapsados] = useState<Set<string>>(() => {
@@ -271,6 +277,14 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
       c.id === cicloId ? { ...c, simuladoId, simulado: sim } : c
     ))
     if (!simuladoId) setSimHoras(prev => ({ ...prev, [cicloId]: 3 }))
+  }
+
+  const handleChangeDiaSimulado = async (cicloId: string, dia: string) => {
+    setSimDia(prev => ({ ...prev, [cicloId]: dia }))
+    setSalvandoSimDiaId(cicloId)
+    await adminAtualizarDiaSimuladoCiclo(cicloId, dia || null, planoId)
+    setSalvandoSimDiaId(null)
+    setCiclos(prev => prev.map(c => c.id === cicloId ? { ...c, simuladoDia: dia || null } : c))
   }
 
   const handleBlurSimHoras = async (cicloId: string) => {
@@ -471,50 +485,78 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                       </thead>
                       <tbody className="divide-y">
                         {/* Linha do simulado — só aparece quando há simulado associado */}
-                        {ciclo.simulado && (
-                          <tr className="bg-amber-50/60 align-middle">
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <ClipboardList className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                                <span className="text-sm font-medium text-amber-800 truncate">
-                                  {ciclo.simulado.nome}
+                        {ciclo.simulado && (() => {
+                          // Gerar opções dia1–diaX baseado nas datas do ciclo
+                          const start = new Date(ciclo.dataInicio)
+                          const end = new Date(ciclo.dataFim)
+                          start.setUTCHours(12, 0, 0, 0)
+                          end.setUTCHours(12, 0, 0, 0)
+                          const diasOpcoes: { id: string; label: string }[] = []
+                          const cur = new Date(start)
+                          let idx = 1
+                          while (cur <= end && idx <= 7) {
+                            diasOpcoes.push({ id: `dia${idx}`, label: `dia${idx} · ${format(cur, 'EEE dd/MM', { locale: ptBR })}` })
+                            cur.setUTCDate(cur.getUTCDate() + 1)
+                            idx++
+                          }
+                          return (
+                            <tr className="bg-amber-50/60 align-middle">
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <ClipboardList className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                  <span className="text-sm font-medium text-amber-800 truncate">
+                                    {ciclo.simulado.nome}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    className="h-9 w-full text-sm bg-white"
+                                    value={simHoras[ciclo.id] ?? 3}
+                                    onChange={e => setSimHoras(prev => ({ ...prev, [ciclo.id]: parseInt(e.target.value) || 0 }))}
+                                    onBlur={() => handleBlurSimHoras(ciclo.id)}
+                                  />
+                                  {salvandoSimHorasId === ciclo.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400 shrink-0" />}
+                                  {savedSimHorasId === ciclo.id && <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="text-sm text-amber-700 font-medium">
+                                  {ciclo.simulado.config?.totalQuestoes ?? '—'}
                                 </span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  className="h-9 w-full text-sm bg-white"
-                                  value={simHoras[ciclo.id] ?? 3}
-                                  onChange={e => setSimHoras(prev => ({ ...prev, [ciclo.id]: parseInt(e.target.value) || 0 }))}
-                                  onBlur={() => handleBlurSimHoras(ciclo.id)}
-                                />
-                                {salvandoSimHorasId === ciclo.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400 shrink-0" />}
-                                {savedSimHorasId === ciclo.id && <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <span className="text-sm text-amber-700 font-medium">
-                                {ciclo.simulado.config?.totalQuestoes ?? '—'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <span className="text-xs text-slate-300">—</span>
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <span className="text-xs text-slate-300">—</span>
-                            </td>
-                            <td className="px-2 py-2.5">
-                              <Button variant="ghost" size="sm"
-                                className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                                onClick={() => handleAssociarSimulado(ciclo.id, null)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        )}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                {/* Seletor de dia do simulado */}
+                                <div className="flex items-center gap-1">
+                                  <select
+                                    className="border rounded px-2 h-8 text-xs bg-white text-slate-700 w-full"
+                                    value={simDia[ciclo.id] ?? ''}
+                                    onChange={e => handleChangeDiaSimulado(ciclo.id, e.target.value)}
+                                  >
+                                    <option value="">Dia não definido</option>
+                                    {diasOpcoes.map(d => (
+                                      <option key={d.id} value={d.id}>{d.label}</option>
+                                    ))}
+                                  </select>
+                                  {salvandoSimDiaId === ciclo.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400 shrink-0" />}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span className="text-xs text-slate-300">—</span>
+                              </td>
+                              <td className="px-2 py-2.5">
+                                <Button variant="ghost" size="sm"
+                                  className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                  onClick={() => handleAssociarSimulado(ciclo.id, null)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          )
+                        })()}
 
                         {ciclo.disciplinas.length === 0 && (
                           <tr>

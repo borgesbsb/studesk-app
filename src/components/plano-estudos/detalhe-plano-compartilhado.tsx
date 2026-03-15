@@ -89,12 +89,22 @@ interface DisciplinaExtra {
   disciplina: DisciplinaInfo
 }
 
+interface SimuladoCiclo {
+  id: string
+  nome: string
+  dataRealizacao: Date | string
+  config: { totalQuestoes: number } | null
+}
+
 interface Ciclo {
   id: string
   numeroSemana: number
   dataInicio: Date
   dataFim: Date
   observacoes: string | null
+  simuladoDia: string | null
+  simuladoHoras: number
+  simulado: SimuladoCiclo | null
   disciplinas: DisciplinaSemana[]
 }
 
@@ -685,6 +695,22 @@ function CicloCard({
                       </button>
                     )
                   })}
+
+                  {/* Badge do simulado — aparece no dia definido pelo admin */}
+                  {ciclo.simulado && ciclo.simuladoDia === dia.id && (
+                    <div
+                      className="w-full rounded-md border text-left px-2 py-1.5 min-w-0"
+                      style={{ backgroundColor: '#f59e0b22', borderColor: '#f59e0b80' }}
+                    >
+                      <p className="text-[11px] font-medium leading-tight truncate text-center text-amber-800">
+                        {ciclo.simulado.nome}
+                      </p>
+                      <p className="flex items-center justify-center gap-2 text-[10px] text-amber-700 mt-0.5">
+                        <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{ciclo.simuladoHoras}h</span>
+                        {ciclo.simulado.config && <span className="flex items-center gap-0.5"><Target className="h-2.5 w-2.5" />{ciclo.simulado.config.totalQuestoes}q</span>}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Badges de disciplinas extras (pool) */}
                   {extrasNoDia.map(extra => {

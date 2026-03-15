@@ -36,8 +36,34 @@ export class SimuladoService {
   }
 
   static async listarParaUsuario(userId: string): Promise<SimuladoEvento[]> {
+    // Buscar IDs dos planos que o usuário tem acesso (próprios + compartilhados)
+    const planosUsuario = await prisma.planoEstudo.findMany({
+      where: {
+        OR: [
+          { userId },
+          { usuarios: { some: { userId } } }
+        ]
+      },
+      select: { id: true }
+    })
+    const planoIds = planosUsuario.map(p => p.id)
+
+    // Buscar IDs dos simulados associados a ciclos desses planos
+    const semanasComSimulado = await prisma.semanaEstudo.findMany({
+      where: {
+        planoId: { in: planoIds },
+        simuladoId: { not: null }
+      },
+      select: { simuladoId: true }
+    })
+    const simuladoIds = semanasComSimulado
+      .map(s => s.simuladoId)
+      .filter((id): id is string => id !== null)
+
+    if (simuladoIds.length === 0) return []
+
     const simulados = await prisma.simulado.findMany({
-      where: { ativo: true },
+      where: { ativo: true, id: { in: simuladoIds } },
       include: {
         config: {
           select: {

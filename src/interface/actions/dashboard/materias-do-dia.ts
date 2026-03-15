@@ -23,6 +23,25 @@ export interface MateriaDoDia {
   materiaisAdmin: { id: string; nome: string; tipo: string; paginasLidas: number; totalPaginas: number; tempoAssistido: number | null; duracaoSegundos: number | null }[]
 }
 
+// Converte diasEstudo do admin (formato JSON com nomes: ["segunda","terça",...]) para diaX
+const DIA_NOME_PARA_NUM: Record<string, number> = {
+  'segunda': 1, 'terca': 2, 'terça': 2, 'quarta': 3,
+  'quinta': 4, 'sexta': 5, 'sabado': 6, 'sábado': 6, 'domingo': 7,
+}
+function adminDiasParaDiaX(diasEstudo: string | null): string[] {
+  if (!diasEstudo) return []
+  try {
+    const parsed = JSON.parse(diasEstudo)
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((d: string) => DIA_NOME_PARA_NUM[d.toLowerCase().trim()])
+        .filter(Boolean)
+        .map(n => `dia${n}`)
+    }
+  } catch { /* já no formato diaX */ }
+  return diasEstudo.split(',').map(d => d.trim()).filter(Boolean)
+}
+
 // Função para verificar se o dia atual está nos dias de estudo do ciclo
 function isDiaDeEstudo(diasEstudo: string | null, dataConsultada: Date, dataInicioCiclo: Date): boolean {
   if (!diasEstudo) return false
@@ -31,15 +50,19 @@ function isDiaDeEstudo(diasEstudo: string | null, dataConsultada: Date, dataInic
     const diasString = diasEstudo.split(',').filter(d => d.trim())
 
     // Novo formato: dia1, dia2, dia3...
-    // Normalizar as datas para comparação (remover horas)
-    const inicioNormalizado = new Date(dataInicioCiclo)
-    inicioNormalizado.setHours(0, 0, 0, 0)
-
-    const consultadaNormalizada = new Date(dataConsultada)
-    consultadaNormalizada.setHours(0, 0, 0, 0)
+    // Usar UTC para evitar bug de timezone: setHours local desloca dataInicio (UTC midnight) um dia
+    const inicioNormalizado = new Date(Date.UTC(
+      new Date(dataInicioCiclo).getUTCFullYear(),
+      new Date(dataInicioCiclo).getUTCMonth(),
+      new Date(dataInicioCiclo).getUTCDate()
+    ))
+    const consultadaNormalizada = new Date(Date.UTC(
+      new Date(dataConsultada).getUTCFullYear(),
+      new Date(dataConsultada).getUTCMonth(),
+      new Date(dataConsultada).getUTCDate()
+    ))
 
     // Calcular quantos dias se passaram desde o início
-    // Usando a mesma lógica de calcularDiasCiclo do plano de estudos
     const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime()
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
 
@@ -194,11 +217,18 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
     }
 
     // Calcular qual é o diaId atual (dia1, dia2, etc)
-    const inicioNormalizado = new Date(semanaAtual.dataInicio)
-    inicioNormalizado.setHours(0, 0, 0, 0)
-    const consultadaNormalizada = new Date(diaConsultado)
-    consultadaNormalizada.setHours(0, 0, 0, 0)
-    const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime()
+    // Usar UTC para evitar bug de timezone: setHours local desloca dataInicio (UTC midnight) um dia
+    const inicioUTC = new Date(Date.UTC(
+      semanaAtual.dataInicio.getUTCFullYear(),
+      semanaAtual.dataInicio.getUTCMonth(),
+      semanaAtual.dataInicio.getUTCDate()
+    ))
+    const consultadaUTC = new Date(Date.UTC(
+      diaConsultado.getUTCFullYear(),
+      diaConsultado.getUTCMonth(),
+      diaConsultado.getUTCDate()
+    ))
+    const diffTime = consultadaUTC.getTime() - inicioUTC.getTime()
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
     const diaIdAtual = `dia${diffDays + 1}`
 
@@ -238,8 +268,11 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
       })
 
       const progressosDoDia = progressos.filter(p => {
-        const dias = p.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
-        return dias.includes(diaIdAtual)
+        // Se usuário definiu seu schedule → usa. Senão, fallback no schedule do admin
+        const diasUser = p.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
+        if (diasUser.length > 0) return diasUser.includes(diaIdAtual)
+        const diasAdmin = adminDiasParaDiaX(p.disciplinaSemana.diasEstudo)
+        return diasAdmin.includes(diaIdAtual)
       })
 
       // Disciplinas extras do pool agendadas para hoje

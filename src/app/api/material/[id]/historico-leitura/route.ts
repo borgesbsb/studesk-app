@@ -282,12 +282,13 @@ export async function POST(
 
       if (disciplinasDoMaterial.length > 0) {
         const agora = new Date()
-        const inicioDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0, 0)
-        const fimDoDia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999)
+        // UTC-based para evitar bug de timezone (datas armazenadas como UTC midnight)
+        const todayUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()))
+        const tomorrowUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate() + 1))
 
         console.log(`\n📅 Data/Hora atual: ${agora.toISOString()}`)
-        console.log(`📅 Início do dia: ${inicioDoDia.toISOString()}`)
-        console.log(`📅 Fim do dia: ${fimDoDia.toISOString()}`)
+        console.log(`📅 todayUTC: ${todayUTC.toISOString()}`)
+        console.log(`📅 tomorrowUTC: ${tomorrowUTC.toISOString()}`)
 
         // 2. Para cada disciplina, buscar DisciplinaSemana ativa para a semana atual
         for (const { disciplinaId, disciplina } of disciplinasDoMaterial) {
@@ -297,8 +298,8 @@ export async function POST(
             where: {
               disciplinaId,
               semana: {
-                dataInicio: { lte: fimDoDia },
-                dataFim: { gte: inicioDoDia },
+                dataInicio: { lt: tomorrowUTC },
+                dataFim: { gte: todayUTC },
                 plano: { ativo: true }
               }
             },
@@ -317,37 +318,29 @@ export async function POST(
                   }
                 }
               },
-              dias: true // Buscar TODOS os dias, filtraremos depois
+              dias: true
             }
           })
 
           if (!disciplinaSemanaAtiva) {
             console.log(`   ❌ Disciplina ${disciplina.nome} não está em nenhum plano ativo`)
-            console.log(`      (Procurando plano ativo com semana entre ${inicioDoDia.toISOString()} e ${fimDoDia.toISOString()})`)
             continue
           }
 
           console.log(`   ✅ Encontrou DisciplinaSemana ativa:`)
           console.log(`      Plano: ${disciplinaSemanaAtiva.semana.plano.nome}`)
           console.log(`      Semana: ${disciplinaSemanaAtiva.semana.dataInicio.toISOString()} até ${disciplinaSemanaAtiva.semana.dataFim.toISOString()}`)
-          console.log(`      Dias cadastrados: ${disciplinaSemanaAtiva.dias.length}`)
-          console.log(`      Dias: ${disciplinaSemanaAtiva.dias.map(d => d.dia).join(', ')}`)
 
-          // Calcular qual é o dia do ciclo (dia1, dia2, etc.) baseado na data de início do ciclo
-          const inicioNormalizado = new Date(disciplinaSemanaAtiva.semana.dataInicio)
-          inicioNormalizado.setHours(0, 0, 0, 0)
-          const consultadaNormalizada = new Date(agora)
-          consultadaNormalizada.setHours(0, 0, 0, 0)
-          const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime()
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+          // Calcular diaKey usando UTC para evitar bug de timezone
+          const inicioUTC = new Date(Date.UTC(
+            disciplinaSemanaAtiva.semana.dataInicio.getUTCFullYear(),
+            disciplinaSemanaAtiva.semana.dataInicio.getUTCMonth(),
+            disciplinaSemanaAtiva.semana.dataInicio.getUTCDate()
+          ))
+          const diffDays = Math.round((todayUTC.getTime() - inicioUTC.getTime()) / (1000 * 60 * 60 * 24))
           const diaKey = `dia${diffDays + 1}`
 
-          console.log(`   📆 Cálculo do dia do ciclo:`)
-          console.log(`      Início do ciclo: ${inicioNormalizado.toISOString()}`)
-          console.log(`      Hoje: ${consultadaNormalizada.toISOString()}`)
-          console.log(`      Diferença (ms): ${diffTime}`)
-          console.log(`      Diferença (dias): ${diffDays}`)
-          console.log(`      Dia do ciclo: ${diaKey}`)
+          console.log(`   📆 Dia do ciclo: ${diaKey} (diff=${diffDays})`)
 
           // Buscar o DisciplinaDia correspondente ao dia atual do ciclo
           let diaHoje = disciplinaSemanaAtiva.dias.find(d => d.dia === diaKey)
@@ -389,17 +382,27 @@ export async function POST(
                 where: { planoId_userId: { planoId: disciplinaSemanaAtiva.semana.planoId, userId: auth.userId } }
               })
               if (planoUsuario) {
-                const progresso = await prisma.progressoUsuarioDisciplina.findFirst({
-                  where: { planoUsuarioId: planoUsuario.id, disciplinaSemanaId: disciplinaSemanaAtiva.id }
+                // Upsert ProgressoUsuarioDisciplina — pode não existir se o usuário nunca configurou dias
+                const progresso = await prisma.progressoUsuarioDisciplina.upsert({
+                  where: { planoUsuarioId_disciplinaSemanaId: { planoUsuarioId: planoUsuario.id, disciplinaSemanaId: disciplinaSemanaAtiva.id } },
+                  create: {
+                    planoUsuarioId: planoUsuario.id,
+                    disciplinaSemanaId: disciplinaSemanaAtiva.id,
+                    minutosPlanejados: disciplinaSemanaAtiva.minutosPlanejados,
+                    questoesPlanejadas: disciplinaSemanaAtiva.questoesPlanejadas,
+                    horasRealizadas: 0,
+                    questoesRealizadas: 0,
+                    concluida: false,
+                    removida: false,
+                  },
+                  update: {}
                 })
-                if (progresso) {
-                  await prisma.progressoUsuarioDisciplinaDia.upsert({
-                    where: { progressoId_dia: { progressoId: progresso.id, dia: diaKey } },
-                    create: { progressoId: progresso.id, dia: diaKey, horasRealizadas: horasAdicionar, questoesPlanejadas: 0, questoesRealizadas: 0 },
-                    update: { horasRealizadas: { increment: horasAdicionar } }
-                  })
-                  console.log(`   ✅ ProgressoUsuarioDisciplinaDia atualizado para plano compartilhado`)
-                }
+                await prisma.progressoUsuarioDisciplinaDia.upsert({
+                  where: { progressoId_dia: { progressoId: progresso.id, dia: diaKey } },
+                  create: { progressoId: progresso.id, dia: diaKey, horasRealizadas: horasAdicionar, questoesPlanejadas: 0, questoesRealizadas: 0 },
+                  update: { horasRealizadas: { increment: horasAdicionar } }
+                })
+                console.log(`   ✅ ProgressoUsuarioDisciplinaDia atualizado para plano compartilhado`)
               }
             } catch (sharedErr) {
               console.error('⚠️ Erro ao atualizar ProgressoUsuarioDisciplinaDia:', sharedErr)

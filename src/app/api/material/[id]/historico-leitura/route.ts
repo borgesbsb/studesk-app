@@ -171,7 +171,7 @@ export async function POST(
       )
     }
 
-    const { paginaAtual, tempoLeituraSegundos, assuntosEstudados } = await request.json()
+    const { paginaAtual, tempoLeituraSegundos, assuntosEstudados, dataEstudo } = await request.json()
     const { id } = await params
     const materialId = id
 
@@ -281,8 +281,8 @@ export async function POST(
       })
 
       if (disciplinasDoMaterial.length > 0) {
-        const agora = new Date()
-        // UTC-based para evitar bug de timezone (datas armazenadas como UTC midnight)
+        // Usar data enviada pelo cliente (dia selecionado no /hoje) ou data atual do servidor
+        const agora = dataEstudo ? new Date(`${dataEstudo}T12:00:00Z`) : new Date()
         const todayUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()))
         const tomorrowUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate() + 1))
 

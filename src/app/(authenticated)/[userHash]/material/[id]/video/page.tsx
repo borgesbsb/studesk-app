@@ -69,6 +69,11 @@ interface PageProps {
 export default function VideoViewerPage({ params }: PageProps) {
     const router = useRouter()
     const { setCustomContent, setTitle, setBackButton, setFullWidth } = useHeader()
+    // Data selecionada no /hoje passada via ?data=YYYY-MM-DD
+    const dataEstudo = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('data') ?? undefined
+        : undefined
+    const dataEstudoRef = useRef(dataEstudo)
     const [materialId, setMaterialId] = useState<string>("")
     const [material, setMaterial] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -363,7 +368,8 @@ export default function VideoViewerPage({ params }: PageProps) {
                     body: JSON.stringify({
                         paginaAtual: Math.floor(videoTime),
                         tempoLeituraSegundos: delta,
-                        assuntosEstudados: null
+                        assuntosEstudados: null,
+                        ...(dataEstudoRef.current ? { dataEstudo: dataEstudoRef.current } : {})
                     })
                 })
 
@@ -375,6 +381,7 @@ export default function VideoViewerPage({ params }: PageProps) {
                             disciplinaId,
                             horas: 0,
                             minutos: deltaMinutos,
+                            data: dataEstudoRef.current ? new Date(`${dataEstudoRef.current}T12:00:00Z`) : undefined,
                         })
                     }
                 }
@@ -399,7 +406,8 @@ export default function VideoViewerPage({ params }: PageProps) {
                 const data = JSON.stringify({
                     paginaAtual: Math.floor(videoTime),
                     tempoLeituraSegundos: currentElapsed,
-                    assuntosEstudados: null
+                    assuntosEstudados: null,
+                    ...(dataEstudoRef.current ? { dataEstudo: dataEstudoRef.current } : {})
                 })
 
                 navigator.sendBeacon(
@@ -428,7 +436,8 @@ export default function VideoViewerPage({ params }: PageProps) {
                     body: JSON.stringify({
                         paginaAtual: Math.floor(videoTime),
                         tempoLeituraSegundos: currentElapsed,
-                        assuntosEstudados: null
+                        assuntosEstudados: null,
+                        ...(dataEstudoRef.current ? { dataEstudo: dataEstudoRef.current } : {})
                     }),
                     keepalive: true
                 }).catch(console.error)

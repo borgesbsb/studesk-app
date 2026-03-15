@@ -25,6 +25,10 @@ interface PdfViewerProps {
 }
 
 export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
+  // Ler data selecionada da URL (?data=YYYY-MM-DD)
+  const dataEstudo = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('data') ?? undefined
+    : undefined
   const [resourceUrl, setResourceUrl] = useState('')
   const [absolutePdfUrl, setAbsolutePdfUrl] = useState('')
   const [mounted, setMounted] = useState(false)
@@ -237,6 +241,7 @@ export function PdfViewer({ pdfUrl, materialId }: PdfViewerProps) {
       const payload = {
         paginaAtual,
         tempoLeituraSegundos: elapsedTime,
+        ...(dataEstudo ? { dataEstudo } : {}),
       }
       console.log('📤 Enviando payload:', payload)
 

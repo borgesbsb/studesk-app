@@ -481,9 +481,12 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                               key={mat.id}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                const dataParam = selectedDate
+                                  ? `&data=${new Date(selectedDate).toISOString().split('T')[0]}`
+                                  : '';
                                 const path = mat.tipo === 'VIDEO'
-                                  ? `/${hash}/material/${mat.id}/video?disciplinaId=${materia.disciplinaId}`
-                                  : `/${hash}/material/${mat.id}/ler?mode=pdf`;
+                                  ? `/${hash}/material/${mat.id}/video?disciplinaId=${materia.disciplinaId}${dataParam}`
+                                  : `/${hash}/material/${mat.id}/ler?mode=pdf${dataParam}`;
                                 router.push(path);
                               }}
                               title={mat.tipo === 'VIDEO' && mat.paginasLidas > 0

@@ -97,11 +97,17 @@ export async function getProgressoCiclo(data?: Date | string): Promise<Progresso
       let questoesPlanejadasTotal = 0;
 
       progressos.forEach(p => {
+        const diasDoUsuario = p.diasEstudo
+          ? p.diasEstudo.split(',').map((d: string) => d.trim()).filter(Boolean)
+          : [];
         p.dias.forEach(d => {
-          minutosPlanejadosTotal += d.minutosPlanejados;
-          questoesPlanejadasTotal += d.questoesPlanejadas;
           horasRealizadasTotal += d.horasRealizadas;
           questoesRealizadasTotal += d.questoesRealizadas;
+          // planejadas só contam se o dia está no ciclo configurado pelo usuário
+          if (diasDoUsuario.includes(d.dia)) {
+            minutosPlanejadosTotal += d.minutosPlanejados;
+            questoesPlanejadasTotal += d.questoesPlanejadas;
+          }
         });
       });
 

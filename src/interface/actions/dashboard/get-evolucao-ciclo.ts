@@ -137,23 +137,14 @@ export async function getEvolucaoCiclo(data?: Date | string): Promise<EvolucaoCi
         });
       }
 
-      // Admin progressos: distribui planejadas pelos dias de estudo; realizadas por ProgressoUsuarioDisciplinaDia
+      // Apenas disciplinas que o usuário incluiu no ciclo (diasEstudo preenchido)
       progressos.forEach(p => {
-        // Usa os valores por dia de ProgressoUsuarioDisciplinaDia quando disponíveis;
-        // distribui proporcionalmente como fallback
-        const diasComMetas = p.dias.filter(d => d.minutosPlanejados > 0 || d.questoesPlanejadas > 0)
-        if (diasComMetas.length > 0) {
-          p.dias.forEach(d => {
-            const entry = diasMapShared.get(d.dia)
-            if (entry) {
-              entry.minutosPlanejados += d.minutosPlanejados
-              entry.questoesPlanejadas += d.questoesPlanejadas
-              entry.horasRealizadas += d.horasRealizadas
-              entry.questoesRealizadas += d.questoesRealizadas
-            }
-          })
-        } else {
-          // Sem metas por dia: mostra apenas realizadas (sem planejadas artificiais)
+        const diasDoUsuario = p.diasEstudo
+          ? p.diasEstudo.split(',').map((d: string) => d.trim()).filter(Boolean)
+          : []
+
+        // Disciplina não está no ciclo do usuário: ignora planejadas, contabiliza só realizadas
+        if (diasDoUsuario.length === 0) {
           p.dias.forEach(d => {
             const entry = diasMapShared.get(d.dia)
             if (entry) {
@@ -161,7 +152,29 @@ export async function getEvolucaoCiclo(data?: Date | string): Promise<EvolucaoCi
               entry.questoesRealizadas += d.questoesRealizadas
             }
           })
+          return
         }
+
+        // Disciplina está no ciclo: usa dados de ProgressoUsuarioDisciplinaDia
+        // mas somente para dias que o usuário efetivamente marcou em diasEstudo
+        p.dias.forEach(d => {
+          if (!diasDoUsuario.includes(d.dia)) {
+            // dia tem registro mas não está no ciclo configurado — ignora planejadas
+            const entry = diasMapShared.get(d.dia)
+            if (entry) {
+              entry.horasRealizadas += d.horasRealizadas
+              entry.questoesRealizadas += d.questoesRealizadas
+            }
+            return
+          }
+          const entry = diasMapShared.get(d.dia)
+          if (entry) {
+            entry.minutosPlanejados += d.minutosPlanejados
+            entry.questoesPlanejadas += d.questoesPlanejadas
+            entry.horasRealizadas += d.horasRealizadas
+            entry.questoesRealizadas += d.questoesRealizadas
+          }
+        })
       });
 
       // Extras: cada registro tem dia e valores corretos por dia

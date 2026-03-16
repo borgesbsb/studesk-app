@@ -91,8 +91,11 @@ export async function getDisciplinasCiclo(data?: Date | string): Promise<Discipl
 
       const disciplinasDeProgressos: DisciplinaCiclo[] = progressos.map(p => {
         const ds = p.disciplinaSemana;
-        const minutosPlanejados = p.dias.reduce((acc, d) => acc + d.minutosPlanejados, 0);
-        const questoesPlanejadas = p.dias.reduce((acc, d) => acc + d.questoesPlanejadas, 0);
+        const diasDoUsuario = p.diasEstudo
+          ? p.diasEstudo.split(',').map((d: string) => d.trim()).filter(Boolean)
+          : [];
+        const minutosPlanejados = p.dias.reduce((acc, d) => acc + (diasDoUsuario.includes(d.dia) ? d.minutosPlanejados : 0), 0);
+        const questoesPlanejadas = p.dias.reduce((acc, d) => acc + (diasDoUsuario.includes(d.dia) ? d.questoesPlanejadas : 0), 0);
         const horasRealizadas = p.dias.reduce((acc, d) => acc + d.horasRealizadas, 0);
         const questoesRealizadas = p.dias.reduce((acc, d) => acc + d.questoesRealizadas, 0);
         return {

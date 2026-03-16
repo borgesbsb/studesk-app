@@ -5,6 +5,7 @@ import { getProgressoCiclo, ProgressoCiclo } from "@/interface/actions/dashboard
 import { getEvolucaoCiclo, EvolucaoCiclo } from "@/interface/actions/dashboard/get-evolucao-ciclo"
 import { getDisciplinasCiclo } from "@/interface/actions/dashboard/get-disciplinas-ciclo"
 import { getContribuicoesEstudo } from "@/interface/actions/dashboard/get-contribuicoes-estudo"
+import { limparProgressoCiclo } from "@/interface/actions/dashboard/limpar-progresso-ciclo"
 import { CicloStatsCards } from "@/components/dashboard/ciclo-stats-cards"
 import { DisciplinasCicloCard } from "@/components/dashboard/disciplinas-ciclo-card"
 import { ContribuicoesCard } from "@/components/dashboard/contribuicoes-card"
@@ -12,6 +13,10 @@ import { EvolucaoHorasCard } from "@/components/hoje/evolucao-horas-card"
 import { EvolucaoQuestoesCard } from "@/components/hoje/evolucao-questoes-card"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { HourglassCard } from "@/components/dashboard/hourglass-card"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 // Formata a data como YYYY-MM-DD usando o timezone local do usuário
 function toLocalDateString(date: Date) {
@@ -27,11 +32,12 @@ export default function DashboardPage() {
   const [disciplinas, setDisciplinas] = useState<any>(null)
   const [contribuicoes, setContribuicoes] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [limpando, setLimpando] = useState(false)
+
+  const hoje = toLocalDateString(new Date())
 
   useEffect(() => {
     async function loadData() {
-      // Usa a data local do browser para evitar bug de timezone (servidor em UTC)
-      const hoje = toLocalDateString(new Date())
       const [p, e, d, c] = await Promise.all([
         getProgressoCiclo(hoje),
         getEvolucaoCiclo(hoje),
@@ -47,9 +53,59 @@ export default function DashboardPage() {
     loadData()
   }, [])
 
+  const handleLimparProgresso = async () => {
+    setLimpando(true)
+    const res = await limparProgressoCiclo(hoje)
+    setLimpando(false)
+    if (res.error) {
+      toast.error(res.error)
+      return
+    }
+    toast.success('Progresso do ciclo zerado com sucesso')
+    // Recarregar dados
+    const [p, e, d, c] = await Promise.all([
+      getProgressoCiclo(hoje),
+      getEvolucaoCiclo(hoje),
+      getDisciplinasCiclo(hoje),
+      getContribuicoesEstudo(),
+    ])
+    setProgresso(p)
+    setEvolucao(e)
+    setDisciplinas(d)
+    setContribuicoes(c)
+  }
+
   return (
     <div className="h-full p-3">
-      <DashboardHeader />
+      <div className="flex items-center justify-between mb-1">
+        <DashboardHeader />
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive h-7 px-2">
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              <span className="text-xs">Zerar ciclo</span>
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Zerar progresso do ciclo atual?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso vai apagar todas as horas realizadas, questões resolvidas e sessões de estudo do ciclo corrente. Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleLimparProgresso}
+                disabled={limpando}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {limpando ? 'Zerando...' : 'Zerar progresso'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
       {loading ? (
         <div className="h-full flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />

@@ -268,11 +268,9 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
       })
 
       const progressosDoDia = progressos.filter(p => {
-        // Se usuário definiu seu schedule → usa. Senão, fallback no schedule do admin
+        // Só aparece se o usuário configurou seus dias de estudo para esta disciplina
         const diasUser = p.diasEstudo?.split(',').map(d => d.trim()).filter(Boolean) ?? []
-        if (diasUser.length > 0) return diasUser.includes(diaIdAtual)
-        const diasAdmin = adminDiasParaDiaX(p.disciplinaSemana.diasEstudo)
-        return diasAdmin.includes(diaIdAtual)
+        return diasUser.length > 0 && diasUser.includes(diaIdAtual)
       })
 
       // Disciplinas extras do pool agendadas para hoje

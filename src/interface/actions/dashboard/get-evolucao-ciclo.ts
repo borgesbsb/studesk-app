@@ -30,10 +30,22 @@ export interface EvolucaoCiclo {
   dataFim: Date;
 }
 
-export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | null> {
+export async function getEvolucaoCiclo(data?: Date | string): Promise<EvolucaoCiclo | null> {
   try {
     const { userId } = await requireAuth();
-    const diaConsultado = data || new Date();
+
+    // Normalizar para UTC midnight (evita bug de timezone com setHours local)
+    let baseDate: Date
+    if (typeof data === 'string') {
+      const [y, m, d] = data.split('-').map(Number)
+      baseDate = new Date(Date.UTC(y, m - 1, d))
+    } else if (data) {
+      baseDate = new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), data.getUTCDate()))
+    } else {
+      const now = new Date()
+      baseDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    }
+    const tomorrowUTC = new Date(baseDate.getTime() + 86400000)
 
     // Buscar o plano ativo que contém o dia consultado
     const planoAtivo = await prisma.planoEstudo.findFirst({
@@ -43,12 +55,8 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
           { userId },
           { userId: null, usuarios: { some: { userId } } }
         ],
-        dataInicio: {
-          lte: diaConsultado
-        },
-        dataFim: {
-          gte: diaConsultado
-        }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: baseDate }
       }
     });
 
@@ -57,14 +65,11 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
     }
 
     // Buscar a semana (ciclo) que contém o dia consultado
-    // Normalizar a data para comparação (apenas data, sem horas)
-    const diaParaComparacao = new Date(diaConsultado);
-    diaParaComparacao.setHours(0, 0, 0, 0);
-
-    // Buscar todas as semanas do plano
-    const todasSemanas = await prisma.semanaEstudo.findMany({
+    const semanaAtual = await prisma.semanaEstudo.findFirst({
       where: {
-        planoId: planoAtivo.id
+        planoId: planoAtivo.id,
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: baseDate }
       },
       include: {
         disciplinas: {
@@ -74,16 +79,6 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
           }
         }
       }
-    });
-
-    // Encontrar a semana que contém o dia consultado
-    const semanaAtual = todasSemanas.find(semana => {
-      const inicio = new Date(semana.dataInicio);
-      inicio.setHours(0, 0, 0, 0);
-      const fim = new Date(semana.dataFim);
-      fim.setHours(23, 59, 59, 999);
-
-      return diaParaComparacao >= inicio && diaParaComparacao <= fim;
     });
 
     if (!semanaAtual) {
@@ -119,12 +114,13 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
         })
       ]);
 
-      // Montar mapa de dias
-      const inicioNorm = new Date(semanaAtual.dataInicio);
-      inicioNorm.setHours(0, 0, 0, 0);
-      const diaConsNorm = new Date(diaConsultado);
-      diaConsNorm.setHours(0, 0, 0, 0);
-      const diasDecorridos = Math.floor((diaConsNorm.getTime() - inicioNorm.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // Montar mapa de dias (usar UTC puro para evitar bug de timezone)
+      const inicioNorm = new Date(Date.UTC(
+        semanaAtual.dataInicio.getUTCFullYear(),
+        semanaAtual.dataInicio.getUTCMonth(),
+        semanaAtual.dataInicio.getUTCDate()
+      ));
+      const diasDecorridos = Math.floor((baseDate.getTime() - inicioNorm.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
       const diasMapShared = new Map<string, DiaEvolucao>();
       for (let i = 0; i < diasDecorridos; i++) {
@@ -222,13 +218,14 @@ export async function getEvolucaoCiclo(data?: Date): Promise<EvolucaoCiclo | nul
     }
     // ── PLANO PESSOAL ─────────────────────────────────────────────────────────
 
-    // Calcular quantos dias se passaram desde o início do ciclo até a data consultada
-    const inicioNormalizado = new Date(semanaAtual.dataInicio);
-    inicioNormalizado.setHours(0, 0, 0, 0);
-    const diaConsultadoNormalizado = new Date(diaConsultado);
-    diaConsultadoNormalizado.setHours(0, 0, 0, 0);
+    // Calcular quantos dias se passaram desde o início do ciclo (UTC puro)
+    const inicioNormalizado = new Date(Date.UTC(
+      semanaAtual.dataInicio.getUTCFullYear(),
+      semanaAtual.dataInicio.getUTCMonth(),
+      semanaAtual.dataInicio.getUTCDate()
+    ));
 
-    const diffTime = diaConsultadoNormalizado.getTime() - inicioNormalizado.getTime();
+    const diffTime = baseDate.getTime() - inicioNormalizado.getTime();
     const diasDecorridos = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir o dia atual
 
     // Criar array de dias com dados agregados

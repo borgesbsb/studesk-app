@@ -13,10 +13,22 @@ export interface DisciplinaCiclo {
   questoesRealizadas: number;
 }
 
-export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[]> {
+export async function getDisciplinasCiclo(data?: Date | string): Promise<DisciplinaCiclo[]> {
   try {
     const { userId } = await requireAuth();
-    const diaConsultado = data || new Date();
+
+    // Normalizar para UTC midnight (evita bug de timezone com setHours local)
+    let baseDate: Date
+    if (typeof data === 'string') {
+      const [y, m, d] = data.split('-').map(Number)
+      baseDate = new Date(Date.UTC(y, m - 1, d))
+    } else if (data) {
+      baseDate = new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), data.getUTCDate()))
+    } else {
+      const now = new Date()
+      baseDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    }
+    const tomorrowUTC = new Date(baseDate.getTime() + 86400000)
 
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
@@ -25,8 +37,8 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
           { userId },
           { userId: null, usuarios: { some: { userId } } }
         ],
-        dataInicio: { lte: diaConsultado },
-        dataFim: { gte: diaConsultado }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: baseDate }
       }
     });
 
@@ -35,8 +47,8 @@ export async function getDisciplinasCiclo(data?: Date): Promise<DisciplinaCiclo[
     const semanaAtual = await prisma.semanaEstudo.findFirst({
       where: {
         planoId: planoAtivo.id,
-        dataInicio: { lte: diaConsultado },
-        dataFim: { gte: diaConsultado }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: baseDate }
       },
       include: {
         disciplinas: {

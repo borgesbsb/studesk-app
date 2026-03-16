@@ -11,10 +11,17 @@ export function ProgressoCicloWrapper() {
   const [evolucao, setEvolucao] = useState<EvolucaoCiclo | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const toLocalDateString = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   useEffect(() => {
     async function loadEvolucao() {
       setLoading(true);
-      const data = await getEvolucaoCiclo(selectedDate);
+      const data = await getEvolucaoCiclo(toLocalDateString(selectedDate));
       setEvolucao(data);
       setLoading(false);
     }

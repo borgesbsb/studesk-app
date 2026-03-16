@@ -13,10 +13,22 @@ export interface ProgressoCiclo {
   dataFim: Date;
 }
 
-export async function getProgressoCiclo(data?: Date): Promise<ProgressoCiclo | null> {
+export async function getProgressoCiclo(data?: Date | string): Promise<ProgressoCiclo | null> {
   try {
     const { userId } = await requireAuth();
-    const diaConsultado = data || new Date();
+
+    // Normalizar para UTC midnight (evita bug de timezone com setHours local)
+    let baseDate: Date
+    if (typeof data === 'string') {
+      const [y, m, d] = data.split('-').map(Number)
+      baseDate = new Date(Date.UTC(y, m - 1, d))
+    } else if (data) {
+      baseDate = new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), data.getUTCDate()))
+    } else {
+      const now = new Date()
+      baseDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+    }
+    const tomorrowUTC = new Date(baseDate.getTime() + 86400000)
 
     // Buscar o plano ativo que contém o dia consultado
     const planoAtivo = await prisma.planoEstudo.findFirst({
@@ -26,12 +38,8 @@ export async function getProgressoCiclo(data?: Date): Promise<ProgressoCiclo | n
           { userId },
           { userId: null, usuarios: { some: { userId } } }
         ],
-        dataInicio: {
-          lte: diaConsultado
-        },
-        dataFim: {
-          gte: diaConsultado
-        }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: baseDate }
       }
     });
 
@@ -43,12 +51,8 @@ export async function getProgressoCiclo(data?: Date): Promise<ProgressoCiclo | n
     const semanaAtual = await prisma.semanaEstudo.findFirst({
       where: {
         planoId: planoAtivo.id,
-        dataInicio: {
-          lte: diaConsultado
-        },
-        dataFim: {
-          gte: diaConsultado
-        }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: baseDate }
       },
       include: {
         disciplinas: {

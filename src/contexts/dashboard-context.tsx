@@ -12,7 +12,12 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Inicializa com meia-noite local para evitar bug de UTC: new Date() às 23h BRT = dia seguinte em UTC
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const triggerRefresh = () => {

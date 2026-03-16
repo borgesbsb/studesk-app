@@ -6,7 +6,6 @@ import { buscarMaterialEstudoPorId } from "@/interface/actions/material-estudo/l
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, AlertCircle, Download, Wifi } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { adicionarTempoManual } from "@/interface/actions/dashboard/adicionar-tempo-manual"
 import { videoCacheService } from "@/services/video-cache.service"
 import { YouTubePlayer } from "@/components/video/YouTubePlayer"
 import { useHeader } from "@/contexts/header-context"
@@ -355,7 +354,6 @@ export default function VideoViewerPage({ params }: PageProps) {
             const lastSaved = lastSavedElapsedSecondsRef.current
             const matId = materialIdRef.current
             const videoTime = currentTimeRef.current
-            const disciplinaId = disciplinaIdRef.current
 
             if (!isTimerRunningRef.current || !matId) return
             const delta = elapsed - lastSaved
@@ -372,19 +370,6 @@ export default function VideoViewerPage({ params }: PageProps) {
                         ...(dataEstudoRef.current ? { dataEstudo: dataEstudoRef.current } : {})
                     })
                 })
-
-                // Adicionar tempo ao ciclo de estudos automaticamente
-                if (disciplinaId) {
-                    const deltaMinutos = Math.floor(delta / 60)
-                    if (deltaMinutos >= 1) {
-                        await adicionarTempoManual({
-                            disciplinaId,
-                            horas: 0,
-                            minutos: deltaMinutos,
-                            data: dataEstudoRef.current ? new Date(`${dataEstudoRef.current}T12:00:00Z`) : undefined,
-                        })
-                    }
-                }
 
                 lastSavedElapsedSecondsRef.current = elapsed
                 setLastSavedElapsedSeconds(elapsed)
@@ -445,14 +430,13 @@ export default function VideoViewerPage({ params }: PageProps) {
         }
     }, [])
 
-    // Salvar sessão: adiciona o tempo ao ciclo de estudos e reinicia o cronômetro
+    // Salvar sessão: registra o tempo no histórico (que atualiza o progresso do dia)
     const handleSalvarSessao = async () => {
         if (!materialId) return
 
         const currentElapsed = elapsedTimeRef.current
         const lastSaved = lastSavedElapsedSecondsRef.current
         const delta = Math.max(0, currentElapsed - lastSaved)
-        const disciplinaId = disciplinaIdRef.current
         const deltaMinutos = Math.floor(delta / 60)
 
         if (deltaMinutos < 1) {
@@ -462,13 +446,16 @@ export default function VideoViewerPage({ params }: PageProps) {
 
         setSavingProgress(true)
         try {
-            if (disciplinaId) {
-                await adicionarTempoManual({
-                    disciplinaId,
-                    horas: 0,
-                    minutos: deltaMinutos,
+            await fetch(`/api/material/${materialId}/historico-leitura`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    paginaAtual: Math.floor(currentTimeRef.current),
+                    tempoLeituraSegundos: delta,
+                    assuntosEstudados: null,
+                    ...(dataEstudoRef.current ? { dataEstudo: dataEstudoRef.current } : {})
                 })
-            }
+            })
 
             // Reiniciar cronômetro para a próxima sessão
             lastSavedElapsedSecondsRef.current = 0

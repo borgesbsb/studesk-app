@@ -89,25 +89,25 @@ export async function getDisciplinasCiclo(data?: Date | string): Promise<Discipl
         })
       ]);
 
-      const disciplinasDeProgressos: DisciplinaCiclo[] = progressos.map(p => {
-        const ds = p.disciplinaSemana;
-        const diasDoUsuario = p.diasEstudo
-          ? p.diasEstudo.split(',').map((d: string) => d.trim()).filter(Boolean)
-          : [];
-        const minutosPlanejados = p.dias.reduce((acc, d) => acc + (diasDoUsuario.includes(d.dia) ? d.minutosPlanejados : 0), 0);
-        const questoesPlanejadas = p.dias.reduce((acc, d) => acc + (diasDoUsuario.includes(d.dia) ? d.questoesPlanejadas : 0), 0);
-        const horasRealizadas = p.dias.reduce((acc, d) => acc + d.horasRealizadas, 0);
-        const questoesRealizadas = p.dias.reduce((acc, d) => acc + d.questoesRealizadas, 0);
-        return {
-          disciplinaId: ds.disciplinaId,
-          nome: ds.disciplina.nome.trim(),
-          cor: ds.disciplina.cor,
-          minutosPlanejados: Math.round(minutosPlanejados * 100) / 100,
-          horasRealizadas: Math.round(horasRealizadas * 100) / 100,
-          questoesPlanejadas,
-          questoesRealizadas,
-        };
-      });
+      const disciplinasDeProgressos: DisciplinaCiclo[] = progressos
+        .filter(p => p.diasEstudo && p.diasEstudo.split(',').some((d: string) => d.trim()))
+        .map(p => {
+          const ds = p.disciplinaSemana;
+          const diasDoUsuario = p.diasEstudo!.split(',').map((d: string) => d.trim()).filter(Boolean);
+          const minutosPlanejados = p.dias.reduce((acc, d) => acc + (diasDoUsuario.includes(d.dia) ? d.minutosPlanejados : 0), 0);
+          const questoesPlanejadas = p.dias.reduce((acc, d) => acc + (diasDoUsuario.includes(d.dia) ? d.questoesPlanejadas : 0), 0);
+          const horasRealizadas = p.dias.reduce((acc, d) => acc + d.horasRealizadas, 0);
+          const questoesRealizadas = p.dias.reduce((acc, d) => acc + d.questoesRealizadas, 0);
+          return {
+            disciplinaId: ds.disciplinaId,
+            nome: ds.disciplina.nome.trim(),
+            cor: ds.disciplina.cor,
+            minutosPlanejados: Math.round(minutosPlanejados * 100) / 100,
+            horasRealizadas: Math.round(horasRealizadas * 100) / 100,
+            questoesPlanejadas,
+            questoesRealizadas,
+          };
+        });
 
       // Agrupar extras por disciplinaId (cada disciplina pode ter um registro por dia)
       const extrasMap = new Map<string, DisciplinaCiclo>()

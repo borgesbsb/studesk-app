@@ -12,8 +12,22 @@ export async function getContribuicoesEstudo(): Promise<ContribuicaoDia[]> {
   try {
     const { userId } = await requireAuth();
 
-    // Buscar o plano ativo
-    const planoAtivo = await prisma.planoEstudo.findFirst({
+    const mapaHoras = new Map<string, number>();
+
+    // Helper: converte dataInicio (UTC midnight) + diaId -> chave "YYYY-MM-DD" em UTC
+    const diaChave = (dataInicio: Date, diaId: string): string => {
+      const num = parseInt(diaId.replace("dia", "")) - 1;
+      const inicioUTC = new Date(Date.UTC(
+        dataInicio.getUTCFullYear(),
+        dataInicio.getUTCMonth(),
+        dataInicio.getUTCDate()
+      ));
+      inicioUTC.setUTCDate(inicioUTC.getUTCDate() + num);
+      return inicioUTC.toISOString().split("T")[0];
+    };
+
+    // Buscar todos os planos do usuário (pessoais e compartilhados)
+    const planos = await prisma.planoEstudo.findMany({
       where: {
         ativo: true,
         OR: [
@@ -21,63 +35,85 @@ export async function getContribuicoesEstudo(): Promise<ContribuicaoDia[]> {
           { userId: null, usuarios: { some: { userId } } }
         ]
       },
-      include: {
-        semanas: {
-          include: {
-            disciplinas: {
-              include: {
-                dias: true,
-              },
-            },
-          },
-          orderBy: { dataInicio: "asc" },
-        },
-      },
+      select: { id: true, userId: true }
     });
 
-    if (!planoAtivo) return [];
+    for (const plano of planos) {
+      if (plano.userId !== null) {
+        // ── PLANO PESSOAL: DisciplinaDia é exclusivo do usuário ─────────────
+        const semanas = await prisma.semanaEstudo.findMany({
+          where: { planoId: plano.id },
+          include: { disciplinas: { include: { dias: true } } },
+          orderBy: { dataInicio: "asc" }
+        });
 
-    // Agregar horas realizadas por data real
-    const mapaHoras = new Map<string, number>();
+        for (const semana of semanas) {
+          for (const disciplina of semana.disciplinas) {
+            for (const dia of disciplina.dias) {
+              if (dia.horasRealizadas === 0) continue;
+              const chave = diaChave(semana.dataInicio, dia.dia);
+              mapaHoras.set(chave, (mapaHoras.get(chave) || 0) + dia.horasRealizadas);
+            }
+          }
+        }
+      } else {
+        // ── PLANO COMPARTILHADO: usar ProgressoUsuarioDisciplinaDia (por usuário) ─
+        const planoUsuario = await prisma.planoEstudoUsuario.findUnique({
+          where: { planoId_userId: { planoId: plano.id, userId } }
+        });
+        if (!planoUsuario) continue;
 
-    // 1. Horas do plano de estudo
-    for (const semana of planoAtivo.semanas) {
-      const inicio = new Date(semana.dataInicio);
-      inicio.setHours(0, 0, 0, 0);
+        const progressosDias = await prisma.progressoUsuarioDisciplinaDia.findMany({
+          where: {
+            progresso: {
+              planoUsuarioId: planoUsuario.id,
+              removida: false
+            }
+          },
+          include: {
+            progresso: {
+              include: {
+                disciplinaSemana: {
+                  include: { semana: { select: { dataInicio: true } } }
+                }
+              }
+            }
+          }
+        });
 
-      for (const disciplina of semana.disciplinas) {
-        for (const dia of disciplina.dias) {
-          // Extrair número do dia: "dia1" -> 0, "dia2" -> 1, etc.
-          const numDia = parseInt(dia.dia.replace("dia", "")) - 1;
-          const dataDia = new Date(inicio);
-          dataDia.setDate(dataDia.getDate() + numDia);
-          const chave = dataDia.toISOString().split("T")[0];
+        for (const pd of progressosDias) {
+          if (pd.horasRealizadas === 0) continue;
+          const dataInicio = pd.progresso.disciplinaSemana.semana.dataInicio;
+          const chave = diaChave(dataInicio, pd.dia);
+          mapaHoras.set(chave, (mapaHoras.get(chave) || 0) + pd.horasRealizadas);
+        }
 
-          const atual = mapaHoras.get(chave) || 0;
-          mapaHoras.set(chave, atual + dia.horasRealizadas);
+        // Extras do pool
+        const extras = await prisma.progressoUsuarioDisciplinaExtra.findMany({
+          where: { planoUsuarioId: planoUsuario.id },
+          include: { semana: { select: { dataInicio: true } } }
+        });
+
+        for (const e of extras) {
+          if (e.horasRealizadas === 0) continue;
+          const chave = diaChave(e.semana.dataInicio, e.dia);
+          // extras armazenam em minutos
+          mapaHoras.set(chave, (mapaHoras.get(chave) || 0) + e.horasRealizadas / 60);
         }
       }
     }
 
-    // 2. Adicionar tempo de leitura de PDFs (HistoricoLeitura)
-    const historicoLeitura = await prisma.historicoLeitura.findMany({
-      where: {
-        material: { userId },
-      },
-      select: {
-        dataLeitura: true,
-        tempoLeituraSegundos: true,
-      },
+    // HistoricoLeitura do próprio usuário (PDF e vídeo)
+    const historico = await prisma.historicoLeitura.findMany({
+      where: { userId },
+      select: { dataLeitura: true, tempoLeituraSegundos: true }
     });
 
-    for (const leitura of historicoLeitura) {
-      const chave = new Date(leitura.dataLeitura).toISOString().split("T")[0];
-      const horasLeitura = leitura.tempoLeituraSegundos / 3600; // Converter segundos para horas
-      const atual = mapaHoras.get(chave) || 0;
-      mapaHoras.set(chave, atual + horasLeitura);
+    for (const h of historico) {
+      const chave = new Date(h.dataLeitura).toISOString().split("T")[0];
+      mapaHoras.set(chave, (mapaHoras.get(chave) || 0) + h.tempoLeituraSegundos / 3600);
     }
 
-    // Converter para array
     return Array.from(mapaHoras.entries())
       .map(([data, horas]) => ({ data, horas }))
       .sort((a, b) => a.data.localeCompare(b.data));

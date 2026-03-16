@@ -153,18 +153,7 @@ export async function getEvolucaoCiclo(data?: Date | string): Promise<EvolucaoCi
             }
           })
         } else {
-          // Fallback: distribui pelo diasEstudo
-          const diasEstudo = p.diasEstudo
-            ? p.diasEstudo.split(',').map(d => d.trim()).filter(Boolean)
-            : []
-          const numDias = diasEstudo.length || 1
-          diasEstudo.forEach(diaId => {
-            const entry = diasMapShared.get(diaId)
-            if (entry) {
-              entry.minutosPlanejados += p.disciplinaSemana.minutosPlanejados / numDias
-              entry.questoesPlanejadas += p.disciplinaSemana.questoesPlanejadas / numDias
-            }
-          })
+          // Sem metas por dia: mostra apenas realizadas (sem planejadas artificiais)
           p.dias.forEach(d => {
             const entry = diasMapShared.get(d.dia)
             if (entry) {

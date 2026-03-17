@@ -561,7 +561,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                   )}
 
                   {/* Card Questões com ação */}
-                  {materia.questoesPlanejadas > 0 && (
+                  {(materia.questoesPlanejadas > 0 || materia.cadernoQuestoesUrl) && (
                     <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
                       {/* Coluna esquerda: label + gráfico */}
                       <div className="flex flex-col items-center">
@@ -574,19 +574,34 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                           {materia.questoesRealizadas} / {materia.questoesPlanejadas}
                         </div>
                       </div>
-                      {/* Coluna direita: botão */}
+                      {/* Coluna direita: botões */}
                       <div className="flex flex-col gap-2 justify-center">
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAdicionarQuestoes(materia);
-                          }}
-                          className="w-full h-auto py-1.5 px-2 text-[10px]"
-                        >
-                          <ClipboardList className="h-3 w-3 mr-1" />
-                          Add Questões
-                        </Button>
+                        {materia.questoesPlanejadas > 0 && (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAdicionarQuestoes(materia);
+                            }}
+                            className="w-full h-auto py-1.5 px-2 text-[10px]"
+                          >
+                            <ClipboardList className="h-3 w-3 mr-1" />
+                            Add Questões
+                          </Button>
+                        )}
+                        {materia.cadernoQuestoesUrl && (
+                          <a
+                            href={materia.cadernoQuestoesUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full inline-flex items-center justify-center gap-1 h-auto py-1.5 px-2 text-[10px] rounded-md border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors font-medium"
+                          >
+                            <BookOpen className="h-3 w-3 shrink-0" />
+                            Caderno
+                            <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-70" />
+                          </a>
+                        )}
                       </div>
                     </div>
                   )}

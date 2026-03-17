@@ -21,6 +21,7 @@ export interface MateriaDoDia {
   observacoes?: string
   assuntos?: string
   materiaisAdmin: { id: string; nome: string; tipo: string; paginasLidas: number; totalPaginas: number; tempoAssistido: number | null; duracaoSegundos: number | null }[]
+  cadernoQuestoesUrl?: string | null
 }
 
 // Converte diasEstudo do admin (formato JSON com nomes: ["segunda","terça",...]) para diaX
@@ -546,7 +547,8 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
             totalPaginas: m.material.totalPaginas,
             tempoAssistido: m.material.tempoAssistido ?? null,
             duracaoSegundos: m.material.duracaoSegundos ?? null,
-          }))
+          })),
+          cadernoQuestoesUrl: semanaAtual.cadernoQuestoesUrl ?? null,
         }
       })
     )

@@ -8,6 +8,7 @@ import { useState, useEffect } from "react"
 import { getAgendaMensal, type AgendaMensal, type DisciplinaAgenda } from "@/interface/actions/agenda/get-agenda-mensal"
 import { debugBanco } from "@/interface/actions/agenda/debug-banco"
 import { useHeader } from "@/contexts/header-context"
+import { CardCapture } from "@/components/dashboard/card-capture"
 
 export default function AgendaPage() {
   const { setTitle } = useHeader()
@@ -146,8 +147,16 @@ export default function AgendaPage() {
       </div>
 
       {/* Calendar Grid */}
+      <CardCapture filename={`agenda-${monthNames[currentDate.getMonth()]}-${currentDate.getFullYear()}`}>
       <Card>
         <CardContent className="p-4">
+          {/* Cabeçalho do mês (visível no screenshot) */}
+          <div className="flex items-center justify-center mb-4">
+            <h2 className="text-base font-bold tracking-wide">
+              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+            </h2>
+          </div>
+
           {/* Day Headers */}
           <div className="grid grid-cols-7 gap-2 mb-4">
             {dayNames.map((day) => (
@@ -198,6 +207,7 @@ export default function AgendaPage() {
           </div>
         </CardContent>
       </Card>
+      </CardCapture>
 
       {/* Legend */}
       <Card>

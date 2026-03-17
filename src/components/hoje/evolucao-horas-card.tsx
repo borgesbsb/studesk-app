@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import { EvolucaoCiclo } from "@/interface/actions/dashboard/get-evolucao-ciclo";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 
 interface EvolucaoHorasCardProps {
@@ -16,6 +16,58 @@ function formatMinutos(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return m === 0 ? `${h}h` : `${h}h${m}m`;
+}
+
+const DEPTH = 7; // profundidade do efeito 3D em px
+
+function Bar3D({ x, y, width, height, frontColor, topColor, sideColor }: {
+  x: number; y: number; width: number; height: number;
+  frontColor: string; topColor: string; sideColor: string;
+}) {
+  if (height <= 0) return null;
+  const d = DEPTH;
+  return (
+    <g>
+      {/* Face frontal */}
+      <rect x={x} y={y} width={width} height={height} fill={frontColor} />
+      {/* Face superior */}
+      <polygon
+        points={`${x},${y} ${x + d},${y - d} ${x + width + d},${y - d} ${x + width},${y}`}
+        fill={topColor}
+      />
+      {/* Face lateral direita */}
+      <polygon
+        points={`${x + width},${y} ${x + width + d},${y - d} ${x + width + d},${y + height - d} ${x + width},${y + height}`}
+        fill={sideColor}
+      />
+    </g>
+  );
+}
+
+function RealizadasShape(props: any) {
+  const { x, y, width, height } = props;
+  if (!height || height <= 0) return null;
+  return (
+    <Bar3D
+      x={x} y={y} width={width} height={height}
+      frontColor="#22c55e"
+      topColor="#86efac"
+      sideColor="#15803d"
+    />
+  );
+}
+
+function PlanejadasShape(props: any) {
+  const { x, y, width, height } = props;
+  if (!height || height <= 0) return null;
+  return (
+    <Bar3D
+      x={x} y={y} width={width} height={height}
+      frontColor="#ef4444"
+      topColor="#fca5a5"
+      sideColor="#b91c1c"
+    />
+  );
 }
 
 export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
@@ -68,12 +120,7 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
         <ChartContainer config={chartConfig} className="h-full w-full">
           <BarChart
             data={chartData}
-            margin={{
-              left: 12,
-              right: 12,
-              top: 12,
-              bottom: 12,
-            }}
+            margin={{ left: 12, right: 20, top: 16, bottom: 12 }}
           >
             <CartesianGrid vertical={false} />
             <XAxis
@@ -97,16 +144,8 @@ export function EvolucaoHorasCard({ evolucao }: EvolucaoHorasCardProps) {
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Bar
-              dataKey="planejadas"
-              fill="var(--color-planejadas)"
-              radius={[4, 4, 0, 0]}
-            />
-            <Bar
-              dataKey="realizadas"
-              fill="var(--color-realizadas)"
-              radius={[4, 4, 0, 0]}
-            />
+            <Bar dataKey="planejadas" shape={<PlanejadasShape />} isAnimationActive={false} />
+            <Bar dataKey="realizadas" shape={<RealizadasShape />} isAnimationActive={false} />
           </BarChart>
         </ChartContainer>
       </CardContent>

@@ -10,6 +10,55 @@ interface EvolucaoQuestoesCardProps {
   evolucao: EvolucaoCiclo | null;
 }
 
+const DEPTH = 7;
+
+function Bar3D({ x, y, width, height, frontColor, topColor, sideColor }: {
+  x: number; y: number; width: number; height: number;
+  frontColor: string; topColor: string; sideColor: string;
+}) {
+  if (height <= 0) return null;
+  const d = DEPTH;
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={frontColor} />
+      <polygon
+        points={`${x},${y} ${x + d},${y - d} ${x + width + d},${y - d} ${x + width},${y}`}
+        fill={topColor}
+      />
+      <polygon
+        points={`${x + width},${y} ${x + width + d},${y - d} ${x + width + d},${y + height - d} ${x + width},${y + height}`}
+        fill={sideColor}
+      />
+    </g>
+  );
+}
+
+function RealizadasShape(props: any) {
+  const { x, y, width, height } = props;
+  if (!height || height <= 0) return null;
+  return (
+    <Bar3D
+      x={x} y={y} width={width} height={height}
+      frontColor="#22c55e"
+      topColor="#86efac"
+      sideColor="#15803d"
+    />
+  );
+}
+
+function PlanejadasShape(props: any) {
+  const { x, y, width, height } = props;
+  if (!height || height <= 0) return null;
+  return (
+    <Bar3D
+      x={x} y={y} width={width} height={height}
+      frontColor="#ef4444"
+      topColor="#fca5a5"
+      sideColor="#b91c1c"
+    />
+  );
+}
+
 export function EvolucaoQuestoesCard({ evolucao }: EvolucaoQuestoesCardProps) {
   if (!evolucao) {
     return (
@@ -60,12 +109,7 @@ export function EvolucaoQuestoesCard({ evolucao }: EvolucaoQuestoesCardProps) {
         <ChartContainer config={chartConfig} className="h-full w-full">
           <BarChart
             data={chartData}
-            margin={{
-              left: 12,
-              right: 12,
-              top: 12,
-              bottom: 12,
-            }}
+            margin={{ left: 12, right: 20, top: 16, bottom: 12 }}
           >
             <CartesianGrid vertical={false} />
             <XAxis
@@ -84,16 +128,8 @@ export function EvolucaoQuestoesCard({ evolucao }: EvolucaoQuestoesCardProps) {
               content={<ChartTooltipContent />}
             />
             <ChartLegend content={<ChartLegendContent />} />
-            <Bar
-              dataKey="planejadas"
-              fill="var(--color-planejadas)"
-              radius={[4, 4, 0, 0]}
-            />
-            <Bar
-              dataKey="realizadas"
-              fill="var(--color-realizadas)"
-              radius={[4, 4, 0, 0]}
-            />
+            <Bar dataKey="planejadas" shape={<PlanejadasShape />} isAnimationActive={false} />
+            <Bar dataKey="realizadas" shape={<RealizadasShape />} isAnimationActive={false} />
           </BarChart>
         </ChartContainer>
       </CardContent>

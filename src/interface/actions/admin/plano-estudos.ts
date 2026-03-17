@@ -728,3 +728,27 @@ export async function adminAtualizarDiaSimuladoCiclo(
     return { error: 'Erro ao salvar dia' }
   }
 }
+
+export async function adminAtualizarCadernoQuestoesCiclo(
+  semanaId: string,
+  url: string | null,
+  planoId: string
+) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const semana = await prisma.semanaEstudo.findFirst({ where: { id: semanaId, planoId } })
+    if (!semana) return { error: 'Ciclo não encontrado neste plano' }
+
+    await prisma.semanaEstudo.update({
+      where: { id: semanaId },
+      data: { cadernoQuestoesUrl: url || null },
+    })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao atualizar caderno de questões:', error)
+    return { error: 'Erro ao salvar URL do caderno' }
+  }
+}

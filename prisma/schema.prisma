@@ -268,6 +268,7 @@ model SemanaEstudo {
   simuladoId      String?            // Simulado associado a este ciclo
   simuladoHoras   Int                @default(3) // Horas planejadas para o simulado
   simuladoDia     String?            // Dia do ciclo em que o simulado ocorre (ex: 'dia7')
+  cadernoQuestoesUrl String?         // URL externa do caderno de questões do ciclo
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   disciplinas     DisciplinaSemana[]

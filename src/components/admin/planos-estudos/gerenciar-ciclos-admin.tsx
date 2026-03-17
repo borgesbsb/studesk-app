@@ -14,7 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  Plus, Trash2, Loader2, CalendarDays, FileText, Video, Link2, Check, X, Bold, Italic, ClipboardList, ChevronDown, ChevronUp,
+  Plus, Trash2, Loader2, CalendarDays, FileText, Video, Link2, Check, X, Bold, Italic, ClipboardList, ChevronDown, ChevronUp, BookOpen, ExternalLink,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -29,6 +29,7 @@ import {
   adminAssociarSimuladoAoCiclo,
   adminAtualizarHorasSimuladoCiclo,
   adminAtualizarDiaSimuladoCiclo,
+  adminAtualizarCadernoQuestoesCiclo,
 } from '@/interface/actions/admin/plano-estudos'
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ interface Ciclo {
   simuladoHoras: number
   simuladoDia: string | null
   simulado: SimuladoRef | null
+  cadernoQuestoesUrl: string | null
   disciplinas: DisciplinaSemana[]
 }
 
@@ -151,6 +153,14 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
     () => Object.fromEntries(ciclosIniciais.map(c => [c.id, c.simuladoDia ?? '']))
   )
   const [salvandoSimDiaId, setSalvandoSimDiaId] = useState<string | null>(null)
+
+  // ── Estado: caderno de questões por ciclo ─────────────────────────────────────
+  const [cadernoUrl, setCadernoUrl] = useState<Record<string, string>>(
+    () => Object.fromEntries(ciclosIniciais.map(c => [c.id, c.cadernoQuestoesUrl ?? '']))
+  )
+  const [salvandoCadernoId, setSalvandoCadernoId] = useState<string | null>(null)
+  const [savedCadernoId, setSavedCadernoId] = useState<string | null>(null)
+  const [editandoCadernoId, setEditandoCadernoId] = useState<string | null>(null)
 
   // ── Estado: collapse por ciclo (todos fechados exceto o da semana atual) ──────
   const [ciclosColapsados, setCiclosColapsados] = useState<Set<string>>(() => {
@@ -300,6 +310,22 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
     setTimeout(() => setSavedSimHorasId(id => id === cicloId ? null : id), 1500)
   }
 
+  // ── Caderno de questões ───────────────────────────────────────────────────────
+
+  const handleBlurCadernoUrl = async (cicloId: string) => {
+    setEditandoCadernoId(null)
+    const ciclo = ciclos.find(c => c.id === cicloId)
+    if (!ciclo) return
+    const url = cadernoUrl[cicloId] ?? ''
+    if (url === (ciclo.cadernoQuestoesUrl ?? '')) return
+    setSalvandoCadernoId(cicloId)
+    await adminAtualizarCadernoQuestoesCiclo(cicloId, url || null, planoId)
+    setSalvandoCadernoId(null)
+    setCiclos(prev => prev.map(c => c.id === cicloId ? { ...c, cadernoQuestoesUrl: url || null } : c))
+    setSavedCadernoId(cicloId)
+    setTimeout(() => setSavedCadernoId(id => id === cicloId ? null : id), 1500)
+  }
+
   // ── Ciclos ────────────────────────────────────────────────────────────────────
 
   const handleAdicionarCiclo = async (e: React.FormEvent) => {
@@ -317,10 +343,11 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
     setSalvandoCiclo(false)
     if (res.error) { alert(res.error); return }
     if (res.success && res.data) {
-      const d = res.data as Omit<Ciclo, 'disciplinas'> & { disciplinas?: DisciplinaSemana[] }
-      const novoCicloData = { ...d, simuladoId: null, simuladoHoras: 3, simulado: null, disciplinas: d.disciplinas ?? [] } as Ciclo
+      const d = res.data as unknown as Omit<Ciclo, 'disciplinas'> & { disciplinas?: DisciplinaSemana[] }
+      const novoCicloData = { ...d, simuladoId: null, simuladoHoras: 3, simulado: null, cadernoQuestoesUrl: null, disciplinas: d.disciplinas ?? [] } as Ciclo
       setCiclos(prev => [...prev, novoCicloData])
       setSimHoras(prev => ({ ...prev, [novoCicloData.id]: 3 }))
+      setCadernoUrl(prev => ({ ...prev, [novoCicloData.id]: '' }))
       setModalCiclo(false)
       setNovoCiclo({ dataInicio: '', dataFim: '', observacoes: '' })
     }
@@ -450,6 +477,51 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                           <option key={s.id} value={s.id}>{s.nome}</option>
                         ))}
                       </select>
+                    )}
+                    {/* Caderno de questões */}
+                    {editandoCadernoId === ciclo.id ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          autoFocus
+                          type="url"
+                          placeholder="URL do caderno de questões..."
+                          className="h-7 text-xs w-48 px-2"
+                          value={cadernoUrl[ciclo.id] ?? ''}
+                          onChange={e => setCadernoUrl(prev => ({ ...prev, [ciclo.id]: e.target.value }))}
+                          onBlur={() => handleBlurCadernoUrl(ciclo.id)}
+                          onKeyDown={e => { if (e.key === 'Escape') { setEditandoCadernoId(null) } if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
+                        />
+                        {salvandoCadernoId === ciclo.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400 shrink-0" />}
+                        {savedCadernoId === ciclo.id && <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                      </div>
+                    ) : ciclo.cadernoQuestoesUrl ? (
+                      <div className="flex items-center gap-1">
+                        <a
+                          href={ciclo.cadernoQuestoesUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 h-7 px-2 text-xs rounded border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+                          title={ciclo.cadernoQuestoesUrl}
+                        >
+                          <BookOpen className="h-3.5 w-3.5 shrink-0" />
+                          Caderno
+                          <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+                        </a>
+                        <button
+                          className="h-7 w-7 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                          title="Editar URL"
+                          onClick={() => setEditandoCadernoId(ciclo.id)}
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="inline-flex items-center gap-1 h-7 px-2 text-xs rounded border border-dashed border-slate-300 text-slate-400 hover:text-violet-600 hover:border-violet-300 transition-colors"
+                        onClick={() => setEditandoCadernoId(ciclo.id)}
+                      >
+                        <BookOpen className="h-3.5 w-3.5" /> Caderno
+                      </button>
                     )}
                     <Button variant="ghost" size="sm"
                       className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"

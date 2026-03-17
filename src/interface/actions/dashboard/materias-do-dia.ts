@@ -340,7 +340,8 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
               totalPaginas: m.material.totalPaginas,
               tempoAssistido: m.material.tempoAssistido ?? null,
               duracaoSegundos: m.material.duracaoSegundos ?? null,
-            }))
+            })),
+            cadernoQuestoesUrl: semanaAtual.cadernoQuestoesUrl ?? null,
           }
         })
       )
@@ -362,7 +363,8 @@ export async function getMateriasDoDia(data?: Date | string): Promise<MateriaDoD
           questoesRealizadas: extra.questoesRealizadas,
           prioridade: 999,
           observacoes: extra.observacoes || undefined,
-          materiaisAdmin: []
+          materiaisAdmin: [],
+          cadernoQuestoesUrl: semanaAtual.cadernoQuestoesUrl ?? null,
         }))
       )
 

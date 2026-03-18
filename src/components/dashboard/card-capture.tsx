@@ -45,8 +45,10 @@ export function CardCapture({ children, filename = "card", className }: CardCapt
   }
 
   return (
-    <div ref={ref} className={`relative group ${className ?? ""}`}>
-      {children}
+    <div className={`relative group ${className ?? ""}`}>
+      <div ref={ref}>
+        {children}
+      </div>
       <button
         onClick={capture}
         disabled={status === "capturing"}
@@ -70,4 +72,5 @@ export function CardCapture({ children, filename = "card", className }: CardCapt
       </button>
     </div>
   )
+
 }

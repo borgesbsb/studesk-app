@@ -1,8 +1,11 @@
 "use server"
 
 import { getMateriasDoDia } from './materias-do-dia'
+import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-helpers'
 
 export interface ResumoCompartilhar {
+  nomePlano: string
   ontem: {
     horasEstudo: number
   }
@@ -19,18 +22,37 @@ function toLocalDateString(date: Date) {
 }
 
 export async function getResumoCompartilhar(): Promise<ResumoCompartilhar> {
+  const { userId } = await requireAuth()
   const hoje = new Date()
   const ontem = new Date(hoje)
   ontem.setDate(ontem.getDate() - 1)
 
-  const [materiasHoje, materiasOntem] = await Promise.all([
-    getMateriasDoDia(toLocalDateString(hoje)),
+  const hojeStr = toLocalDateString(hoje)
+  const [y, m, d] = hojeStr.split('-').map(Number)
+  const hojeUTC = new Date(Date.UTC(y, m - 1, d))
+  const amanhaUTC = new Date(hojeUTC.getTime() + 86400000)
+
+  const [materiasHoje, materiasOntem, planoAtivo] = await Promise.all([
+    getMateriasDoDia(hojeStr),
     getMateriasDoDia(toLocalDateString(ontem)),
+    prisma.planoEstudo.findFirst({
+      where: {
+        ativo: true,
+        OR: [
+          { userId },
+          { userId: null, usuarios: { some: { userId } } }
+        ],
+        dataInicio: { lt: amanhaUTC },
+        dataFim: { gte: hojeUTC },
+      },
+      select: { nome: true },
+    }),
   ])
 
   const horasEstudoOntem = materiasOntem.reduce((total, m) => total + m.horasRealizadas, 0)
 
   return {
+    nomePlano: planoAtivo?.nome ?? '',
     ontem: {
       horasEstudo: Math.round(horasEstudoOntem * 100) / 100,
     },

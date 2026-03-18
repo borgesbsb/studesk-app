@@ -54,6 +54,7 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
     const linhas = [
       `📊 *RELATÓRIO DE ESTUDOS*`,
       `📅 ${dataCapitalizada}`,
+      ...(resumo.nomePlano ? [`📋 ${resumo.nomePlano}`] : []),
       ``,
       `━━━━━━━━━━━━━━━━━`,
       `⏰ *ONTEM*`,

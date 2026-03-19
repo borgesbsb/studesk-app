@@ -65,7 +65,7 @@ function gerarTexto(resumo: ResumoCompartilhar, atividadeFisica: number, progres
   linhas.push(`*— ONTEM —*`)
   linhas.push(`📖 Horas estudadas: *${formatarHorasMin(resumo.ontem.horasEstudo)}*`)
   linhas.push(`✅ Questões: *${resumo.ontem.questoesRealizadas}*`)
-  if (atividadeFisica > 0) linhas.push(`🏋️ Atividade física: *${atividadeFisica}h*`)
+  if (atividadeFisica > 0) linhas.push(`🏋️ Atividade física: *${atividadeFisica}min*`)
   linhas.push('')
 
   if (resumo.hoje.disciplinas.length > 0) {
@@ -108,9 +108,9 @@ export function ResumoCompartilharCard({ resumo, progresso }: ResumoCompartilhar
       <div className="px-4 pt-3 pb-3 flex items-center justify-between border-b border-border bg-primary/5">
         <p className="text-xs font-bold text-primary uppercase tracking-widest">Resumo para Compartilhar</p>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground">Ativ. física (h):</span>
+          <span className="text-[10px] text-muted-foreground">Ativ. física (min):</span>
           <Input
-            type="number" min={0} step={0.5}
+            type="number" min={0} step={5}
             value={atividadeFisica}
             onChange={e => setAtividadeFisica(Number(e.target.value))}
             className="h-6 text-xs w-14 px-2"

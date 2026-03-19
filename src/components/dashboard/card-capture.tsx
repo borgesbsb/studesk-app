@@ -46,7 +46,7 @@ export function CardCapture({ children, filename = "card", className }: CardCapt
 
   return (
     <div className={`relative group ${className ?? ""}`}>
-      <div ref={ref}>
+      <div ref={ref} className="h-full">
         {children}
       </div>
       <button

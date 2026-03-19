@@ -249,6 +249,47 @@ export async function salvarAssuntosEmLote(
   }
 }
 
+// ─── Gerar assuntos com IA ─────────────────────────────────────────────────
+
+export async function gerarComIA(buildId: string) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const build = await prisma.buildPlano.findUnique({
+      where: { id: buildId },
+      include: {
+        disciplinas: { select: { id: true, nome: true, tipo: true, conteudoEdital: true, cargaHoraria: true } },
+      },
+    })
+    if (!build) return { error: 'Build não encontrado' }
+
+    const disciplinasValidas = build.disciplinas.filter((d: any) => d.conteudoEdital?.trim())
+    if (disciplinasValidas.length === 0) return { error: 'Preencha o conteúdo do edital de pelo menos uma disciplina' }
+
+    const { BuildPlanoAIService } = await import('@/application/services/build-plano-ai.service')
+    const service = new BuildPlanoAIService()
+
+    const resultado = await service.gerarDistribuicao(
+      disciplinasValidas.map((d: any) => ({
+        id: d.id,
+        nome: d.nome,
+        tipo: d.tipo as 'P1' | 'P2',
+        conteudoEdital: d.conteudoEdital || '',
+        cargaHoraria: d.cargaHoraria || 0,
+      })),
+      build.numeroCiclos
+    )
+
+    const res = await salvarAssuntosEmLote(buildId, resultado.assuntos)
+    if (res.error) return res
+
+    return { success: true, count: resultado.assuntos.length, modelo: resultado.modelo }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}
+
 // ─── Listar disciplinas disponíveis no BD ─────────────────────────────────
 
 export async function listarDisciplinasDisponiveis() {

@@ -58,7 +58,7 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
     >
       {/* Header bar */}
       <div
-        className="px-4 pt-3 pb-2.5 flex items-center justify-between"
+        className="px-4 pt-4 pb-3 flex items-center justify-between"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
       >
         <div className="flex items-center gap-2">
@@ -79,7 +79,7 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
       </div>
 
       {/* Avatar + nome + plano */}
-      <div className="px-4 py-3 flex items-center gap-3">
+      <div className="px-4 py-4 flex items-center gap-3">
         <div
           className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold shrink-0"
           style={{
@@ -99,7 +99,7 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
 
       {/* ── ONTEM ── */}
       <div
-        className="mx-3 rounded-xl px-3 py-3 mb-2"
+        className="mx-4 rounded-xl px-4 py-3 mb-3"
         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
       >
         <p className="text-[9px] font-bold tracking-widest uppercase mb-3" style={{ color: '#818cf8' }}>Ontem</p>
@@ -170,7 +170,7 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
 
       {/* ── HOJE ── */}
       <div
-        className="mx-3 mb-3 rounded-xl px-3 py-3 flex-1"
+        className="mx-4 mb-4 rounded-xl px-4 py-3 flex-1"
         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
       >
         <div className="flex items-center justify-between mb-2.5">
@@ -216,7 +216,7 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
       </div>
 
       {/* Footer */}
-      <div className="px-4 pb-3 flex items-center justify-between">
+      <div className="px-4 pb-4 flex items-center justify-between">
         <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.18)' }}>studesk.com.br</p>
         <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.18)' }}>#estudos #concurso</p>
       </div>

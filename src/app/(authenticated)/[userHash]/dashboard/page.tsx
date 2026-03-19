@@ -84,8 +84,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="h-full p-3">
-      <div className="flex items-center justify-between mb-1">
+    <div className="h-full p-4">
+      <div className="flex items-center justify-between mb-3">
         <DashboardHeader />
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div
-          className="h-full grid gap-3"
+          className="h-full grid gap-4"
           style={{
             gridTemplateColumns: '8fr 2fr',
             gridTemplateRows: 'auto auto auto 2fr',
@@ -148,7 +148,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Linha 3, Col 1: Resumo + Disciplinas lado a lado */}
-          <div className="min-h-0 grid grid-cols-2 gap-3 items-stretch">
+          <div className="min-h-0 grid grid-cols-2 gap-4 items-stretch">
             <CardCapture filename="resumo-compartilhar">
               <ResumoCompartilharCard resumo={resumo} />
             </CardCapture>
@@ -158,7 +158,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Linha 4, Col 1-2: Gráficos lado a lado com mesma largura */}
-          <div className="min-h-0 grid grid-cols-2 gap-3" style={{ gridColumn: '1 / -1' }}>
+          <div className="min-h-0 grid grid-cols-2 gap-4" style={{ gridColumn: '1 / -1' }}>
             <CardCapture filename="evolucao-horas">
               <EvolucaoHorasCard evolucao={evolucao} />
             </CardCapture>

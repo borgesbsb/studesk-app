@@ -137,7 +137,7 @@ export default function DashboardPage() {
             {/* Coluna esquerda: Resumo + Gráficos empilhados */}
             <div className="flex flex-col gap-4">
               <CardCapture filename="resumo-compartilhar">
-                <ResumoCompartilharCard resumo={resumo} />
+                <ResumoCompartilharCard resumo={resumo} progresso={progresso} />
               </CardCapture>
               <div className="grid grid-cols-2 gap-4 h-56">
                 <CardCapture filename="evolucao-horas" className="h-full">

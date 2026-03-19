@@ -49,7 +49,7 @@ export async function getResumoCompartilhar(): Promise<ResumoCompartilhar> {
       include: {
         semanas: {
           where: { dataInicio: { lt: amanhaUTC }, dataFim: { gte: hojeUTC } },
-          select: { numeroSemana: true, dataInicio: true },
+          select: { numeroSemana: true, dataInicio: true, dataFim: true },
           take: 1,
         }
       }
@@ -61,8 +61,9 @@ export async function getResumoCompartilhar(): Promise<ResumoCompartilhar> {
   const questoesOntem = materiasOntem.reduce((total, m) => total + m.questoesRealizadas, 0)
   const totalMinutosHoje = materiasHoje.reduce((total, m) => total + m.minutosPlanejados, 0)
 
-  // Calcular dia do ciclo
+  // Calcular dia do ciclo e total de dias
   let diaCiclo: number | null = null
+  let totalDiasCiclo: number | null = null
   const semana = planoAtivo?.semanas?.[0]
   if (semana) {
     const inicioUTC = new Date(Date.UTC(

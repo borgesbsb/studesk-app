@@ -84,7 +84,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="h-full p-4">
+    <div className="h-full p-4 flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <DashboardHeader />
         <AlertDialog>
@@ -115,55 +115,42 @@ export default function DashboardPage() {
         </AlertDialog>
       </div>
       {loading ? (
-        <div className="h-full flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : (
-        <div
-          className="h-full grid gap-4"
-          style={{
-            gridTemplateColumns: '8fr 2fr',
-            gridTemplateRows: 'auto auto auto 2fr',
-          }}
-        >
-          {/* Linha 1, Col 1: Stats */}
-          <div>
-            <CardCapture filename="stats-ciclo">
-              <CicloStatsCards progresso={progresso} />
-            </CardCapture>
-          </div>
-
-          {/* Linhas 1-3, Col 2: Ampulheta */}
-          <div style={{ gridRow: '1/4', gridColumn: '2' }}>
-            <CardCapture filename="ampulheta">
+        <div className="flex flex-col gap-4">
+          {/* Linha 1: Stats + Ampulheta */}
+          <CardCapture filename="stats-ciclo">
+            <CicloStatsCards progresso={progresso}>
               <HourglassCard progresso={progresso} />
-            </CardCapture>
-          </div>
+            </CicloStatsCards>
+          </CardCapture>
 
-          {/* Linha 2, Col 1: Contribuições */}
-          <div className="min-h-0">
-            <CardCapture filename="contribuicoes">
-              <ContribuicoesCard contribuicoes={contribuicoes} />
-            </CardCapture>
-          </div>
+          {/* Linha 2: Contribuições (largura total) */}
+          <CardCapture filename="contribuicoes">
+            <ContribuicoesCard contribuicoes={contribuicoes} />
+          </CardCapture>
 
-          {/* Linha 3, Col 1: Resumo + Disciplinas lado a lado */}
-          <div className="min-h-0 grid grid-cols-2 gap-4 items-stretch">
-            <CardCapture filename="resumo-compartilhar">
-              <ResumoCompartilharCard resumo={resumo} />
-            </CardCapture>
+          {/* Linhas 3+4: Esquerda (Resumo + Gráficos) | Direita (Disciplinas spanning tudo) */}
+          <div className="grid grid-cols-2 gap-4 items-stretch">
+            {/* Coluna esquerda: Resumo + Gráficos empilhados */}
+            <div className="flex flex-col gap-4">
+              <CardCapture filename="resumo-compartilhar">
+                <ResumoCompartilharCard resumo={resumo} />
+              </CardCapture>
+              <div className="grid grid-cols-2 gap-4 h-56">
+                <CardCapture filename="evolucao-horas" className="h-full">
+                  <EvolucaoHorasCard evolucao={evolucao} />
+                </CardCapture>
+                <CardCapture filename="evolucao-questoes" className="h-full">
+                  <EvolucaoQuestoesCard evolucao={evolucao} />
+                </CardCapture>
+              </div>
+            </div>
+            {/* Coluna direita: Disciplinas ocupa toda a altura */}
             <CardCapture filename="disciplinas-ciclo" className="h-full">
               <DisciplinasCicloCard disciplinas={disciplinas} />
-            </CardCapture>
-          </div>
-
-          {/* Linha 4, Col 1-2: Gráficos lado a lado com mesma largura */}
-          <div className="min-h-0 grid grid-cols-2 gap-4" style={{ gridColumn: '1 / -1' }}>
-            <CardCapture filename="evolucao-horas">
-              <EvolucaoHorasCard evolucao={evolucao} />
-            </CardCapture>
-            <CardCapture filename="evolucao-questoes">
-              <EvolucaoQuestoesCard evolucao={evolucao} />
             </CardCapture>
           </div>
         </div>

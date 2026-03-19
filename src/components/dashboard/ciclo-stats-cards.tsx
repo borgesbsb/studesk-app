@@ -6,9 +6,10 @@ import { ProgressoCiclo } from "@/interface/actions/dashboard/get-progresso-cicl
 
 interface CicloStatsCardsProps {
   progresso: ProgressoCiclo | null;
+  children?: React.ReactNode;
 }
 
-export function CicloStatsCards({ progresso }: CicloStatsCardsProps) {
+export function CicloStatsCards({ progresso, children }: CicloStatsCardsProps) {
   const formatarTempo = (horas: number) => {
     if (horas < 1) {
       const minutos = Math.round(horas * 60);
@@ -51,8 +52,10 @@ export function CicloStatsCards({ progresso }: CicloStatsCardsProps) {
     },
   ];
 
+  const numCols = children ? 5 : 4;
+
   return (
-    <div className="grid grid-cols-4 gap-2 h-full">
+    <div className="grid gap-2 h-full" style={{ gridTemplateColumns: `repeat(${numCols}, 1fr)` }}>
           {stats.map((stat) => (
             <Card key={stat.label} className="bg-card border-primary/15">
             <CardContent className="flex flex-col items-center justify-center gap-1 px-3 py-3">
@@ -64,6 +67,7 @@ export function CicloStatsCards({ progresso }: CicloStatsCardsProps) {
             </CardContent>
             </Card>
           ))}
+          {children}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Input } from "@/components/ui/input"
 import { ResumoCompartilhar } from "@/interface/actions/dashboard/get-resumo-compartilhar"
-import { BookOpen, Dumbbell, Target, GraduationCap } from "lucide-react"
+import { BookOpen, Dumbbell, Target } from "lucide-react"
 
 interface ResumoCompartilharCardProps {
   resumo: ResumoCompartilhar | null
@@ -49,141 +50,104 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
   const estudo = formatarHorasMin(resumo.ontem.horasEstudo)
 
   return (
-    <div
-      className="rounded-xl overflow-hidden text-white select-none h-full flex flex-col"
-      style={{
-        background: 'linear-gradient(145deg, #0a0f1e 0%, #12103a 45%, #0a1628 100%)',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
+    <div className="rounded-xl overflow-hidden bg-card text-card-foreground select-none h-full flex flex-col border border-border">
       {/* Header bar */}
-      <div
-        className="px-4 pt-4 pb-3 flex items-center justify-between"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-      >
-        <div className="flex items-center gap-2">
-          <div
-            className="w-6 h-6 rounded-md flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-          >
-            <GraduationCap className="h-3.5 w-3.5 text-white" />
-          </div>
-          <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: '#a5b4fc' }}>Studesk</span>
-        </div>
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-border">
+        <Image src="/logo-mvt.png" alt="Logo" width={140} height={38} className="object-contain" />
         <div className="text-right">
-          <p className="text-[10px] font-medium" style={{ color: 'rgba(255,255,255,0.55)' }}>{dataCapitalizada}</p>
+          <p className="text-[10px] font-medium text-muted-foreground">{dataCapitalizada}</p>
           {resumo.diaCiclo && (
-            <p className="text-[9px]" style={{ color: '#818cf8' }}>Dia {resumo.diaCiclo} do ciclo</p>
+            <p className="text-[9px] text-primary">Dia {resumo.diaCiclo} do ciclo</p>
           )}
         </div>
       </div>
 
       {/* Avatar + nome + plano */}
       <div className="px-4 py-4 flex items-center gap-3">
-        <div
-          className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            boxShadow: '0 0 0 3px rgba(99,102,241,0.25), 0 4px 12px rgba(99,102,241,0.3)'
-          }}
-        >
+        <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold shrink-0 bg-primary text-primary-foreground ring-2 ring-primary/25">
           {iniciais(resumo.nomeUsuario || 'U')}
         </div>
         <div className="min-w-0">
           <p className="text-base font-bold leading-tight truncate">{resumo.nomeUsuario || 'Estudante'}</p>
           {resumo.nomePlano && (
-            <p className="text-[10px] truncate mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{resumo.nomePlano}</p>
+            <p className="text-[10px] truncate mt-0.5 text-muted-foreground">{resumo.nomePlano}</p>
           )}
         </div>
       </div>
 
       {/* ── ONTEM ── */}
-      <div
-        className="mx-4 rounded-xl px-4 py-3 mb-3"
-        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
-      >
-        <p className="text-[9px] font-bold tracking-widest uppercase mb-3" style={{ color: '#818cf8' }}>Ontem</p>
+      <div className="mx-4 rounded-xl px-4 py-3 mb-3 bg-muted border border-border">
+        <p className="text-[9px] font-bold tracking-widest uppercase mb-3 text-primary">Ontem</p>
         <div className="grid grid-cols-3 gap-2">
 
           {/* Estudos */}
           <div className="flex flex-col items-center gap-1.5">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.25)' }}
-            >
-              <BookOpen className="h-5 w-5" style={{ color: '#4ade80' }} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-green-500/10 border border-green-500/25">
+              <BookOpen className="h-5 w-5 text-green-500" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-bold leading-none" style={{ color: '#4ade80' }}>
+              <p className="text-sm font-bold leading-none text-green-500">
                 {estudo.val}<span className="text-[10px] ml-0.5">{estudo.unit}</span>
               </p>
-              <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Estudadas</p>
+              <p className="text-[9px] mt-0.5 text-muted-foreground">Estudadas</p>
             </div>
           </div>
 
           {/* Questões */}
           <div className="flex flex-col items-center gap-1.5">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.25)' }}
-            >
-              <Target className="h-5 w-5" style={{ color: '#fbbf24' }} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-yellow-500/10 border border-yellow-500/25">
+              <Target className="h-5 w-5 text-yellow-500" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-bold leading-none" style={{ color: '#fbbf24' }}>
+              <p className="text-sm font-bold leading-none text-yellow-500">
                 {resumo.ontem.questoesRealizadas}<span className="text-[10px] ml-0.5">q</span>
               </p>
-              <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Questões</p>
+              <p className="text-[9px] mt-0.5 text-muted-foreground">Questões</p>
             </div>
           </div>
 
           {/* Atividade física */}
           <div className="flex flex-col items-center gap-1.5">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)' }}
-            >
-              <Dumbbell className="h-5 w-5" style={{ color: '#f87171' }} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-500/10 border border-red-500/25">
+              <Dumbbell className="h-5 w-5 text-red-500" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-bold leading-none" style={{ color: '#f87171' }}>
+              <p className="text-sm font-bold leading-none text-red-500">
                 {atividadeFisica > 0 ? atividadeFisica : '—'}
                 {atividadeFisica > 0 && <span className="text-[10px] ml-0.5">h</span>}
               </p>
-              <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Ativ. física</p>
+              <p className="text-[9px] mt-0.5 text-muted-foreground">Ativ. física</p>
             </div>
           </div>
 
         </div>
 
-        {/* Input atividade física */}
-        <div className="mt-2.5 flex items-center gap-1.5">
-          <span className="text-[9px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Ativ. física (h):</span>
-          <Input
-            type="number" min={0} step={0.5}
-            value={atividadeFisica}
-            onChange={e => setAtividadeFisica(Number(e.target.value))}
-            className="h-5 text-[10px] w-14 px-1.5 bg-white/10 border-white/10 text-white"
-          />
-        </div>
+      </div>
+
+      {/* Input atividade física */}
+      <div className="mx-4 mb-3 flex items-center gap-1.5">
+        <span className="text-[9px] text-muted-foreground">Ativ. física (h):</span>
+        <Input
+          type="number" min={0} step={0.5}
+          value={atividadeFisica}
+          onChange={e => setAtividadeFisica(Number(e.target.value))}
+          className="h-5 text-[10px] w-14 px-1.5"
+        />
       </div>
 
       {/* ── HOJE ── */}
-      <div
-        className="mx-4 mb-4 rounded-xl px-4 py-3 flex-1"
-        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
-      >
+      <div className="mx-4 mb-4 rounded-xl px-4 py-3 overflow-y-auto bg-muted border border-border">
         <div className="flex items-center justify-between mb-2.5">
-          <p className="text-[9px] font-bold tracking-widest uppercase" style={{ color: '#818cf8' }}>Hoje</p>
+          <p className="text-[9px] font-bold tracking-widest uppercase text-primary">Hoje</p>
           {resumo.hoje.totalMinutosPlanejados > 0 && (
-            <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc' }}>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
               {formatarMinutos(resumo.hoje.totalMinutosPlanejados)} planejadas
             </span>
           )}
         </div>
 
         {resumo.hoje.disciplinas.length === 0 ? (
-          <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>Sem disciplinas planejadas</p>
+          <p className="text-[10px] text-muted-foreground">Sem disciplinas planejadas</p>
         ) : (
           <div className="flex flex-col gap-1.5">
             {resumo.hoje.disciplinas.map((disc, i) => {
@@ -195,8 +159,8 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
                   style={{ background: cor + '18', border: `1px solid ${cor}40` }}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: cor, boxShadow: `0 0 6px ${cor}` }} />
-                    <span className="text-[11px] font-medium truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
+                    <span className="text-[11px] font-medium truncate">
                       {disc.nome}
                     </span>
                   </div>
@@ -217,8 +181,8 @@ export function ResumoCompartilharCard({ resumo }: ResumoCompartilharCardProps) 
 
       {/* Footer */}
       <div className="px-4 pb-4 flex items-center justify-between">
-        <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.18)' }}>studesk.com.br</p>
-        <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.18)' }}>#estudos #concurso</p>
+        <p className="text-[9px] text-muted-foreground/50">studesk.com.br</p>
+        <p className="text-[9px] text-muted-foreground/50">#estudos #concurso</p>
       </div>
     </div>
   )

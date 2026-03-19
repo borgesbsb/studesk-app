@@ -19,7 +19,7 @@ function formatarTempo(horas: number) {
 export function DisciplinasCicloCard({ disciplinas }: DisciplinasCicloCardProps) {
   if (disciplinas.length === 0) {
     return (
-      <Card className="bg-card border-primary/15">
+      <Card className="bg-card border-primary/15 h-full">
         <CardHeader className="pb-2 pt-3 px-3">
           <CardTitle className="flex items-center gap-2 text-xs">
             <BookOpen className="h-3.5 w-3.5" />
@@ -34,7 +34,7 @@ export function DisciplinasCicloCard({ disciplinas }: DisciplinasCicloCardProps)
   }
 
   return (
-    <Card className="bg-card border-primary/15 h-full flex flex-col">
+    <Card className="bg-card border-primary/15 h-full">
       <CardHeader className="pb-2 pt-3 px-3 flex-shrink-0">
         <CardTitle className="flex items-center gap-2 text-xs">
           <BookOpen className="h-3.5 w-3.5" />

@@ -16,6 +16,18 @@ export async function adicionarQuestoes(params: AdicionarQuestoesParams) {
     const { disciplinaId, quantidade, data } = params;
     const diaConsultado = data || new Date();
 
+    // Normalizar diaConsultado para UTC midnight (evita bug de timezone com setHours local)
+    const todayUTC = new Date(Date.UTC(
+      diaConsultado.getUTCFullYear(),
+      diaConsultado.getUTCMonth(),
+      diaConsultado.getUTCDate()
+    ))
+    const tomorrowUTC = new Date(Date.UTC(
+      diaConsultado.getUTCFullYear(),
+      diaConsultado.getUTCMonth(),
+      diaConsultado.getUTCDate() + 1
+    ))
+
     // Buscar a semana de estudo ativa para a disciplina do usuário
     const planoAtivo = await prisma.planoEstudo.findFirst({
       where: {
@@ -24,12 +36,8 @@ export async function adicionarQuestoes(params: AdicionarQuestoesParams) {
           { userId },
           { userId: null, usuarios: { some: { userId } } }
         ],
-        dataInicio: {
-          lte: diaConsultado
-        },
-        dataFim: {
-          gte: diaConsultado
-        }
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: todayUTC }
       }
     });
 
@@ -37,38 +45,26 @@ export async function adicionarQuestoes(params: AdicionarQuestoesParams) {
       throw new Error('Nenhum plano de estudo ativo encontrado');
     }
 
-    // Buscar a semana de estudo
-    // Normalizar a data para comparação (apenas data, sem horas)
-    const diaParaComparacao = new Date(diaConsultado);
-    diaParaComparacao.setHours(0, 0, 0, 0);
-
-    // Buscar todas as semanas do plano
-    const todasSemanas = await prisma.semanaEstudo.findMany({
+    // Buscar a semana de estudo usando UTC para evitar bug de timezone
+    const semanaEstudo = await prisma.semanaEstudo.findFirst({
       where: {
-        planoId: planoAtivo.id
+        planoId: planoAtivo.id,
+        dataInicio: { lt: tomorrowUTC },
+        dataFim: { gte: todayUTC }
       }
-    });
-
-    // Encontrar a semana que contém o dia consultado
-    const semanaEstudo = todasSemanas.find(semana => {
-      const inicio = new Date(semana.dataInicio);
-      inicio.setHours(0, 0, 0, 0);
-      const fim = new Date(semana.dataFim);
-      fim.setHours(23, 59, 59, 999);
-
-      return diaParaComparacao >= inicio && diaParaComparacao <= fim;
     });
 
     if (!semanaEstudo) {
       throw new Error('Semana de estudo não encontrada para o período');
     }
 
-    // Calcular qual é o diaId atual (dia1, dia2, etc)
-    const inicioNormalizado = new Date(semanaEstudo.dataInicio);
-    inicioNormalizado.setHours(0, 0, 0, 0);
-    const consultadaNormalizada = new Date(diaConsultado);
-    consultadaNormalizada.setHours(0, 0, 0, 0);
-    const diffTime = consultadaNormalizada.getTime() - inicioNormalizado.getTime();
+    // Calcular qual é o diaId atual (dia1, dia2, etc) usando UTC puro
+    const inicioUTC = new Date(Date.UTC(
+      semanaEstudo.dataInicio.getUTCFullYear(),
+      semanaEstudo.dataInicio.getUTCMonth(),
+      semanaEstudo.dataInicio.getUTCDate()
+    ))
+    const diffTime = todayUTC.getTime() - inicioUTC.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     const diaIdAtual = `dia${diffDays + 1}`;
 

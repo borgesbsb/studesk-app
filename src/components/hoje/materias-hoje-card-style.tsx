@@ -202,7 +202,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
   };
 
   const renderRadialChartOnly = (progresso: number, titulo: string) => {
-    const porcentagem = Math.min(Math.round(progresso), 100);
+    const porcentagem = Math.min(Math.max(Math.round(progresso), 0), 100);
     const cor = getCorProgresso(progresso);
 
     const chartConfig = {
@@ -215,14 +215,15 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
         className="mx-auto aspect-square w-full max-w-[140px] pointer-events-none"
       >
         <RadialBarChart
+          key={porcentagem}
           data={[{ progress: porcentagem, fill: cor }]}
           startAngle={0}
-          endAngle={(porcentagem / 100) * 360}
+          endAngle={porcentagem > 0 ? (porcentagem / 100) * 360 : 360}
           innerRadius={50}
           outerRadius={70}
         >
           <PolarGrid gridType="circle" radialLines={false} stroke="none" className="first:fill-muted last:fill-background" polarRadius={[54, 46]} />
-          <RadialBar dataKey="progress" background cornerRadius={10} fill={cor} />
+          <RadialBar dataKey="progress" background cornerRadius={10} fill={cor} isAnimationActive={false} />
           <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
             <Label
               content={({ viewBox }) => {
@@ -271,7 +272,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     setMateriasState(prev => {
       const m = prev[materia.disciplinaId];
       if (!m) return prev;
-      return { ...prev, [materia.disciplinaId]: { ...m, horasRealizadas: m.horasRealizadas + horasAdicionadas, tempoRealEstudo: m.tempoRealEstudo + horasAdicionadas } };
+      return { ...prev, [materia.disciplinaId]: { ...m, horasRealizadas: Math.max(0, m.horasRealizadas + horasAdicionadas), tempoRealEstudo: Math.max(0, m.tempoRealEstudo + horasAdicionadas) } };
     });
 
     try {
@@ -308,7 +309,7 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     setMateriasState(prev => {
       const m = prev[materia.disciplinaId];
       if (!m) return prev;
-      return { ...prev, [materia.disciplinaId]: { ...m, questoesRealizadas: m.questoesRealizadas + quantidade } };
+      return { ...prev, [materia.disciplinaId]: { ...m, questoesRealizadas: Math.max(0, m.questoesRealizadas + quantidade) } };
     });
 
     try {

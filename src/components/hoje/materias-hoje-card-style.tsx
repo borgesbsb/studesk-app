@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp, Play, List, FileText } from "lucide-react";
+import { Clock, BookOpen, Timer, ClipboardList, ExternalLink, TrendingUp, Play, List, FileText, CheckCheck } from "lucide-react";
 import { MateriaDoDia } from "@/interface/actions/dashboard/materias-do-dia";
 import { AdicionarTempoModal } from "./adicionar-tempo-modal";
 import { AdicionarQuestoesModal } from "./adicionar-questoes-modal";
@@ -45,6 +45,8 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
   const [modalTempoAberto, setModalTempoAberto] = useState(false);
   const [modalQuestoesAberto, setModalQuestoesAberto] = useState(false);
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<MateriaDoDia | null>(null);
+  const [feitosIds, setFeitosIds] = useState<Set<string>>(new Set());
+  const [feitosQuestoesIds, setFeitosQuestoesIds] = useState<Set<string>>(new Set());
   const { iniciar: iniciarCronometro } = useCronometro();
 
   // Sincronizar estado local quando props mudam
@@ -249,9 +251,79 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
     iniciarCronometro(materia.disciplinaId, materia.disciplinaNome);
   };
 
+  const handleFeito = async (materia: MateriaDoDia) => {
+    if (!materia.minutosPlanejados) return;
+    const jaFeito = feitosIds.has(materia.disciplinaId);
+    const totalMinutos = materia.minutosPlanejados;
+    const sinal = jaFeito ? -1 : 1;
+    const horasAdicionadas = (totalMinutos / 60) * sinal;
+    const horas = Math.floor(totalMinutos / 60) * sinal;
+    const minutos = (totalMinutos % 60) * sinal;
+
+    // Toggle visual imediato
+    setFeitosIds(prev => {
+      const next = new Set(prev);
+      jaFeito ? next.delete(materia.disciplinaId) : next.add(materia.disciplinaId);
+      return next;
+    });
+
+    // Atualização otimista
+    setMateriasState(prev => {
+      const m = prev[materia.disciplinaId];
+      if (!m) return prev;
+      return { ...prev, [materia.disciplinaId]: { ...m, horasRealizadas: m.horasRealizadas + horasAdicionadas, tempoRealEstudo: m.tempoRealEstudo + horasAdicionadas } };
+    });
+
+    try {
+      const result = await adicionarTempoManual({ disciplinaId: materia.disciplinaId, horas, minutos, data: selectedDate });
+      if (result.success) {
+        setSuccess(jaFeito ? "Tempo removido!" : "Tempo planejado marcado como feito!");
+        triggerRefresh();
+      } else {
+        setError(result.message || "Erro");
+        onTempoAdicionado?.();
+      }
+    } catch {
+      setError("Erro ao atualizar tempo");
+      onTempoAdicionado?.();
+    }
+  };
+
   const handleAdicionarQuestoes = (materia: MateriaDoDia) => {
     setDisciplinaSelecionada(materia);
     setModalQuestoesAberto(true);
+  };
+
+  const handleFeitoQuestoes = async (materia: MateriaDoDia) => {
+    if (!materia.questoesPlanejadas) return;
+    const jaFeito = feitosQuestoesIds.has(materia.disciplinaId);
+    const quantidade = materia.questoesPlanejadas * (jaFeito ? -1 : 1);
+
+    setFeitosQuestoesIds(prev => {
+      const next = new Set(prev);
+      jaFeito ? next.delete(materia.disciplinaId) : next.add(materia.disciplinaId);
+      return next;
+    });
+
+    setMateriasState(prev => {
+      const m = prev[materia.disciplinaId];
+      if (!m) return prev;
+      return { ...prev, [materia.disciplinaId]: { ...m, questoesRealizadas: m.questoesRealizadas + quantidade } };
+    });
+
+    try {
+      const result = await adicionarQuestoes({ disciplinaId: materia.disciplinaId, quantidade, data: selectedDate });
+      if (result.success) {
+        setSuccess(jaFeito ? "Questões removidas!" : "Questões planejadas marcadas como feitas!");
+        triggerRefresh();
+      } else {
+        setError(result.message || "Erro");
+        onTempoAdicionado?.();
+      }
+    } catch {
+      setError("Erro ao atualizar questões");
+      onTempoAdicionado?.();
+    }
   };
 
   const handleSalvarTempo = async (totalMinutos: number) => {
@@ -437,9 +509,24 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
                     {/* Coluna esquerda: label + gráfico */}
                     <div className="flex flex-col items-center">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Timer className="h-4 w-4" />
-                        <span className="text-xs font-semibold">Tempo</span>
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Timer className="h-4 w-4" />
+                          <span className="text-xs font-semibold">Tempo</span>
+                        </div>
+                        {materia.minutosPlanejados > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleFeito(materia); }}
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                              feitosIds.has(materia.disciplinaId)
+                                ? "bg-green-500 text-white"
+                                : "border border-green-500/40 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                            }`}
+                          >
+                            <CheckCheck className="h-2.5 w-2.5 inline mr-0.5" />
+                            Feito!
+                          </button>
+                        )}
                       </div>
                       {renderRadialChartOnly(progressoTempo, "Tempo")}
                       <div className="text-[10px] font-medium text-muted-foreground -mt-1">
@@ -565,9 +652,24 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                     <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
                       {/* Coluna esquerda: label + gráfico */}
                       <div className="flex flex-col items-center">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <ClipboardList className="h-4 w-4" />
-                          <span className="text-xs font-semibold">Questões</span>
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <ClipboardList className="h-4 w-4" />
+                            <span className="text-xs font-semibold">Questões</span>
+                          </div>
+                          {materia.questoesPlanejadas > 0 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleFeitoQuestoes(materia); }}
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
+                                feitosQuestoesIds.has(materia.disciplinaId)
+                                  ? "bg-green-500 text-white"
+                                  : "border border-green-500/40 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                              }`}
+                            >
+                              <CheckCheck className="h-2.5 w-2.5 inline mr-0.5" />
+                              Feito!
+                            </button>
+                          )}
                         </div>
                         {renderRadialChartOnly(progressoQuestoes, "Questões")}
                         <div className="text-[10px] font-medium text-muted-foreground -mt-1">

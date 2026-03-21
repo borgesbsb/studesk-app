@@ -515,17 +515,15 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                           <span className="text-xs font-semibold">Tempo</span>
                         </div>
                         {materia.minutosPlanejados > 0 && (
-                          <button
+                          <Button
+                            size="sm"
                             onClick={(e) => { e.stopPropagation(); handleFeito(materia); }}
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
-                              feitosIds.has(materia.disciplinaId)
-                                ? "bg-green-500 text-white"
-                                : "border border-green-500/40 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                            }`}
+                            className={`h-auto py-1.5 px-2 text-[10px] ${feitosIds.has(materia.disciplinaId) ? "bg-green-500 hover:bg-green-600 text-white" : ""}`}
+                            variant={feitosIds.has(materia.disciplinaId) ? "default" : "outline"}
                           >
-                            <CheckCheck className="h-2.5 w-2.5 inline mr-0.5" />
+                            <CheckCheck className="h-3 w-3 mr-0.5" />
                             Feito!
-                          </button>
+                          </Button>
                         )}
                       </div>
                       {renderRadialChartOnly(progressoTempo, "Tempo")}
@@ -658,17 +656,15 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                             <span className="text-xs font-semibold">Questões</span>
                           </div>
                           {materia.questoesPlanejadas > 0 && (
-                            <button
+                            <Button
+                              size="sm"
                               onClick={(e) => { e.stopPropagation(); handleFeitoQuestoes(materia); }}
-                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
-                                feitosQuestoesIds.has(materia.disciplinaId)
-                                  ? "bg-green-500 text-white"
-                                  : "border border-green-500/40 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                              }`}
+                              className={`h-auto py-1.5 px-2 text-[10px] ${feitosQuestoesIds.has(materia.disciplinaId) ? "bg-green-500 hover:bg-green-600 text-white" : ""}`}
+                              variant={feitosQuestoesIds.has(materia.disciplinaId) ? "default" : "outline"}
                             >
-                              <CheckCheck className="h-2.5 w-2.5 inline mr-0.5" />
+                              <CheckCheck className="h-3 w-3 mr-0.5" />
                               Feito!
-                            </button>
+                            </Button>
                           )}
                         </div>
                         {renderRadialChartOnly(progressoQuestoes, "Questões")}

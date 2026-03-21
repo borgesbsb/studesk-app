@@ -509,22 +509,9 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
                     {/* Coluna esquerda: label + gráfico */}
                     <div className="flex flex-col items-center">
-                      <div className="flex items-center justify-between w-full mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <Timer className="h-4 w-4" />
-                          <span className="text-xs font-semibold">Tempo</span>
-                        </div>
-                        {materia.minutosPlanejados > 0 && (
-                          <Button
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); handleFeito(materia); }}
-                            className={`h-auto py-1.5 px-2 text-[10px] ${feitosIds.has(materia.disciplinaId) ? "bg-green-500 hover:bg-green-600 text-white" : ""}`}
-                            variant={feitosIds.has(materia.disciplinaId) ? "default" : "outline"}
-                          >
-                            <CheckCheck className="h-3 w-3 mr-0.5" />
-                            Feito!
-                          </Button>
-                        )}
+                      <div className="flex items-center gap-1.5 w-full mb-1">
+                        <Timer className="h-4 w-4" />
+                        <span className="text-xs font-semibold">Tempo</span>
                       </div>
                       {renderRadialChartOnly(progressoTempo, "Tempo")}
                       <div className="text-[10px] font-medium text-muted-foreground -mt-1">
@@ -558,6 +545,17 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                           Crono
                         </Button>
                       </div>
+                      {materia.minutosPlanejados > 0 && (
+                        <Button
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleFeito(materia); }}
+                          className={`w-full h-auto py-1.5 px-2 text-[10px] ${feitosIds.has(materia.disciplinaId) ? "bg-green-500 hover:bg-green-600 text-white" : ""}`}
+                          variant={feitosIds.has(materia.disciplinaId) ? "default" : "outline"}
+                        >
+                          <CheckCheck className="h-3 w-3 mr-0.5" />
+                          Feito!
+                        </Button>
+                      )}
                       {/* Materiais abaixo */}
                       {materia.materiaisAdmin?.length > 0 ? (
                         <div className="flex flex-col gap-1">
@@ -650,22 +648,9 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                     <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card">
                       {/* Coluna esquerda: label + gráfico */}
                       <div className="flex flex-col items-center">
-                        <div className="flex items-center justify-between w-full mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <ClipboardList className="h-4 w-4" />
-                            <span className="text-xs font-semibold">Questões</span>
-                          </div>
-                          {materia.questoesPlanejadas > 0 && (
-                            <Button
-                              size="sm"
-                              onClick={(e) => { e.stopPropagation(); handleFeitoQuestoes(materia); }}
-                              className={`h-auto py-1.5 px-2 text-[10px] ${feitosQuestoesIds.has(materia.disciplinaId) ? "bg-green-500 hover:bg-green-600 text-white" : ""}`}
-                              variant={feitosQuestoesIds.has(materia.disciplinaId) ? "default" : "outline"}
-                            >
-                              <CheckCheck className="h-3 w-3 mr-0.5" />
-                              Feito!
-                            </Button>
-                          )}
+                        <div className="flex items-center gap-1.5 w-full mb-1">
+                          <ClipboardList className="h-4 w-4" />
+                          <span className="text-xs font-semibold">Questões</span>
                         </div>
                         {renderRadialChartOnly(progressoQuestoes, "Questões")}
                         <div className="text-[10px] font-medium text-muted-foreground -mt-1">
@@ -685,6 +670,17 @@ export function MateriasHojeCardStyle({ materias, onTempoAdicionado }: MateriasH
                           >
                             <ClipboardList className="h-3 w-3 mr-1" />
                             Add Questões
+                          </Button>
+                        )}
+                        {materia.questoesPlanejadas > 0 && (
+                          <Button
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); handleFeitoQuestoes(materia); }}
+                            className={`w-full h-auto py-1.5 px-2 text-[10px] ${feitosQuestoesIds.has(materia.disciplinaId) ? "bg-green-500 hover:bg-green-600 text-white" : ""}`}
+                            variant={feitosQuestoesIds.has(materia.disciplinaId) ? "default" : "outline"}
+                          >
+                            <CheckCheck className="h-3 w-3 mr-0.5" />
+                            Feito!
                           </Button>
                         )}
                         {materia.cadernoQuestoesUrl && (

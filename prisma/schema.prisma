@@ -37,6 +37,7 @@ model User {
   planosAtribuidos      PlanoEstudoUsuario[]
   historicosLeitura     HistoricoLeitura[]
   solicitacoesPlano     SolicitacaoPlano[]
+  editais               Edital[]
 
   @@index([hash])
   @@index([email])
@@ -97,6 +98,38 @@ model Admin {
 // MODELOS DE DOMÍNIO
 // ============================================
 
+model Edital {
+  id          String            @id @default(cuid())
+  userId      String?           // null = edital do admin (compartilhado)
+  nome        String
+  descricao   String?
+  orgao       String?
+  cargo       String?
+  ano         Int?
+  link        String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disciplinas EditalDisciplina[]
+
+  @@index([userId])
+}
+
+model EditalDisciplina {
+  id                   String     @id @default(cuid())
+  editalId             String
+  disciplinaId         String
+  conteudoProgramatico  String?   @db.Text
+  conteudoVerticalizado String?   @db.Text
+  createdAt             DateTime  @default(now())
+  edital               Edital     @relation(fields: [editalId], references: [id], onDelete: Cascade)
+  disciplina           Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([editalId, disciplinaId])
+  @@index([editalId])
+  @@index([disciplinaId])
+}
+
 model Disciplina {
   id            String               @id @default(cuid())
   userId        String?              // null para disciplinas admin (compartilhadas)
@@ -115,6 +148,7 @@ model Disciplina {
   planosDisponiveis       PlanoEstudoDisciplina[]
   progressosExtras        ProgressoUsuarioDisciplinaExtra[]
   buildDisciplinas        BuildPlanoDisciplina[]
+  editais                 EditalDisciplina[]
 
   @@index([userId])
   @@index([nome])
@@ -516,10 +550,24 @@ model Simulado {
   config           ConfigSimulado?    @relation(fields: [configSimuladoId], references: [id], onDelete: SetNull)
   resultados       SimuladoResultado[]
   semanas          SemanaEstudo[]
+  questoes         SimuladoQuestao[]
 
   @@index([configSimuladoId])
   @@index([dataRealizacao])
   @@index([ativo])
+}
+
+// Gabarito: resposta correta por questão de um simulado
+model SimuladoQuestao {
+  id          String   @id @default(cuid())
+  simuladoId  String
+  numero      Int
+  resposta    String   // A, B, C, D, E ou "Certo"/"Errado"
+
+  simulado    Simulado @relation(fields: [simuladoId], references: [id], onDelete: Cascade)
+
+  @@unique([simuladoId, numero])
+  @@index([simuladoId])
 }
 
 // Resultado de um usuário em um simulado

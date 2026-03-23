@@ -7,6 +7,8 @@ import { getDisciplinasCiclo } from "@/interface/actions/dashboard/get-disciplin
 import { getContribuicoesEstudo } from "@/interface/actions/dashboard/get-contribuicoes-estudo"
 import { limparProgressoCiclo } from "@/interface/actions/dashboard/limpar-progresso-ciclo"
 import { getResumoCompartilhar, ResumoCompartilhar } from "@/interface/actions/dashboard/get-resumo-compartilhar"
+import { getCicloPlanejado, CicloPlanejado } from "@/interface/actions/dashboard/get-ciclo-planejado"
+import { getCiclosPlano, CicloInfo } from "@/interface/actions/dashboard/get-ciclos-plano"
 import { CicloStatsCards } from "@/components/dashboard/ciclo-stats-cards"
 import { DisciplinasCicloCard } from "@/components/dashboard/disciplinas-ciclo-card"
 import { ContribuicoesCard } from "@/components/dashboard/contribuicoes-card"
@@ -16,6 +18,7 @@ import { EvolucaoQuestoesCard } from "@/components/hoje/evolucao-questoes-card"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { HourglassCard } from "@/components/dashboard/hourglass-card"
 import { CardCapture } from "@/components/dashboard/card-capture"
+import { CicloPlanejadoCard } from "@/components/dashboard/ciclo-planejado-card"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
@@ -35,6 +38,8 @@ export default function DashboardPage() {
   const [disciplinas, setDisciplinas] = useState<any>(null)
   const [contribuicoes, setContribuicoes] = useState<any>(null)
   const [resumo, setResumo] = useState<ResumoCompartilhar | null>(null)
+  const [cicloPlanejado, setCicloPlanejado] = useState<CicloPlanejado | null>(null)
+  const [ciclosList, setCiclosList] = useState<CicloInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [limpando, setLimpando] = useState(false)
 
@@ -42,18 +47,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function loadData() {
-      const [p, e, d, c, r] = await Promise.all([
+      const [p, e, d, c, r, cp, cl] = await Promise.all([
         getProgressoCiclo(hoje),
         getEvolucaoCiclo(hoje),
         getDisciplinasCiclo(hoje),
         getContribuicoesEstudo(),
         getResumoCompartilhar(),
+        getCicloPlanejado(hoje),
+        getCiclosPlano(hoje),
       ])
       setProgresso(p)
       setEvolucao(e)
       setDisciplinas(d)
       setContribuicoes(c)
       setResumo(r)
+      setCicloPlanejado(cp)
+      setCiclosList(cl)
       setLoading(false)
     }
     loadData()
@@ -69,18 +78,22 @@ export default function DashboardPage() {
     }
     toast.success('Progresso do ciclo zerado com sucesso')
     // Recarregar dados
-    const [p, e, d, c, r] = await Promise.all([
+    const [p, e, d, c, r, cp, cl] = await Promise.all([
       getProgressoCiclo(hoje),
       getEvolucaoCiclo(hoje),
       getDisciplinasCiclo(hoje),
       getContribuicoesEstudo(),
       getResumoCompartilhar(),
+      getCicloPlanejado(hoje),
+      getCiclosPlano(hoje),
     ])
     setProgresso(p)
     setEvolucao(e)
     setDisciplinas(d)
     setContribuicoes(c)
     setResumo(r)
+    setCicloPlanejado(cp)
+    setCiclosList(cl)
   }
 
   return (
@@ -132,25 +145,26 @@ export default function DashboardPage() {
             <ContribuicoesCard contribuicoes={contribuicoes} />
           </CardCapture>
 
-          {/* Linhas 3+4: Esquerda (Resumo + Gráficos) | Direita (Disciplinas spanning tudo) */}
+          {/* Linha 3: Resumo | Disciplinas do Ciclo */}
           <div className="grid grid-cols-2 gap-4 items-stretch">
-            {/* Coluna esquerda: Resumo + Gráficos empilhados */}
-            <div className="flex flex-col gap-4">
-              <CardCapture filename="resumo-compartilhar">
-                <ResumoCompartilharCard resumo={resumo} progresso={progresso} />
-              </CardCapture>
-              <div className="grid grid-cols-2 gap-4 h-56">
-                <CardCapture filename="evolucao-horas" className="h-full">
-                  <EvolucaoHorasCard evolucao={evolucao} />
-                </CardCapture>
-                <CardCapture filename="evolucao-questoes" className="h-full">
-                  <EvolucaoQuestoesCard evolucao={evolucao} />
-                </CardCapture>
-              </div>
-            </div>
-            {/* Coluna direita: Disciplinas ocupa toda a altura */}
+            <CardCapture filename="resumo-compartilhar">
+              <ResumoCompartilharCard resumo={resumo} progresso={progresso} />
+            </CardCapture>
             <CardCapture filename="disciplinas-ciclo" className="h-full">
               <DisciplinasCicloCard disciplinas={disciplinas} />
+            </CardCapture>
+          </div>
+
+          {/* Linha 4: Evolução Horas | Evolução Questões | Ciclo Planejado */}
+          <div className="grid grid-cols-3 gap-4 h-56">
+            <CardCapture filename="evolucao-horas" className="h-full">
+              <EvolucaoHorasCard evolucao={evolucao} />
+            </CardCapture>
+            <CardCapture filename="evolucao-questoes" className="h-full">
+              <EvolucaoQuestoesCard evolucao={evolucao} />
+            </CardCapture>
+            <CardCapture filename="ciclo-planejado" className="h-full">
+              <CicloPlanejadoCard cicloPlanejado={cicloPlanejado} ciclosList={ciclosList} hoje={hoje} />
             </CardCapture>
           </div>
         </div>

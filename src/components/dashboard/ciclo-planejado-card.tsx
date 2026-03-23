@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Target } from "lucide-react";
 import { CicloPlanejado, getCicloPlanejado } from "@/interface/actions/dashboard/get-ciclo-planejado";
 import { CicloInfo } from "@/interface/actions/dashboard/get-ciclos-plano";
 
@@ -15,21 +13,12 @@ interface CicloPlanejadoCardProps {
 }
 
 function formatarTempo(minutos: number): string {
-  if (minutos <= 0) return "0min";
+  if (minutos <= 0) return "—";
   const h = Math.floor(minutos / 60);
   const m = minutos % 60;
   if (h === 0) return `${m}min`;
   if (m === 0) return `${h}h`;
   return `${h}h${m}m`;
-}
-
-function formatarDia(data: Date): string {
-  const d = new Date(data);
-  const dias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-  const diaSemana = dias[d.getUTCDay()];
-  const dia = String(d.getUTCDate()).padStart(2, '0');
-  const mes = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return `${diaSemana}, ${dia}/${mes}`;
 }
 
 function formatarIntervalo(dataInicio: Date, dataFim: Date): string {
@@ -40,66 +29,98 @@ function formatarIntervalo(dataInicio: Date, dataFim: Date): string {
   return `${d1}–${d2}`;
 }
 
-function CicloGrid({ cicloPlanejado }: { cicloPlanejado: CicloPlanejado | null }) {
+interface DisciplinaAgregada {
+  id: string;
+  nome: string;
+  cor: string | null;
+  totalMinutos: number;
+  totalQuestoes: number;
+}
+
+function agregarDisciplinas(cicloPlanejado: CicloPlanejado): DisciplinaAgregada[] {
+  const mapa = new Map<string, DisciplinaAgregada>();
+  for (const dia of cicloPlanejado.dias) {
+    for (const disc of dia.disciplinas) {
+      const existente = mapa.get(disc.id);
+      if (existente) {
+        existente.totalMinutos += disc.minutosPlanejados;
+        existente.totalQuestoes += disc.questoesPlanejadas;
+      } else {
+        mapa.set(disc.id, {
+          id: disc.id,
+          nome: disc.nome,
+          cor: disc.cor,
+          totalMinutos: disc.minutosPlanejados,
+          totalQuestoes: disc.questoesPlanejadas,
+        });
+      }
+    }
+  }
+  return Array.from(mapa.values()).sort((a, b) => b.totalMinutos - a.totalMinutos);
+}
+
+function CicloTabela({ cicloPlanejado }: { cicloPlanejado: CicloPlanejado | null }) {
   if (!cicloPlanejado) {
-    return <p className="text-muted-foreground text-sm">Nenhum ciclo ativo</p>;
+    return <p className="text-muted-foreground text-xs">Nenhum ciclo ativo</p>;
   }
 
-  const diasComDiscs = cicloPlanejado.dias.filter(d => d.disciplinas.length > 0);
+  const disciplinas = agregarDisciplinas(cicloPlanejado);
 
-  if (diasComDiscs.length === 0) {
-    return <p className="text-muted-foreground text-sm">Nenhuma disciplina planejada</p>;
+  if (disciplinas.length === 0) {
+    return <p className="text-muted-foreground text-xs">Nenhuma disciplina planejada</p>;
   }
+
+  const totalMinutos = disciplinas.reduce((s, d) => s + d.totalMinutos, 0);
+  const totalQuestoes = disciplinas.reduce((s, d) => s + d.totalQuestoes, 0);
 
   return (
-    <div
-      className="grid gap-1.5"
-      style={{ gridTemplateColumns: `repeat(${diasComDiscs.length}, minmax(0, 1fr))` }}
-    >
-      {diasComDiscs.map(dia => (
-        <div key={dia.diaId} className="flex flex-col gap-1">
-          <div className="rounded-md bg-muted/60 px-1 py-1 text-center">
-            <p className="text-[10px] font-semibold capitalize leading-tight truncate">
-              {formatarDia(dia.data)}
-            </p>
+    <div className="flex flex-col">
+      {/* Cabeçalho */}
+      <div className="grid gap-x-2 pb-1 border-b border-border/50 mb-1" style={{ gridTemplateColumns: '1fr 56px 56px' }}>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Disciplina</span>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground text-right">Horas</span>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground text-right">Questões</span>
+      </div>
+
+      {/* Linhas */}
+      <div className="flex flex-col divide-y divide-border/30">
+        {disciplinas.map(disc => (
+          <div key={disc.id} className="grid gap-x-2 py-1 items-center" style={{ gridTemplateColumns: '1fr 56px 56px' }}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: disc.cor ?? "#6366f1" }}
+              />
+              <span className="text-[10px] truncate">{disc.nome}</span>
+            </div>
+            <span className="text-[10px] text-right font-medium tabular-nums">
+              {formatarTempo(disc.totalMinutos)}
+            </span>
+            <span className="text-[10px] text-right font-medium tabular-nums text-muted-foreground">
+              {disc.totalQuestoes > 0 ? disc.totalQuestoes : "—"}
+            </span>
           </div>
-          <div className="flex flex-col gap-1">
-            {dia.disciplinas.map(disc => {
-              const cor = disc.cor || "#6366f1";
-              return (
-                <div
-                  key={disc.id}
-                  className="rounded-md border px-1.5 py-1"
-                  style={{ backgroundColor: cor + "30", borderColor: cor + "80" }}
-                >
-                  <p className="text-[10px] font-medium leading-tight truncate text-center">
-                    {disc.nome}
-                  </p>
-                  <p className="flex items-center justify-center gap-1.5 text-[9px] text-muted-foreground mt-0.5">
-                    <span className="flex items-center gap-0.5">
-                      <Clock className="h-2 w-2" />
-                      {formatarTempo(disc.minutosPlanejados)}
-                    </span>
-                    {disc.questoesPlanejadas > 0 && (
-                      <span className="flex items-center gap-0.5">
-                        <Target className="h-2 w-2" />
-                        {disc.questoesPlanejadas}q
-                      </span>
-                    )}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
+
+      {/* Totais */}
+      <div className="grid gap-x-2 pt-1.5 mt-0.5 border-t border-border/50 items-center" style={{ gridTemplateColumns: '1fr 56px 56px' }}>
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Total</span>
+        <span className="text-[10px] text-right font-bold tabular-nums">{formatarTempo(totalMinutos)}</span>
+        <span className="text-[10px] text-right font-bold tabular-nums text-muted-foreground">
+          {totalQuestoes > 0 ? totalQuestoes : "—"}
+        </span>
+      </div>
     </div>
   );
 }
 
 export function CicloPlanejadoCard({ cicloPlanejado: inicial, ciclosList, hoje }: CicloPlanejadoCardProps) {
-  const cicloAtual = ciclosList.find(c => c.isCurrent);
-  const [selectedId, setSelectedId] = useState<string>(cicloAtual?.id ?? ciclosList[0]?.id ?? "");
+  const hojeDate = new Date(hoje + 'T12:00:00Z')
+  const cicloHoje = ciclosList.find(c =>
+    new Date(c.dataInicio) <= hojeDate && new Date(c.dataFim) >= hojeDate
+  )
+  const [selectedId, setSelectedId] = useState<string>(cicloHoje?.id ?? ciclosList[0]?.id ?? "");
   const [dados, setDados] = useState<CicloPlanejado | null>(inicial);
   const [loading, setLoading] = useState(false);
 
@@ -112,10 +133,9 @@ export function CicloPlanejadoCard({ cicloPlanejado: inicial, ciclosList, hoje }
   }
 
   return (
-    <Card className="bg-card border-primary/15">
-      <CardHeader className="pb-2 pt-3 px-3">
+    <Card className="bg-card border-primary/15 h-full flex flex-col">
+      <CardHeader className="pb-2 pt-3 px-3 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Image src="/logo-mvt.png" alt="Logo" width={80} height={20} className="object-contain flex-shrink-0" />
           <span className="text-xs font-semibold flex-shrink-0">Ciclo Planejado</span>
           {ciclosList.length > 0 && (
             <Select value={selectedId} onValueChange={handleSelect}>
@@ -136,13 +156,13 @@ export function CicloPlanejadoCard({ cicloPlanejado: inicial, ciclosList, hoje }
           )}
         </div>
       </CardHeader>
-      <CardContent className="px-3 pb-3">
+      <CardContent className="px-3 pb-3 flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-4">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
           </div>
         ) : (
-          <CicloGrid cicloPlanejado={dados} />
+          <CicloTabela cicloPlanejado={dados} />
         )}
       </CardContent>
     </Card>

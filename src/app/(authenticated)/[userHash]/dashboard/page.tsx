@@ -9,6 +9,7 @@ import { limparProgressoCiclo } from "@/interface/actions/dashboard/limpar-progr
 import { getResumoCompartilhar, ResumoCompartilhar } from "@/interface/actions/dashboard/get-resumo-compartilhar"
 import { getCicloPlanejado, CicloPlanejado } from "@/interface/actions/dashboard/get-ciclo-planejado"
 import { getCiclosPlano, CicloInfo } from "@/interface/actions/dashboard/get-ciclos-plano"
+import { getResultadoSimuladoCicloAtual, ResultadoSimulado } from "@/interface/actions/dashboard/get-resultado-simulado"
 import { CicloStatsCards } from "@/components/dashboard/ciclo-stats-cards"
 import { DisciplinasCicloCard } from "@/components/dashboard/disciplinas-ciclo-card"
 import { ContribuicoesCard } from "@/components/dashboard/contribuicoes-card"
@@ -19,6 +20,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { HourglassCard } from "@/components/dashboard/hourglass-card"
 import { CardCapture } from "@/components/dashboard/card-capture"
 import { CicloPlanejadoCard } from "@/components/dashboard/ciclo-planejado-card"
+import { SimuladoResultadoCard } from "@/components/dashboard/simulado-resultado-card"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
@@ -40,6 +42,7 @@ export default function DashboardPage() {
   const [resumo, setResumo] = useState<ResumoCompartilhar | null>(null)
   const [cicloPlanejado, setCicloPlanejado] = useState<CicloPlanejado | null>(null)
   const [ciclosList, setCiclosList] = useState<CicloInfo[]>([])
+  const [resultadoSimulado, setResultadoSimulado] = useState<ResultadoSimulado | null>(null)
   const [loading, setLoading] = useState(true)
   const [limpando, setLimpando] = useState(false)
 
@@ -56,6 +59,10 @@ export default function DashboardPage() {
         getCicloPlanejado(hoje),
         getCiclosPlano(hoje),
       ])
+      // Ciclo anterior por default no card de simulado
+      const hojeDate = new Date(hoje + 'T12:00:00Z')
+      const cicloAnteriorLoad = [...cl].filter((c: CicloInfo) => new Date(c.dataFim) < hojeDate).pop()
+      const rs = await getResultadoSimuladoCicloAtual(hoje, cicloAnteriorLoad?.id)
       setProgresso(p)
       setEvolucao(e)
       setDisciplinas(d)
@@ -63,6 +70,7 @@ export default function DashboardPage() {
       setResumo(r)
       setCicloPlanejado(cp)
       setCiclosList(cl)
+      setResultadoSimulado(rs)
       setLoading(false)
     }
     loadData()
@@ -87,6 +95,9 @@ export default function DashboardPage() {
       getCicloPlanejado(hoje),
       getCiclosPlano(hoje),
     ])
+    const hojeDate = new Date(hoje + 'T12:00:00Z')
+    const cicloAnteriorLoad = [...cl].filter((c: CicloInfo) => new Date(c.dataFim) < hojeDate).pop()
+    const rs = await getResultadoSimuladoCicloAtual(hoje, cicloAnteriorLoad?.id)
     setProgresso(p)
     setEvolucao(e)
     setDisciplinas(d)
@@ -94,6 +105,7 @@ export default function DashboardPage() {
     setResumo(r)
     setCicloPlanejado(cp)
     setCiclosList(cl)
+    setResultadoSimulado(rs)
   }
 
   return (
@@ -140,10 +152,15 @@ export default function DashboardPage() {
             </CicloStatsCards>
           </CardCapture>
 
-          {/* Linha 2: Contribuições (largura total) */}
-          <CardCapture filename="contribuicoes">
-            <ContribuicoesCard contribuicoes={contribuicoes} />
-          </CardCapture>
+          {/* Linha 2: Contribuições | Resultado Simulado */}
+          <div className="grid grid-cols-2 gap-4 items-stretch">
+            <CardCapture filename="contribuicoes" className="h-full">
+              <ContribuicoesCard contribuicoes={contribuicoes} />
+            </CardCapture>
+            <CardCapture filename="simulado-resultado" className="h-full">
+              <SimuladoResultadoCard resultado={resultadoSimulado} ciclosList={ciclosList} hoje={hoje} />
+            </CardCapture>
+          </div>
 
           {/* Linha 3: Resumo | Disciplinas do Ciclo */}
           <div className="grid grid-cols-2 gap-4 items-stretch">

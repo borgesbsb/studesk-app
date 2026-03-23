@@ -49,6 +49,11 @@ const navItems: NavItem[] = [
     icon: BookOpen
   },
   {
+    title: 'Editais',
+    href: '/admin/editais',
+    icon: FileText
+  },
+  {
     title: 'Materiais',
     href: '/admin/materiais',
     icon: FileText

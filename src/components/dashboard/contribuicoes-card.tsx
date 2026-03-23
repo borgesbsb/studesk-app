@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ContribuicaoDia } from "@/interface/actions/dashboard/get-contribuicoes-estudo";
 
@@ -102,6 +102,13 @@ export function ContribuicoesCard({
     return { semanas, meses, maxHoras, totalContrib };
   }, [contribuicoes]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, []);
+
   const getCor = (horas: number, futuro: boolean) => {
     if (futuro) return "transparent";
     if (horas === 0) return "var(--muted)";
@@ -131,18 +138,19 @@ export function ContribuicoesCard({
   };
 
   return (
-    <Card className="bg-card border-primary/15 h-full">
-      <CardHeader className="pb-2 pt-3 px-3">
+    <Card className="bg-card border-primary/15 h-full flex flex-col">
+      <CardHeader className="pb-2 pt-3 px-3 flex-shrink-0">
         <CardTitle className="text-xs flex items-center gap-2">
           {formatarHoras(totalContrib)} de estudo no último ano
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 pb-3">
-        <div>
+      <CardContent className="px-3 pb-3 flex-1 flex flex-col min-h-0">
+        <div ref={scrollRef} className="overflow-x-auto flex-1 min-h-0">
           <svg
             viewBox={`0 0 ${svgW} ${svgH}`}
-            className="block w-full"
-            preserveAspectRatio="xMidYMid meet"
+            className="block h-full"
+            style={{ minWidth: svgW }}
+            preserveAspectRatio="xMinYMid meet"
           >
             {/* Labels dos meses */}
             {meses.map((mes, i) => (
@@ -205,7 +213,7 @@ export function ContribuicoesCard({
         </div>
 
         {/* Legenda */}
-        <div className="flex items-center justify-end gap-1 mt-1">
+        <div className="flex items-center justify-end gap-1 mt-1 flex-shrink-0">
           <span className="text-[9px] text-muted-foreground">Menos</span>
           {[0, 0.25, 0.5, 0.75, 1].map((nivel) => (
             <div

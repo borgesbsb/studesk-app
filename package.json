@@ -17,6 +17,7 @@
     "corrigir-dias": "tsx scripts/corrigir-dias-estudo.ts",
     "create-admin": "tsx scripts/create-first-admin.ts",
     "seed-demo": "tsx scripts/seed-random-data.ts",
+    "seed-edital": "tsx scripts/seed-edital.ts",
     "worker:pdf": "tsx workers/pdf-processor-worker.ts",
     "test": "playwright test",
     "test:ui": "playwright test --ui",

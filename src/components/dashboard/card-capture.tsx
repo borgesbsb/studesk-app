@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { flushSync } from "react-dom"
 import { toPng } from "html-to-image"
 import { Camera, Check, Download } from "lucide-react"
 import { toast } from "sonner"
@@ -11,24 +12,49 @@ interface CardCaptureProps {
   className?: string
 }
 
+async function fetchLogoBase64(): Promise<string> {
+  try {
+    const res = await fetch("/logo-mvt.png")
+    const blob = await res.blob()
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return ""
+  }
+}
+
 export function CardCapture({ children, filename = "card", className }: CardCaptureProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<"idle" | "capturing" | "done">("idle")
+  const [logoBase64, setLogoBase64] = useState<string>("")
 
   const capture = async () => {
     if (!ref.current || status === "capturing") return
-    setStatus("capturing")
+
+    // Busca a logo como base64 (garante que html-to-image consegue embedar)
+    const logo = await fetchLogoBase64()
+
+    flushSync(() => {
+      setLogoBase64(logo)
+      setStatus("capturing")
+    })
+
+    // Aguarda 2 frames para o browser pintar com a logo
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
     try {
       const dataUrl = await toPng(ref.current, { cacheBust: true, pixelRatio: 2 })
 
-      // Tenta copiar para clipboard
       try {
         const res = await fetch(dataUrl)
         const blob = await res.blob()
         await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
         toast.success("Imagem copiada para a área de transferência!")
       } catch {
-        // Fallback: download direto
         const a = document.createElement("a")
         a.href = dataUrl
         a.download = `${filename}.png`
@@ -46,8 +72,16 @@ export function CardCapture({ children, filename = "card", className }: CardCapt
 
   return (
     <div className={`relative group ${className ?? ""}`}>
-      <div ref={ref} className="h-full">
-        {children}
+      <div ref={ref} className="h-full flex flex-col">
+        {status === "capturing" && logoBase64 && (
+          <div className="flex items-center justify-center py-1.5 px-3 border-b border-border/40 bg-card flex-shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoBase64} alt="Logo" width={90} style={{ objectFit: "contain" }} />
+          </div>
+        )}
+        <div className="flex-1 min-h-0">
+          {children}
+        </div>
       </div>
       <button
         onClick={capture}
@@ -72,5 +106,4 @@ export function CardCapture({ children, filename = "card", className }: CardCapt
       </button>
     </div>
   )
-
 }

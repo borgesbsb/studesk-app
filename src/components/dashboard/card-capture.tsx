@@ -46,6 +46,30 @@ export function CardCapture({ children, filename = "card", className }: CardCapt
     // Aguarda 2 frames para o browser pintar com a logo
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
+    // Expande temporariamente containers com scroll para capturar conteúdo completo
+    type ScrollOverride = { el: HTMLElement; overflowX: string; width: string; maxWidth: string }
+    const overrides: ScrollOverride[] = []
+
+    // 1. Expande scroll containers internos
+    ref.current.querySelectorAll<HTMLElement>('*').forEach(el => {
+      const computed = window.getComputedStyle(el)
+      if (computed.overflowX === 'auto' || computed.overflowX === 'scroll') {
+        overrides.push({ el, overflowX: el.style.overflowX, width: el.style.width, maxWidth: el.style.maxWidth })
+        el.style.overflowX = 'visible'
+        el.style.width = el.scrollWidth + 'px'
+        el.style.maxWidth = 'none'
+      }
+    })
+
+    // 2. Expande o próprio ref para caber o conteúdo completo
+    const fullWidth = Math.max(ref.current.scrollWidth, ref.current.offsetWidth)
+    const refOrigWidth = ref.current.style.width
+    const refOrigMaxWidth = ref.current.style.maxWidth
+    if (fullWidth > ref.current.offsetWidth) {
+      ref.current.style.width = fullWidth + 'px'
+      ref.current.style.maxWidth = 'none'
+    }
+
     try {
       const dataUrl = await toPng(ref.current, { cacheBust: true, pixelRatio: 2 })
 
@@ -67,6 +91,16 @@ export function CardCapture({ children, filename = "card", className }: CardCapt
     } catch {
       toast.error("Erro ao capturar o card")
       setStatus("idle")
+    } finally {
+      // Restaura overflow dos containers internos
+      overrides.forEach(({ el, overflowX, width, maxWidth }) => {
+        el.style.overflowX = overflowX
+        el.style.width = width
+        el.style.maxWidth = maxWidth
+      })
+      // Restaura o ref
+      ref.current!.style.width = refOrigWidth
+      ref.current!.style.maxWidth = refOrigMaxWidth
     }
   }
 

@@ -175,10 +175,10 @@ export default function DashboardPage() {
           {/* Linha 4: Evolução Horas | Evolução Questões | Ciclo Planejado */}
           <div className="grid grid-cols-3 gap-4 h-56">
             <CardCapture filename="evolucao-horas" className="h-full">
-              <EvolucaoHorasCard evolucao={evolucao} />
+              <EvolucaoHorasCard evolucao={evolucao} ciclosList={ciclosList} hoje={hoje} />
             </CardCapture>
             <CardCapture filename="evolucao-questoes" className="h-full">
-              <EvolucaoQuestoesCard evolucao={evolucao} />
+              <EvolucaoQuestoesCard evolucao={evolucao} ciclosList={ciclosList} hoje={hoje} />
             </CardCapture>
             <CardCapture filename="ciclo-planejado" className="h-full">
               <CicloPlanejadoCard cicloPlanejado={cicloPlanejado} ciclosList={ciclosList} hoje={hoje} />

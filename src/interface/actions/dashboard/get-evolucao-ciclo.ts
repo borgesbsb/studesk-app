@@ -30,7 +30,7 @@ export interface EvolucaoCiclo {
   dataFim: Date;
 }
 
-export async function getEvolucaoCiclo(data?: Date | string): Promise<EvolucaoCiclo | null> {
+export async function getEvolucaoCiclo(data?: Date | string, semanaId?: string): Promise<EvolucaoCiclo | null> {
   try {
     const { userId } = await requireAuth();
 
@@ -64,13 +64,11 @@ export async function getEvolucaoCiclo(data?: Date | string): Promise<EvolucaoCi
       return null;
     }
 
-    // Buscar a semana (ciclo) que contém o dia consultado
+    // Buscar a semana (ciclo) — por semanaId direto ou pelo ciclo que contém hoje
     const semanaAtual = await prisma.semanaEstudo.findFirst({
-      where: {
-        planoId: planoAtivo.id,
-        dataInicio: { lt: tomorrowUTC },
-        dataFim: { gte: baseDate }
-      },
+      where: semanaId
+        ? { id: semanaId, planoId: planoAtivo.id }
+        : { planoId: planoAtivo.id, dataInicio: { lt: tomorrowUTC }, dataFim: { gte: baseDate } },
       include: {
         disciplinas: {
           include: {

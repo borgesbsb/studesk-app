@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Printer, AlertCircle, Sparkles, Loader2, CheckCircle2 } from 'lucide-react'
+import { Printer, AlertCircle, Sparkles, Loader2, CheckCircle2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Disciplina {
@@ -44,7 +44,25 @@ function formatarConteudo(texto: string): string[] {
 export function EditalVertical({ edital }: EditalVerticalProps) {
   const router = useRouter()
   const [verticalizando, setVerticalizando] = useState(false)
+  const [limpando, setLimpando] = useState(false)
   const [resultado, setResultado] = useState<{ salvos: number; total: number } | null>(null)
+
+  const handleLimpar = async () => {
+    if (!confirm('Limpar todo o conteúdo verticalizado?')) return
+    setLimpando(true)
+    try {
+      const res = await fetch(`/api/admin/editais/${edital.id}/verticalizar`, { method: 'DELETE', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok || !data.success) { toast.error(data.error || 'Erro ao limpar'); return }
+      toast.success('Conteúdo verticalizado limpo!')
+      setResultado(null)
+      router.refresh()
+    } catch {
+      toast.error('Erro de conexão.')
+    } finally {
+      setLimpando(false)
+    }
+  }
 
   const comConteudo = edital.disciplinas.filter(d => d.conteudoProgramatico)
   const semConteudo = edital.disciplinas.filter(d => !d.conteudoProgramatico)
@@ -54,17 +72,21 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
     setVerticalizando(true)
     setResultado(null)
     try {
-      const res = await fetch(`/api/admin/editais/${edital.id}/verticalizar`, { method: 'POST' })
+      console.log('[verticalizar] iniciando fetch para edital:', edital.id)
+      const res = await fetch(`/api/admin/editais/${edital.id}/verticalizar`, { method: 'POST', credentials: 'include' })
+      console.log('[verticalizar] status:', res.status)
       const data = await res.json()
+      console.log('[verticalizar] resposta:', data)
       if (!res.ok || !data.success) {
-        toast.error(data.error || 'Erro ao verticalizar')
+        toast.error(data.error || 'Erro ao verticalizar', { duration: 10000 })
         return
       }
       setResultado({ salvos: data.salvos, total: data.total })
       toast.success(`${data.salvos} de ${data.total} disciplinas verticalizadas!`)
       router.refresh()
-    } catch {
-      toast.error('Erro de conexão. Tente novamente.')
+    } catch (err: any) {
+      console.error('[verticalizar] erro:', err)
+      toast.error(`Erro: ${err?.message || 'Erro de conexão'}`, { duration: 10000 })
     } finally {
       setVerticalizando(false)
     }
@@ -91,13 +113,27 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
             </p>
           )}
           {resultado && (
-            <p className="text-xs text-green-600 flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              {resultado.salvos} de {resultado.total} disciplinas verticalizadas agora
+            <p className={`text-xs flex items-center gap-1 ${resultado.salvos < resultado.total ? 'text-amber-600' : 'text-green-600'}`}>
+              {resultado.salvos < resultado.total
+                ? <AlertCircle className="h-3.5 w-3.5" />
+                : <CheckCircle2 className="h-3.5 w-3.5" />}
+              {resultado.salvos} de {resultado.total} verticalizadas — {resultado.salvos < resultado.total ? 'clique em "Tentar novamente" para processar o restante' : 'concluído'}
             </p>
           )}
         </div>
         <div className="flex items-center gap-2">
+          {verticalizadas.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLimpar}
+              disabled={limpando || verticalizando}
+              className="gap-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+            >
+              {limpando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Limpar verticalizado
+            </Button>
+          )}
           {comConteudo.length > 0 && (
             <Button
               variant="outline"
@@ -108,7 +144,11 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
               {verticalizando
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <Sparkles className="h-4 w-4" />}
-              {verticalizando ? 'Verticalizando...' : 'Verticalizar com IA'}
+              {verticalizando
+                ? 'Verticalizando...'
+                : resultado && resultado.salvos < resultado.total
+                  ? 'Tentar novamente'
+                  : 'Verticalizar com IA'}
             </Button>
           )}
           <Button onClick={() => window.print()} className="gap-2">

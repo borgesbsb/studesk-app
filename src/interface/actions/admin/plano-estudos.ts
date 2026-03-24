@@ -262,6 +262,20 @@ export async function adminExcluirCiclo(cicloId: string, planoId: string) {
   }
 }
 
+export async function adminExcluirTodosCiclos(planoId: string) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  try {
+    const { count } = await prisma.semanaEstudo.deleteMany({ where: { planoId } })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true, count }
+  } catch (error) {
+    console.error('Erro ao excluir ciclos:', error)
+    return { error: 'Erro ao excluir ciclos' }
+  }
+}
+
 // ─── Disciplinas (DisciplinaSemana) ──────────────────────────────────────────
 
 export async function adminAdicionarDisciplina(data: {
@@ -750,5 +764,123 @@ export async function adminAtualizarCadernoQuestoesCiclo(
   } catch (error) {
     console.error('Erro ao atualizar caderno de questões:', error)
     return { error: 'Erro ao salvar URL do caderno' }
+  }
+}
+
+// ─── Gerador de Ciclos em Lote ────────────────────────────────────────────────
+
+export async function adminGerarCiclosEmLote(data: {
+  planoId: string
+  numeroCiclos: number
+  dataInicio: string  // YYYY-MM-DD
+  duracaoDias: number
+  p1DiscIds: string[]
+  p2DiscIds: string[]
+  editalId: string
+}) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+
+  const { planoId, numeroCiclos, dataInicio, duracaoDias, p1DiscIds, p2DiscIds, editalId } = data
+
+  if (numeroCiclos < 1 || numeroCiclos > 52) return { error: 'Número de ciclos inválido (1–52)' }
+  if (p1DiscIds.length === 0 && p2DiscIds.length === 0) return { error: 'Selecione ao menos uma disciplina em P1 ou P2' }
+
+  try {
+    const maxResult = await prisma.semanaEstudo.aggregate({
+      where: { planoId },
+      _max: { numeroSemana: true },
+    })
+    const baseNumero = (maxResult._max.numeroSemana ?? 0)
+
+    const [ano, mes, dia] = dataInicio.split('-').map(Number)
+    const inicio = new Date(ano, mes - 1, dia, 12, 0, 0)
+
+    // Mapeia disciplinaId → lista de DisciplinaSemana IDs criados (em ordem de ciclo)
+    const discSemanaIds: Record<string, string[]> = {}
+
+    const ciclosCriados = await prisma.$transaction(async (tx) => {
+      const criados = []
+      for (let i = 1; i <= numeroCiclos; i++) {
+        const offset = (i - 1) * duracaoDias
+        const cicloInicio = new Date(inicio.getTime() + offset * 86_400_000)
+        const cicloFim = new Date(cicloInicio.getTime() + (duracaoDias - 1) * 86_400_000)
+
+        const semana = await tx.semanaEstudo.create({
+          data: {
+            planoId,
+            numeroSemana: baseNumero + i,
+            dataInicio: cicloInicio,
+            dataFim: cicloFim,
+            totalHoras: 0,
+            horasRealizadas: 0,
+          },
+        })
+
+        const discIds = i % 2 === 1 ? p1DiscIds : p2DiscIds
+        for (let ord = 0; ord < discIds.length; ord++) {
+          const ds = await tx.disciplinaSemana.create({
+            data: {
+              semanaId: semana.id,
+              disciplinaId: discIds[ord],
+              minutosPlanejados: 0,
+              horasRealizadas: 0,
+              questoesPlanejadas: 0,
+              questoesRealizadas: 0,
+              prioridade: ord + 1,
+              concluida: false,
+            },
+          })
+          if (!discSemanaIds[discIds[ord]]) discSemanaIds[discIds[ord]] = []
+          discSemanaIds[discIds[ord]].push(ds.id)
+        }
+        criados.push(semana)
+      }
+      return criados
+    })
+
+    // ── Distribuir assuntos do edital verticalizado ────────────────────────────
+    const todasDiscIds = [...new Set([...p1DiscIds, ...p2DiscIds])]
+
+    const editalDiscs = await prisma.editalDisciplina.findMany({
+      where: { editalId, disciplinaId: { in: todasDiscIds } },
+      select: { disciplinaId: true, conteudoVerticalizado: true },
+    })
+
+    for (const ed of editalDiscs) {
+      if (!ed.conteudoVerticalizado) continue
+      const semanaIds = discSemanaIds[ed.disciplinaId]
+      if (!semanaIds || semanaIds.length === 0) continue
+
+      const topicos = ed.conteudoVerticalizado
+        .split('\n')
+        .map(t => t.trim())
+        .filter(Boolean)
+
+      if (topicos.length === 0) continue
+
+      const numCiclos = semanaIds.length
+      // Quantos tópicos por ciclo (pelo menos 1)
+      const porCiclo = Math.max(1, Math.ceil(topicos.length / numCiclos))
+
+      for (let i = 0; i < semanaIds.length; i++) {
+        // Distribuição circular: se acabar, volta ao início
+        const slice: string[] = []
+        for (let j = 0; j < porCiclo; j++) {
+          const idx = (i * porCiclo + j) % topicos.length
+          slice.push(topicos[idx])
+        }
+        await prisma.disciplinaSemana.update({
+          where: { id: semanaIds[i] },
+          data: { assuntos: slice.join(', ') },
+        })
+      }
+    }
+
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true, criados: ciclosCriados.length }
+  } catch (error) {
+    console.error('Erro ao gerar ciclos em lote:', error)
+    return { error: error instanceof Error ? error.message : 'Erro ao gerar ciclos' }
   }
 }

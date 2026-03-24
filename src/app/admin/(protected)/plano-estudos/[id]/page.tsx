@@ -3,14 +3,12 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, CalendarDays, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays } from 'lucide-react'
 
 import { adminBuscarPlano, adminListarSimuladosDisponiveis } from '@/interface/actions/admin/plano-estudos'
-import { GerenciarDisciplinasPlano } from '@/components/admin/planos-estudos/gerenciar-disciplinas-plano'
+import { adminListarEditais } from '@/interface/actions/admin/editais'
 import { GerenciarCiclosAdmin } from '@/components/admin/planos-estudos/gerenciar-ciclos-admin'
-import { GerenciarUsuariosPlano } from '@/components/admin/planos-estudos/gerenciar-usuarios-plano'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -18,15 +16,17 @@ interface Props {
 
 export default async function AdminPlanoDetalhe({ params }: Props) {
   const { id } = await params
-  const [res, simsRes] = await Promise.all([
+  const [res, simsRes, editaisRes] = await Promise.all([
     adminBuscarPlano(id),
     adminListarSimuladosDisponiveis(),
+    adminListarEditais(),
   ])
 
   if (!res.success || !res.data) notFound()
 
   const plano = res.data
   const simuladosDisponiveis = simsRes.success && simsRes.data ? simsRes.data : []
+  const editais = editaisRes.success && editaisRes.data ? editaisRes.data : []
 
   return (
     <div className="p-8 space-y-8">
@@ -55,42 +55,14 @@ export default async function AdminPlanoDetalhe({ params }: Props) {
         </div>
       </div>
 
-      {/* Pool de disciplinas */}
-      <GerenciarDisciplinasPlano
-        planoId={id}
-        poolInicial={plano.disciplinasDisponiveis}
-        ciclos={plano.semanas}
-      />
-
       {/* Ciclos */}
       <GerenciarCiclosAdmin
         planoId={id}
         ciclosIniciais={plano.semanas as any}
         simuladosDisponiveis={simuladosDisponiveis}
+        editais={editais as any}
       />
 
-      {/* Usuários atribuídos */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Users className="h-4 w-4 text-slate-500" />
-            Usuários Atribuídos
-            <Badge variant="secondary" className="ml-1">
-              {plano.usuarios.length}
-            </Badge>
-          </CardTitle>
-          <p className="text-sm text-slate-500">
-            Busque e adicione usuários que terão acesso a este plano.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <GerenciarUsuariosPlano
-            planoId={id}
-            usuariosIniciais={plano.usuarios}
-            solicitacoesIniciais={plano.solicitacoes}
-          />
-        </CardContent>
-      </Card>
     </div>
   )
 }

@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -14,13 +17,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
-  Plus, Trash2, Loader2, CalendarDays, FileText, Video, Link2, Check, X, Bold, Italic, ClipboardList, ChevronDown, ChevronUp, BookOpen, ExternalLink,
+  Plus, Trash2, Loader2, CalendarDays, FileText, Video, Link2, Check, X, Bold, Italic, ClipboardList, ChevronDown, ChevronUp, BookOpen, ExternalLink, AlertTriangle,
+  Settings2, Zap, Hash, Calendar, ArrowRight, ArrowLeft, Search,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
   adminAdicionarCiclo,
   adminExcluirCiclo,
+  adminExcluirTodosCiclos,
   adminAdicionarDisciplina,
   adminExcluirDisciplina,
   adminAtualizarDisciplinaSemana,
@@ -30,6 +36,7 @@ import {
   adminAtualizarHorasSimuladoCiclo,
   adminAtualizarDiaSimuladoCiclo,
   adminAtualizarCadernoQuestoesCiclo,
+  adminGerarCiclosEmLote,
 } from '@/interface/actions/admin/plano-estudos'
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
@@ -78,10 +85,29 @@ interface MaterialDisponivel {
   tipo: string
 }
 
+// ─── Tipos do gerador ──────────────────────────────────────────────────────────
+
+interface EditalDisciplina {
+  id: string
+  conteudoProgramatico: string | null
+  conteudoVerticalizado: string | null
+  disciplina: { id: string; nome: string; cor: string | null }
+}
+
+interface Edital {
+  id: string
+  nome: string
+  orgao: string | null
+  cargo: string | null
+  ano: number | null
+  disciplinas: EditalDisciplina[]
+}
+
 interface GerenciarCiclosAdminProps {
   planoId: string
   ciclosIniciais: Ciclo[]
   simuladosDisponiveis: SimuladoRef[]
+  editais?: Edital[]
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -117,8 +143,82 @@ function MaterialIcon({ tipo }: { tipo: string }) {
 
 // ─── Componente ────────────────────────────────────────────────────────────────
 
-export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponiveis }: GerenciarCiclosAdminProps) {
+export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponiveis, editais = [] }: GerenciarCiclosAdminProps) {
+  const router = useRouter()
   const [ciclos, setCiclos] = useState<Ciclo[]>(ciclosIniciais)
+
+  // Sincroniza estado local quando o servidor retorna novos dados (após router.refresh())
+  useEffect(() => {
+    setCiclos(ciclosIniciais)
+  }, [ciclosIniciais])
+
+  // ── Estado: painel do gerador ─────────────────────────────────────────────────
+  const [geradorAberto, setGeradorAberto] = useState(false)
+
+  // ── Estado: gerador de ciclos ─────────────────────────────────────────────────
+  const [editalId, setEditalId] = useState<string>(editais[0]?.id ?? '')
+  const [editalSearch, setEditalSearch] = useState('')
+  const [editalDropdownAberto, setEditalDropdownAberto] = useState(false)
+  const [numeroCiclos, setNumeroCiclos] = useState(10)
+  const [dataInicio, setDataInicio] = useState('')
+  const [duracaoDias, setDuracaoDias] = useState(7)
+  const [emP2, setEmP2] = useState<Set<string>>(new Set())
+  const [gerando, setGerando] = useState(false)
+
+  const editalSelecionado = editais.find(e => e.id === editalId)
+  const disciplinasGerador = editalSelecionado?.disciplinas.filter(
+    d => d.conteudoVerticalizado || d.conteudoProgramatico
+  ) ?? []
+  const p1 = disciplinasGerador.filter(d => !emP2.has(d.disciplina.id))
+  const p2 = disciplinasGerador.filter(d => emP2.has(d.disciplina.id))
+
+  useEffect(() => { setEmP2(new Set()) }, [editalId])
+
+  useEffect(() => {
+    if (!editalDropdownAberto) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-edital-dropdown]')) setEditalDropdownAberto(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [editalDropdownAberto])
+
+  function moverParaP2(disciplinaId: string) {
+    setEmP2(prev => new Set([...prev, disciplinaId]))
+  }
+
+  function moverParaP1(disciplinaId: string) {
+    setEmP2(prev => { const s = new Set(prev); s.delete(disciplinaId); return s })
+  }
+
+  const podeGerar = dataInicio && (p1.length > 0 || p2.length > 0)
+
+  async function handleGerar() {
+    if (!podeGerar) return
+    setGerando(true)
+    try {
+      const res = await adminGerarCiclosEmLote({
+        planoId,
+        numeroCiclos,
+        dataInicio,
+        duracaoDias,
+        p1DiscIds: p1.map(d => d.disciplina.id),
+        p2DiscIds: p2.map(d => d.disciplina.id),
+        editalId,
+      })
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(`${res.criados} ciclo${res.criados !== 1 ? 's' : ''} gerado${res.criados !== 1 ? 's' : ''} com sucesso!`)
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao gerar ciclos')
+    } finally {
+      setGerando(false)
+    }
+  }
 
   // ── Estado: horas/questões/assunto por disciplina (auto-save no blur) ─────────
   const [rowEdits, setRowEdits] = useState<Record<string, { horas: number; questoes: number; assunto: string }>>(
@@ -126,6 +226,19 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
       ciclosIniciais.flatMap(c => c.disciplinas).map(d => [d.id, { horas: d.minutosPlanejados, questoes: d.questoesPlanejadas, assunto: d.assuntos ?? '' }])
     )
   )
+
+  // Sincroniza rowEdits quando chegam novos ciclos do servidor
+  useEffect(() => {
+    setRowEdits(prev => {
+      const next = { ...prev }
+      ciclosIniciais.flatMap(c => c.disciplinas).forEach(d => {
+        if (!next[d.id]) {
+          next[d.id] = { horas: d.minutosPlanejados, questoes: d.questoesPlanejadas, assunto: d.assuntos ?? '' }
+        }
+      })
+      return next
+    })
+  }, [ciclosIniciais])
   const [savingDiscId, setSavingDiscId] = useState<string | null>(null)
   const [savedDiscId, setSavedDiscId] = useState<string | null>(null)
 
@@ -133,6 +246,9 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
   const [matAddingDiscId, setMatAddingDiscId] = useState<string | null>(null)
   const [matDisponiveis, setMatDisponiveis] = useState<MaterialDisponivel[]>([])
   const [matSelecionado, setMatSelecionado] = useState('')
+  const [matSearch, setMatSearch] = useState('')
+  const [discMatAtual, setDiscMatAtual] = useState<DisciplinaSemana | null>(null)
+
   const [loadingMatDiscId, setLoadingMatDiscId] = useState<string | null>(null)
   const [addingMatDiscId, setAddingMatDiscId] = useState<string | null>(null)
   const [removendoMatId, setRemovendoMatId] = useState<string | null>(null)
@@ -181,6 +297,22 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
 
   // ── Estado: ciclos ────────────────────────────────────────────────────────────
   const [removendoCicloId, setRemovendoCicloId] = useState<string | null>(null)
+  const [limpandoTodos, setLimpandoTodos] = useState(false)
+
+  const handleLimparTodos = async () => {
+    if (!confirm('Apagar TODOS os ciclos deste plano? Esta ação não pode ser desfeita.')) return
+    setLimpandoTodos(true)
+    try {
+      const res = await adminExcluirTodosCiclos(planoId)
+      if ('error' in res) { toast.error(res.error); return }
+      setCiclos([])
+      toast.success(`${res.count} ciclo${res.count !== 1 ? 's' : ''} apagado${res.count !== 1 ? 's' : ''}`)
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao apagar ciclos')
+    } finally {
+      setLimpandoTodos(false)
+    }
+  }
   const [modalCiclo, setModalCiclo] = useState(false)
   const [novoCiclo, setNovoCiclo] = useState({ dataInicio: '', dataFim: '', observacoes: '' })
   const [salvandoCiclo, setSalvandoCiclo] = useState(false)
@@ -225,7 +357,9 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
 
   const iniciarAddMaterial = async (disc: DisciplinaSemana) => {
     setMatAddingDiscId(disc.id)
+    setDiscMatAtual(disc)
     setMatSelecionado('')
+    setMatSearch('')
     setLoadingMatDiscId(disc.id)
     const res = await fetch(`/api/admin/materiais-disciplina?disciplinaId=${disc.disciplinaId}`)
     const todos: MaterialDisponivel[] = res.ok ? await res.json() : []
@@ -249,6 +383,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
     setMatDisponiveis(prev => prev.filter(m => m.id !== matSelecionado))
     setMatSelecionado('')
     setMatAddingDiscId(null)
+    setDiscMatAtual(null)
   }
 
   const removerMaterial = async (matEntryId: string, disc: DisciplinaSemana) => {
@@ -422,11 +557,298 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
               <CalendarDays className="h-4 w-4 text-slate-500" />
               Ciclos e Disciplinas
             </CardTitle>
-            <Button size="sm" onClick={() => setModalCiclo(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Adicionar Ciclo
-            </Button>
+            <div className="flex items-center gap-2">
+              {editais.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setGeradorAberto(v => !v)}
+                  className="gap-1.5 text-violet-600 hover:text-violet-800 hover:bg-violet-50 border-violet-200"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Configurar gerador
+                  {geradorAberto ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </Button>
+              )}
+              {ciclos.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLimparTodos}
+                  disabled={limpandoTodos}
+                  className="gap-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200"
+                >
+                  {limpandoTodos ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Apagar todos
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setModalCiclo(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Adicionar Ciclo
+              </Button>
+            </div>
           </div>
         </CardHeader>
+
+        {/* Painel do gerador — colapsável */}
+        {geradorAberto && editais.length > 0 && (
+          <div className="mx-6 mb-4 rounded-lg border border-violet-200 bg-violet-50/30">
+            <div className="px-5 py-4 border-b border-violet-100 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-violet-500" />
+              <span className="text-sm font-semibold text-violet-800">Gerador de Ciclos</span>
+              <span className="text-xs text-slate-500 ml-1">
+                Distribua as disciplinas do edital entre P1 (ciclos ímpares) e P2 (ciclos pares) e gere os ciclos automaticamente.
+              </span>
+            </div>
+
+            <div className="p-5 space-y-6">
+              {/* Edital */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Edital de referência
+                </label>
+                {editais.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">Nenhum edital disponível.</p>
+                ) : (
+                  <div className="relative" data-edital-dropdown>
+                    {/* Trigger */}
+                    <button
+                      type="button"
+                      onClick={() => { setEditalDropdownAberto(v => !v); setEditalSearch('') }}
+                      className="w-full flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    >
+                      <span className="truncate text-left">
+                        {editalSelecionado
+                          ? `${editalSelecionado.nome}${editalSelecionado.orgao ? ` — ${editalSelecionado.orgao}` : ''}${editalSelecionado.ano ? ` (${editalSelecionado.ano})` : ''}`
+                          : 'Selecione um edital…'}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0 ml-2" />
+                    </button>
+
+                    {/* Dropdown */}
+                    {editalDropdownAberto && (
+                      <div className="absolute z-50 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg">
+                        {/* Search */}
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100">
+                          <Search className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Buscar edital…"
+                            value={editalSearch}
+                            onChange={e => setEditalSearch(e.target.value)}
+                            className="flex-1 text-sm text-slate-700 placeholder-slate-400 outline-none bg-transparent"
+                          />
+                        </div>
+                        {/* Options */}
+                        <ul className="max-h-56 overflow-y-auto py-1">
+                          {editais
+                            .filter(e => {
+                              const q = editalSearch.toLowerCase()
+                              return (
+                                e.nome.toLowerCase().includes(q) ||
+                                (e.orgao ?? '').toLowerCase().includes(q) ||
+                                (e.cargo ?? '').toLowerCase().includes(q) ||
+                                String(e.ano ?? '').includes(q)
+                              )
+                            })
+                            .map(e => {
+                              const label = `${e.nome}${e.orgao ? ` — ${e.orgao}` : ''}${e.ano ? ` (${e.ano})` : ''}`
+                              return (
+                                <li key={e.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setEditalId(e.id); setEditalDropdownAberto(false) }}
+                                    className={`w-full text-left px-3 py-2 text-sm hover:bg-violet-50 hover:text-violet-700 transition-colors ${e.id === editalId ? 'bg-violet-50 text-violet-700 font-medium' : 'text-slate-700'}`}
+                                  >
+                                    {label}
+                                  </button>
+                                </li>
+                              )
+                            })}
+                          {editais.filter(e => {
+                            const q = editalSearch.toLowerCase()
+                            return e.nome.toLowerCase().includes(q) || (e.orgao ?? '').toLowerCase().includes(q)
+                          }).length === 0 && (
+                            <li className="px-3 py-2 text-sm text-slate-400 italic">Nenhum resultado</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {editalSelecionado && (
+                  <p className="text-xs text-slate-400">
+                    {disciplinasGerador.length} disciplina{disciplinasGerador.length !== 1 ? 's' : ''} com conteúdo
+                    {disciplinasGerador.filter(d => d.conteudoVerticalizado).length > 0 && (
+                      <> · <span className="text-green-600">{disciplinasGerador.filter(d => d.conteudoVerticalizado).length} verticalizadas</span></>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              {/* Configuração de ciclos */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                    <Hash className="h-3.5 w-3.5" />
+                    Nº de ciclos
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={52}
+                    value={numeroCiclos}
+                    onChange={e => setNumeroCiclos(Math.max(1, Math.min(52, Number(e.target.value))))}
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400 text-center"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Data de início
+                  </label>
+                  <input
+                    type="date"
+                    value={dataInicio}
+                    onChange={e => setDataInicio(e.target.value)}
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                    Duração (dias)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={duracaoDias}
+                    onChange={e => setDuracaoDias(Math.max(1, Math.min(30, Number(e.target.value))))}
+                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400 text-center"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-400 -mt-3">
+                Ciclos ímpares (1, 3, 5…) → disciplinas P1 &nbsp;·&nbsp; Ciclos pares (2, 4, 6…) → disciplinas P2
+              </p>
+
+              {/* Distribuição P1 / P2 */}
+              {disciplinasGerador.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                    Distribuição P1 / P2
+                  </label>
+                  <p className="text-xs text-slate-400">
+                    Passe o mouse sobre a disciplina e clique na seta para movê-la.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* P1 */}
+                    <div className="rounded-md border border-indigo-100 bg-indigo-50/40 overflow-hidden">
+                      <div className="px-3 py-2 bg-indigo-100/70 border-b border-indigo-100 flex items-center justify-between">
+                        <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">P1 — Ímpares</span>
+                        <Badge className="bg-indigo-600 text-white text-xs h-5 px-1.5">{p1.length}</Badge>
+                      </div>
+                      <div className="divide-y divide-indigo-100/60 min-h-[48px]">
+                        {p1.length === 0 && (
+                          <p className="text-xs text-indigo-300 italic px-3 py-3">Nenhuma disciplina</p>
+                        )}
+                        {p1.map(d => (
+                          <div key={d.disciplina.id} className="flex items-center justify-between px-3 py-2 group">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: d.disciplina.cor || '#6366f1' }}
+                              />
+                              <span className="text-xs text-slate-700 truncate">{d.disciplina.nome}</span>
+                              {d.conteudoVerticalizado && (
+                                <span className="text-green-500 text-xs flex-shrink-0" title="Verticalizado">✓</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => moverParaP2(d.disciplina.id)}
+                              title="Mover para P2"
+                              className="ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-rose-500"
+                            >
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* P2 */}
+                    <div className="rounded-md border border-rose-100 bg-rose-50/40 overflow-hidden">
+                      <div className="px-3 py-2 bg-rose-100/70 border-b border-rose-100 flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-700 uppercase tracking-wide">P2 — Pares</span>
+                        <Badge className="bg-rose-600 text-white text-xs h-5 px-1.5">{p2.length}</Badge>
+                      </div>
+                      <div className="divide-y divide-rose-100/60 min-h-[48px]">
+                        {p2.length === 0 && (
+                          <p className="text-xs text-rose-300 italic px-3 py-3">Nenhuma disciplina</p>
+                        )}
+                        {p2.map(d => (
+                          <div key={d.disciplina.id} className="flex items-center justify-between px-3 py-2 group">
+                            <button
+                              onClick={() => moverParaP1(d.disciplina.id)}
+                              title="Mover para P1"
+                              className="mr-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500"
+                            >
+                              <ArrowLeft className="h-3.5 w-3.5" />
+                            </button>
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: d.disciplina.cor || '#f43f5e' }}
+                              />
+                              <span className="text-xs text-slate-700 truncate">{d.disciplina.nome}</span>
+                              {d.conteudoVerticalizado && (
+                                <span className="text-green-500 text-xs flex-shrink-0" title="Verticalizado">✓</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Resumo + botão */}
+              <div className="flex items-center justify-between gap-4">
+                {disciplinasGerador.length > 0 ? (
+                  <div className="flex items-center gap-4 p-3 rounded-md bg-slate-50 text-xs text-slate-500 flex-1">
+                    <span><span className="font-semibold text-indigo-600">{p1.length}</span> em P1</span>
+                    <span className="text-slate-300">·</span>
+                    <span><span className="font-semibold text-rose-600">{p2.length}</span> em P2</span>
+                    <span className="text-slate-300">·</span>
+                    <span>{numeroCiclos} ciclos de {duracaoDias} dia{duracaoDias !== 1 ? 's' : ''}</span>
+                  </div>
+                ) : (
+                  <div className="flex-1" />
+                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {!dataInicio && (
+                    <p className="text-xs text-slate-400">informe a data →</p>
+                  )}
+                  <Button
+                    onClick={handleGerar}
+                    disabled={!podeGerar || gerando}
+                    className="gap-2"
+                  >
+                    {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                    {gerando ? 'Gerando ciclos…' : 'Gerar Ciclos'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <CardContent className="space-y-6">
           {ciclos.length === 0 ? (
             <div className="text-center py-8 text-slate-400 border rounded-lg bg-slate-50 text-sm">
@@ -675,7 +1097,7 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                               </td>
 
                               {/* Materiais */}
-                              <td className="px-4 py-3" style={{overflow:'hidden'}}>
+                              <td className="px-4 py-3">
                                 <div className="space-y-2">
                                   <div className="flex flex-wrap gap-1.5">
                                     {disc.materiais.map(mat => (
@@ -696,49 +1118,11 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                                     ))}
                                   </div>
 
-                                  {matAddingDiscId === disc.id ? (
-                                    <div className="flex items-center gap-1.5">
-                                      {loadingMatDiscId === disc.id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                                      ) : matDisponiveis.length === 0 ? (
-                                        <span className="text-xs text-slate-400">Nenhum disponível</span>
-                                      ) : (
-                                        <select
-                                          className="border rounded px-2 h-8 text-xs bg-background flex-1 min-w-0"
-                                          value={matSelecionado}
-                                          onChange={e => setMatSelecionado(e.target.value)}
-                                          autoFocus>
-                                          <option value="">Selecione...</option>
-                                          {matDisponiveis.map(m => (
-                                            <option key={m.id} value={m.id}>{m.nome}</option>
-                                          ))}
-                                        </select>
-                                      )}
-                                      {!loadingMatDiscId && (
-                                        <>
-                                          <button
-                                            className="h-8 w-8 flex items-center justify-center rounded border bg-white hover:bg-slate-50 disabled:opacity-50"
-                                            disabled={!matSelecionado || addingMatDiscId === disc.id}
-                                            onClick={() => confirmarAddMaterial(disc)}>
-                                            {addingMatDiscId === disc.id
-                                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                              : <Check className="h-3.5 w-3.5 text-emerald-600" />}
-                                          </button>
-                                          <button
-                                            className="h-8 w-8 flex items-center justify-center rounded hover:bg-slate-100"
-                                            onClick={() => setMatAddingDiscId(null)}>
-                                            <X className="h-3.5 w-3.5 text-slate-400" />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <button
-                                      className="text-xs text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
-                                      onClick={() => iniciarAddMaterial(disc)}>
-                                      <Plus className="h-3.5 w-3.5" /> material
-                                    </button>
-                                  )}
+                                  <button
+                                    className="text-xs text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                                    onClick={() => iniciarAddMaterial(disc)}>
+                                    <Plus className="h-3.5 w-3.5" /> material
+                                  </button>
                                 </div>
                               </td>
 
@@ -911,6 +1295,100 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Modal customizado: selecionar material */}
+      {matAddingDiscId !== null && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => { setMatAddingDiscId(null); setDiscMatAtual(null) }}
+        >
+          {/* Overlay */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          {/* Painel */}
+          <div
+            style={{ position: 'relative', background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', width: '100%', maxWidth: 460, margin: '0 16px', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 600, fontSize: 16, color: '#1e293b' }}>Adicionar material</span>
+              <button
+                onClick={() => { setMatAddingDiscId(null); setDiscMatAtual(null) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}
+              >
+                <X style={{ width: 18, height: 18 }} />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              {loadingMatDiscId ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0' }}>
+                  <Loader2 style={{ width: 20, height: 20, color: '#94a3b8' }} className="animate-spin" />
+                </div>
+              ) : matDisponiveis.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#64748b', fontSize: 14, padding: '24px 0' }}>Nenhum material disponível</p>
+              ) : (
+                <>
+                  {/* Busca */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 12px', background: '#fff' }}>
+                    <Search style={{ width: 16, height: 16, color: '#94a3b8', flexShrink: 0 }} />
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Buscar material…"
+                      value={matSearch}
+                      onChange={e => setMatSearch(e.target.value)}
+                      style={{ flex: 1, fontSize: 14, color: '#334155', outline: 'none', border: 'none', background: 'transparent' }}
+                    />
+                  </div>
+                  {/* Lista */}
+                  <ul style={{ overflowY: 'auto', flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, margin: 0, padding: 0, listStyle: 'none' }}>
+                    {matDisponiveis
+                      .filter(m => m.nome.toLowerCase().includes(matSearch.toLowerCase()))
+                      .map(m => (
+                        <li key={m.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <button
+                            type="button"
+                            onClick={() => setMatSelecionado(m.id)}
+                            style={{
+                              width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '10px 12px', fontSize: 14, cursor: 'pointer', border: 'none',
+                              background: m.id === matSelecionado ? '#eff6ff' : '#fff',
+                              color: m.id === matSelecionado ? '#1d4ed8' : '#334155',
+                              fontWeight: m.id === matSelecionado ? 600 : 400,
+                            }}
+                          >
+                            <MaterialIcon tipo={m.tipo} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.nome}</span>
+                          </button>
+                        </li>
+                      ))}
+                    {matDisponiveis.filter(m => m.nome.toLowerCase().includes(matSearch.toLowerCase())).length === 0 && (
+                      <li style={{ padding: '10px 12px', fontSize: 14, color: '#94a3b8', fontStyle: 'italic' }}>Nenhum resultado</li>
+                    )}
+                  </ul>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <Button variant="outline" onClick={() => { setMatAddingDiscId(null); setDiscMatAtual(null) }}>
+                Cancelar
+              </Button>
+              <Button
+                disabled={!matSelecionado || addingMatDiscId !== null}
+                onClick={() => { if (discMatAtual) confirmarAddMaterial(discMatAtual) }}
+              >
+                {addingMatDiscId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Adicionar
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   )
 }

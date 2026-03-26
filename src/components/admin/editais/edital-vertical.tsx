@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Printer, AlertCircle, Sparkles, Loader2, CheckCircle2, Trash2 } from 'lucide-react'
+import { Printer, AlertCircle, Sparkles, Loader2, CheckCircle2, Trash2, FileUp, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { adminImportarDisciplinas } from '@/interface/actions/admin/editais'
 
 interface Disciplina {
   id: string
@@ -41,11 +43,73 @@ function formatarConteudo(texto: string): string[] {
     .filter(l => l.length > 0)
 }
 
+type EtapaExtract = 'upload' | 'processando' | 'revisao'
+
+interface DisciplinaExtraida {
+  nome: string
+  conteudo: string
+  incluir: boolean
+}
+
 export function EditalVertical({ edital }: EditalVerticalProps) {
   const router = useRouter()
   const [verticalizando, setVerticalizando] = useState(false)
   const [limpando, setLimpando] = useState(false)
   const [resultado, setResultado] = useState<{ salvos: number; total: number } | null>(null)
+
+  // Extração de disciplinas via PDF
+  const [modalExtrair, setModalExtrair] = useState(false)
+  const [etapaExtract, setEtapaExtract] = useState<EtapaExtract>('upload')
+  const [arquivoPdf, setArquivoPdf] = useState<File | null>(null)
+  const [cargoSelecionado, setCargoSelecionado] = useState(edital.cargo || '')
+  const [disciplinasExtraidas, setDisciplinasExtraidas] = useState<DisciplinaExtraida[]>([])
+  const [erroExtract, setErroExtract] = useState<string | null>(null)
+  const [salvandoExtract, setSalvandoExtract] = useState(false)
+
+  const abrirExtrair = () => {
+    setArquivoPdf(null)
+    setErroExtract(null)
+    setDisciplinasExtraidas([])
+    setCargoSelecionado(edital.cargo || '')
+    setEtapaExtract('upload')
+    setModalExtrair(true)
+  }
+
+  const handleExtrairDisciplinas = async () => {
+    if (!arquivoPdf) return
+    setErroExtract(null)
+    setEtapaExtract('processando')
+    try {
+      const fd = new FormData()
+      fd.append('file', arquivoPdf)
+      fd.append('cargo', cargoSelecionado)
+      const res = await fetch(`/api/admin/editais/${edital.id}/extrair-disciplinas`, { method: 'POST', body: fd })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error || 'Erro ao processar PDF')
+      setDisciplinasExtraidas(json.data.disciplinas.map((d: any) => ({ ...d, incluir: true })))
+      setEtapaExtract('revisao')
+    } catch (err: any) {
+      setErroExtract(err?.message || 'Erro desconhecido')
+      setEtapaExtract('upload')
+    }
+  }
+
+  const handleSalvarDisciplinas = async () => {
+    const selecionadas = disciplinasExtraidas.filter(d => d.incluir && d.nome.trim())
+    if (!selecionadas.length) return
+    setSalvandoExtract(true)
+    try {
+      const res = await adminImportarDisciplinas(edital.id, selecionadas)
+      if ('error' in res && res.error) { toast.error(res.error); return }
+      toast.success(`${res.criadas} disciplina${res.criadas !== 1 ? 's' : ''} importada${res.criadas !== 1 ? 's' : ''} com sucesso!`)
+      setModalExtrair(false)
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao salvar')
+    } finally {
+      setSalvandoExtract(false)
+    }
+  }
 
   const handleLimpar = async () => {
     if (!confirm('Limpar todo o conteúdo verticalizado?')) return
@@ -221,6 +285,129 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
           </div>
         )}
       </div>
+
+      {/* Modal portal: extrair disciplinas do PDF */}
+      {modalExtrair && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setModalExtrair(false)}
+        >
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div
+            style={{ position: 'relative', background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', width: '100%', maxWidth: 520, margin: '0 16px', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <span style={{ fontWeight: 600, fontSize: 16, color: '#1e293b' }}>
+                {etapaExtract === 'upload' && 'Extrair disciplinas do PDF'}
+                {etapaExtract === 'processando' && 'Analisando edital…'}
+                {etapaExtract === 'revisao' && 'Disciplinas encontradas'}
+              </span>
+              <button onClick={() => setModalExtrair(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, borderRadius: 6, display: 'flex' }}>
+                <X style={{ width: 18, height: 18 }} />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div style={{ padding: '16px 24px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {etapaExtract === 'upload' && (
+                <>
+                  <div>
+                    <label style={{ fontSize: 13, fontWeight: 500, color: '#475569', display: 'block', marginBottom: 6 }}>Cargo</label>
+                    <input
+                      type="text"
+                      value={cargoSelecionado}
+                      onChange={e => setCargoSelecionado(e.target.value)}
+                      placeholder="Ex: Analista Judiciário - Área Administrativa"
+                      style={{ width: '100%', border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 12px', fontSize: 14, color: '#334155', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 13, fontWeight: 500, color: '#475569', display: 'block', marginBottom: 6 }}>PDF do edital</label>
+                    <div
+                      onClick={() => document.getElementById('pdf-disciplinas-input')?.click()}
+                      style={{ border: '2px dashed #cbd5e1', borderRadius: 8, padding: '28px 16px', textAlign: 'center', cursor: 'pointer' }}
+                    >
+                      <FileUp style={{ width: 28, height: 28, color: '#94a3b8', margin: '0 auto 8px' }} />
+                      {arquivoPdf
+                        ? <p style={{ fontSize: 14, fontWeight: 500, color: '#334155' }}>{arquivoPdf.name}</p>
+                        : <p style={{ fontSize: 14, color: '#94a3b8' }}>Clique para selecionar o PDF</p>}
+                      <input id="pdf-disciplinas-input" type="file" accept=".pdf" style={{ display: 'none' }}
+                        onChange={e => setArquivoPdf(e.target.files?.[0] ?? null)} />
+                    </div>
+                  </div>
+                  {erroExtract && (
+                    <p style={{ fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' }}>{erroExtract}</p>
+                  )}
+                </>
+              )}
+
+              {etapaExtract === 'processando' && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '32px 0', color: '#64748b' }}>
+                  <Loader2 style={{ width: 32, height: 32, color: '#94a3b8' }} className="animate-spin" />
+                  <p style={{ fontSize: 14 }}>A IA está lendo o edital e extraindo as disciplinas…</p>
+                  <p style={{ fontSize: 12, color: '#94a3b8' }}>Isso pode levar alguns segundos</p>
+                </div>
+              )}
+
+              {etapaExtract === 'revisao' && (
+                <>
+                  <p style={{ fontSize: 13, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CheckCircle2 style={{ width: 16, height: 16, flexShrink: 0 }} />
+                    {disciplinasExtraidas.length} disciplina{disciplinasExtraidas.length !== 1 ? 's' : ''} encontrada{disciplinasExtraidas.length !== 1 ? 's' : ''}. Selecione as que deseja importar.
+                  </p>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                    {disciplinasExtraidas.map((disc, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: i < disciplinasExtraidas.length - 1 ? '1px solid #f1f5f9' : 'none', background: disc.incluir ? '#f8fafc' : '#fff' }}>
+                        <input
+                          type="checkbox"
+                          checked={disc.incluir}
+                          onChange={e => setDisciplinasExtraidas(prev => prev.map((d, j) => j === i ? { ...d, incluir: e.target.checked } : d))}
+                          style={{ width: 16, height: 16, accentColor: '#3b82f6', flexShrink: 0 }}
+                        />
+                        <input
+                          type="text"
+                          value={disc.nome}
+                          onChange={e => setDisciplinasExtraidas(prev => prev.map((d, j) => j === i ? { ...d, nome: e.target.value } : d))}
+                          style={{ flex: 1, fontSize: 13, color: '#334155', border: 'none', outline: 'none', background: 'transparent' }}
+                        />
+                      </div>
+                    ))}
+                    {disciplinasExtraidas.length === 0 && (
+                      <p style={{ padding: '16px', fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>Nenhuma disciplina encontrada para este cargo.</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
+              {etapaExtract === 'revisao' && (
+                <Button variant="outline" onClick={() => setEtapaExtract('upload')}>Voltar</Button>
+              )}
+              <Button variant="outline" onClick={() => setModalExtrair(false)}>Cancelar</Button>
+              {etapaExtract === 'upload' && (
+                <Button disabled={!arquivoPdf || !cargoSelecionado.trim()} onClick={handleExtrairDisciplinas}>
+                  Extrair
+                </Button>
+              )}
+              {etapaExtract === 'revisao' && (
+                <Button
+                  disabled={!disciplinasExtraidas.some(d => d.incluir) || salvandoExtract}
+                  onClick={handleSalvarDisciplinas}
+                >
+                  {salvandoExtract && <Loader2 style={{ width: 16, height: 16, marginRight: 6 }} className="animate-spin" />}
+                  Importar selecionadas
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

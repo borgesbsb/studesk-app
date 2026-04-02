@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/interface/actions/admin/auth'
-import OpenAI from 'openai'
+import { callIA } from '@/lib/ai-client'
 
 const PROMPT_METADATA = (texto: string) => `Você é especialista em editais de concursos públicos brasileiros.
 
@@ -49,38 +49,6 @@ function parseJSON(raw: string): any {
   return JSON.parse(limpo)
 }
 
-async function callIA(prompt: string, maxTokens: number, groqKey?: string, openaiKey?: string): Promise<string> {
-  if (groqKey) {
-    try {
-      const groq = new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' })
-      const res = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: maxTokens,
-      })
-      const content = res.choices[0]?.message?.content?.trim()
-      if (content) return content
-    } catch (err: any) {
-      console.warn('[extrair-pdf] Groq falhou:', err?.message)
-    }
-  }
-
-  if (openaiKey) {
-    const openai = new OpenAI({ apiKey: openaiKey })
-    const res = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      max_tokens: maxTokens,
-    })
-    const content = res.choices[0]?.message?.content?.trim()
-    if (content) return content
-  }
-
-  throw new Error('Nenhum provedor de IA disponível')
-}
-
 export async function POST(req: NextRequest) {
   try {
     const session = await getAdminSession()
@@ -108,13 +76,6 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    const groqKey = process.env.GROQ_API_KEY
-    const openaiKey = process.env.OPENAI_API_KEY
-
-    if (!groqKey && !openaiKey) {
-      return NextResponse.json({ error: 'Nenhuma chave de IA configurada' }, { status: 500 })
-    }
-
     // Capa (3k chars) → metadados | Início do edital (10k chars) → todos os cargos
     const textoCapa = data.text.slice(0, 3000)
     const textoCompleto = data.text.slice(0, 10000)
@@ -122,8 +83,8 @@ export async function POST(req: NextRequest) {
     console.log('[extrair-pdf] chamando IA em paralelo — capa:', textoCapa.length, 'chars | cargos:', textoCompleto.length, 'chars')
 
     const [respostaMetadata, respostaCargos] = await Promise.all([
-      callIA(PROMPT_METADATA(textoCapa), 512, groqKey, openaiKey),
-      callIA(PROMPT_CARGOS(textoCompleto), 1024, groqKey, openaiKey),
+      callIA(PROMPT_METADATA(textoCapa), { maxTokens: 512, temperature: 0.1 }),
+      callIA(PROMPT_CARGOS(textoCompleto), { maxTokens: 1024, temperature: 0.1 }),
     ])
 
     const metadata = parseJSON(respostaMetadata)

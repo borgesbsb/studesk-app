@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/interface/actions/admin/auth'
 import { prisma } from '@/lib/prisma'
-import OpenAI from 'openai'
+import { callIA } from '@/lib/ai-client'
 import { pdfToMarkdown } from '@/lib/pdf-to-markdown'
 
 const MARCADORES_SECAO = [
@@ -48,43 +48,6 @@ REGRAS:
 TEXTO DO EDITAL:
 ${texto}`
 
-async function callIA(cargo: string, texto: string, groqKey?: string, openaiKey?: string): Promise<string> {
-  if (groqKey) {
-    try {
-      const groq = new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' })
-      const res = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: PROMPT(cargo, texto.slice(0, 20000)) }],
-        temperature: 0.1,
-        max_tokens: 8000,
-      })
-      const content = res.choices[0]?.message?.content?.trim()
-      if (content) return content
-    } catch (err: any) {
-      console.warn('[extrair-disciplinas] Groq falhou, tentando OpenAI:', err?.message)
-    }
-  }
-
-  if (openaiKey) {
-    try {
-      const openai = new OpenAI({ apiKey: openaiKey })
-      const res = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: PROMPT(cargo, texto) }],
-        temperature: 0.1,
-        max_tokens: 8000,
-      })
-      const content = res.choices[0]?.message?.content?.trim()
-      if (content) return content
-      throw new Error('OpenAI retornou resposta vazia')
-    } catch (err: any) {
-      console.error('[extrair-disciplinas] OpenAI falhou:', err?.message)
-      throw err
-    }
-  }
-
-  throw new Error('Nenhum provedor de IA disponível')
-}
 
 export async function POST(
   req: NextRequest,
@@ -124,19 +87,12 @@ export async function POST(
       }, { status: 400 })
     }
 
-    const groqKey = process.env.GROQ_API_KEY
-    const openaiKey = process.env.OPENAI_API_KEY
-
-    if (!groqKey && !openaiKey) {
-      return NextResponse.json({ error: 'Nenhuma chave de IA configurada' }, { status: 500 })
-    }
-
     // Usa até 50k chars para cobrir o edital completo
     const markdown = pdfToMarkdown(data.text)
     const { secao, marcador } = localizarSecao(markdown)
     console.log('[extrair-disciplinas] cargo:', cargo, '| chars da seção (md):', secao.length, '| marcador:', marcador)
 
-    const resposta = await callIA(cargo, secao, groqKey, openaiKey)
+    const resposta = await callIA(PROMPT(cargo, secao), { maxTokens: 8000, temperature: 0.1 })
 
     const jsonLimpo = resposta
       .replace(/^```json\s*/i, '')

@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Plus, Trash2, Pencil, Loader2, BookOpen, ExternalLink, LayoutList, FileUp, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Loader2, BookOpen, ExternalLink, LayoutList, FileUp, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import {
   adminCriarEdital,
@@ -45,7 +45,7 @@ interface EditaisAdminTableProps {
 
 const emptyForm = { nome: '', descricao: '', orgao: '', cargo: '', ano: '', link: '' }
 
-type EtapaImport = 'upload' | 'processando' | 'revisao' | 'processando_disc' | 'revisao_disc'
+type EtapaImport = 'upload' | 'extraindo' | 'revisao'
 
 interface DisciplinaExtraida {
   nome: string
@@ -53,12 +53,20 @@ interface DisciplinaExtraida {
   incluir: boolean
 }
 
+interface CargoExtraido {
+  nome: string
+  disciplinas: DisciplinaExtraida[]
+}
+
 interface DadosExtraidos {
   nome: string
   orgao: string
-  cargo: string
   ano: string
-  cargos: string[]
+}
+
+interface ProgressoExtracao {
+  mensagem: string
+  sub?: string
 }
 
 export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
@@ -74,8 +82,11 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
   const [etapaImport, setEtapaImport] = useState<EtapaImport>('upload')
   const [arquivoPdf, setArquivoPdf] = useState<File | null>(null)
   const [erroImport, setErroImport] = useState<string | null>(null)
+  const [progresso, setProgresso] = useState<ProgressoExtracao | null>(null)
   const [dadosExtraidos, setDadosExtraidos] = useState<DadosExtraidos | null>(null)
-  const [disciplinasExtraidas, setDisciplinasExtraidas] = useState<DisciplinaExtraida[]>([])
+  const [cargosExtraidos, setCargosExtraidos] = useState<CargoExtraido[]>([])
+  const [cargoSelecionado, setCargoSelecionado] = useState<string>('')
+  const [cargoExpandido, setCargoExpandido] = useState<string>('')
   const [salvandoImport, setSalvandoImport] = useState(false)
 
   const abrirCriar = () => {
@@ -133,68 +144,93 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
     setArquivoPdf(null)
     setErroImport(null)
     setDadosExtraidos(null)
-    setDisciplinasExtraidas([])
+    setCargosExtraidos([])
+    setCargoSelecionado('')
+    setCargoExpandido('')
+    setProgresso(null)
     setEtapaImport('upload')
     setModalImportar(true)
   }
 
-  const handleExtrairDisciplinas = async () => {
-    if (!arquivoPdf || !dadosExtraidos?.cargo.trim()) return
-    setErroImport(null)
-    setEtapaImport('processando_disc')
-    try {
-      const fd = new FormData()
-      fd.append('file', arquivoPdf)
-      fd.append('cargo', dadosExtraidos.cargo.trim())
-      const res = await fetch('/api/admin/editais/extrair-disciplinas', { method: 'POST', body: fd })
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json.error || 'Erro ao extrair disciplinas')
-      setDisciplinasExtraidas(json.data.disciplinas.map((d: any) => ({ ...d, incluir: true })))
-      setEtapaImport('revisao_disc')
-    } catch (err: any) {
-      setErroImport(err?.message || 'Erro desconhecido')
-      setEtapaImport('revisao')
-    }
-  }
-
-  const handleExtrairPdf = async () => {
+  const handleImportar = async () => {
     if (!arquivoPdf) return
     setErroImport(null)
-    setEtapaImport('processando')
-    try {
-      const fd = new FormData()
-      fd.append('file', arquivoPdf)
-      const res = await fetch('/api/admin/editais/extrair-pdf', { method: 'POST', body: fd })
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json.error || 'Erro ao processar PDF')
+    setEtapaImport('extraindo')
 
-      const d = json.data
-      setDadosExtraidos({
-        nome: d.nome || '',
-        orgao: d.orgao || '',
-        cargo: d.cargo || '',
-        ano: d.ano ? String(d.ano) : '',
-        cargos: Array.isArray(d.cargos) ? d.cargos : [],
-      })
+    try {
+      // 1. Extrair metadata + lista de cargos
+      setProgresso({ mensagem: 'Lendo o edital e identificando os cargos…' })
+      const fd1 = new FormData()
+      fd1.append('file', arquivoPdf)
+      const res1 = await fetch('/api/admin/editais/extrair-pdf', { method: 'POST', body: fd1 })
+      const json1 = await res1.json()
+      if (!res1.ok || !json1.success) throw new Error(json1.error || 'Erro ao processar PDF')
+
+      const d = json1.data
+      const cargos: string[] = Array.isArray(d.cargos) && d.cargos.length > 0
+        ? d.cargos
+        : d.cargo ? [d.cargo] : []
+
+      setDadosExtraidos({ nome: d.nome || '', orgao: d.orgao || '', ano: d.ano ? String(d.ano) : '' })
+
+      if (cargos.length === 0) throw new Error('Nenhum cargo encontrado no edital.')
+
+      // 2. Extrair disciplinas + conteúdo para cada cargo
+      const resultado: CargoExtraido[] = []
+
+      for (let i = 0; i < cargos.length; i++) {
+        const cargo = cargos[i]
+        setProgresso({
+          mensagem: `Extraindo disciplinas e conteúdo programático…`,
+          sub: `Cargo ${i + 1} de ${cargos.length}: ${cargo}`,
+        })
+
+        try {
+          const fd2 = new FormData()
+          fd2.append('file', arquivoPdf)
+          fd2.append('cargo', cargo)
+          const res2 = await fetch('/api/admin/editais/extrair-disciplinas', { method: 'POST', body: fd2 })
+          const json2 = await res2.json()
+
+          const disciplinas: DisciplinaExtraida[] = Array.isArray(json2.data?.disciplinas)
+            ? json2.data.disciplinas.map((disc: any) => ({ nome: disc.nome, conteudo: disc.conteudo || '', incluir: true }))
+            : []
+
+          resultado.push({ nome: cargo, disciplinas })
+        } catch {
+          resultado.push({ nome: cargo, disciplinas: [] })
+        }
+      }
+
+      setCargosExtraidos(resultado)
+      // Pré-seleciona o primeiro cargo com disciplinas (ou o primeiro)
+      const primeiro = resultado.find(c => c.disciplinas.length > 0) ?? resultado[0]
+      setCargoSelecionado(primeiro?.nome ?? '')
+      setCargoExpandido(primeiro?.nome ?? '')
       setEtapaImport('revisao')
     } catch (err: any) {
       setErroImport(err?.message || 'Erro desconhecido')
       setEtapaImport('upload')
+    } finally {
+      setProgresso(null)
     }
   }
 
   const handleConfirmarImport = async () => {
-    if (!dadosExtraidos) return
+    if (!dadosExtraidos || !cargoSelecionado) return
+    const cargo = cargosExtraidos.find(c => c.nome === cargoSelecionado)
+    if (!cargo) return
+
     setSalvandoImport(true)
     try {
       const res = await adminCriarEditalComDisciplinas({
         edital: {
           nome: dadosExtraidos.nome.trim(),
           orgao: dadosExtraidos.orgao.trim() || undefined,
-          cargo: dadosExtraidos.cargo.trim() || undefined,
+          cargo: cargoSelecionado,
           ano: dadosExtraidos.ano ? parseInt(dadosExtraidos.ano) : undefined,
         },
-        disciplinas: disciplinasExtraidas
+        disciplinas: cargo.disciplinas
           .filter(d => d.incluir && d.nome.trim())
           .map(d => ({ nome: d.nome.trim(), conteudo: d.conteudo })),
       })
@@ -217,6 +253,16 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
     setRemovendoId(null)
     if (res.error) { alert(res.error) }
     else { setEditais(prev => prev.filter(e => e.id !== id)) }
+  }
+
+  const cargoAtivo = cargosExtraidos.find(c => c.nome === cargoSelecionado)
+
+  const toggleDisciplina = (cargoNome: string, idx: number, valor: boolean) => {
+    setCargosExtraidos(prev => prev.map(c =>
+      c.nome === cargoNome
+        ? { ...c, disciplinas: c.disciplinas.map((d, i) => i === idx ? { ...d, incluir: valor } : d) }
+        : c
+    ))
   }
 
   return (
@@ -279,45 +325,23 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center gap-1 justify-end">
                       <Link href={`/admin/editais/${edital.id}/vertical`}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-orange-500 hover:bg-orange-50"
-                          title="Edital verticalizado"
-                        >
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-500 hover:bg-orange-50" title="Edital verticalizado">
                           <LayoutList className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
                       <Link href={`/admin/editais/${edital.id}`}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-blue-500 hover:bg-blue-50"
-                          title="Gerenciar disciplinas"
-                        >
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-blue-500 hover:bg-blue-50" title="Gerenciar disciplinas">
                           <BookOpen className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        title="Editar edital"
-                        onClick={() => abrirEditar(edital)}
-                      >
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Editar edital" onClick={() => abrirEditar(edital)}>
                         <Pencil className="h-3.5 w-3.5 text-slate-500" />
                       </Button>
                       <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-red-500 hover:bg-red-50"
-                        title="Deletar edital"
-                        onClick={() => handleDeletar(edital.id, edital.nome)}
-                        disabled={removendoId === edital.id}
+                        variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:bg-red-50" title="Deletar edital"
+                        onClick={() => handleDeletar(edital.id, edital.nome)} disabled={removendoId === edital.id}
                       >
-                        {removendoId === edital.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <Trash2 className="h-3.5 w-3.5" />}
+                        {removendoId === edital.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
                   </td>
@@ -329,22 +353,21 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
       )}
 
       {/* Modal importar PDF */}
-      <Dialog open={modalImportar} onOpenChange={open => { if (!open) setModalImportar(false) }}>
-        <DialogContent className="sm:max-w-lg">
+      <Dialog open={modalImportar} onOpenChange={open => { if (!open && etapaImport !== 'extraindo') setModalImportar(false) }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {etapaImport === 'upload' && 'Importar edital via PDF'}
-              {etapaImport === 'processando' && 'Extraindo dados do edital…'}
-              {etapaImport === 'revisao' && 'Revisar dados extraídos'}
-              {etapaImport === 'processando_disc' && 'Extraindo disciplinas…'}
-              {etapaImport === 'revisao_disc' && 'Disciplinas encontradas'}
+              {etapaImport === 'extraindo' && 'Analisando edital…'}
+              {etapaImport === 'revisao' && 'Revisar e criar edital'}
             </DialogTitle>
           </DialogHeader>
 
+          {/* Upload */}
           {etapaImport === 'upload' && (
             <div className="py-4 space-y-4">
               <p className="text-sm text-slate-500">
-                Envie o PDF do edital. A IA irá ler a primeira página e extrair automaticamente o nome do concurso, órgão, cargo e ano.
+                Envie o PDF do edital. A IA irá extrair automaticamente os cargos, as disciplinas e o conteúdo programático de cada um.
               </p>
               <div
                 className="border-2 border-dashed border-slate-200 rounded-lg p-8 text-center cursor-pointer hover:border-slate-300 transition-colors"
@@ -357,10 +380,7 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
                   <p className="text-sm text-slate-400">Clique para selecionar o PDF</p>
                 )}
                 <input
-                  id="pdf-import-input"
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
+                  id="pdf-import-input" type="file" accept=".pdf" className="hidden"
                   onChange={e => setArquivoPdf(e.target.files?.[0] ?? null)}
                 />
               </div>
@@ -369,10 +389,7 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
                   {erroImport}
                   {erroImport.includes('imagem') && (
                     <div className="mt-2">
-                      <button
-                        className="text-amber-800 underline text-xs"
-                        onClick={() => { setModalImportar(false); abrirCriar() }}
-                      >
+                      <button className="text-amber-800 underline text-xs" onClick={() => { setModalImportar(false); abrirCriar() }}>
                         Criar manualmente →
                       </button>
                     </div>
@@ -381,122 +398,164 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
               )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setModalImportar(false)}>Cancelar</Button>
-                <Button disabled={!arquivoPdf} onClick={handleExtrairPdf}>
-                  Extrair dados
+                <Button disabled={!arquivoPdf} onClick={handleImportar}>
+                  Importar
                 </Button>
               </DialogFooter>
             </div>
           )}
 
-          {(etapaImport === 'processando' || etapaImport === 'processando_disc') && (
-            <div className="py-12 flex flex-col items-center gap-3 text-slate-500">
-              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-              <p className="text-sm">
-                {etapaImport === 'processando' ? 'A IA está analisando o edital…' : 'A IA está extraindo as disciplinas…'}
-              </p>
-              <p className="text-xs text-slate-400">Isso pode levar alguns segundos</p>
+          {/* Extraindo */}
+          {etapaImport === 'extraindo' && progresso && (
+            <div className="py-16 flex flex-col items-center gap-4 text-slate-500">
+              <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+              <div className="text-center space-y-1">
+                <p className="text-sm font-medium text-slate-700">{progresso.mensagem}</p>
+                {progresso.sub && <p className="text-xs text-slate-400">{progresso.sub}</p>}
+              </div>
             </div>
           )}
 
+          {/* Revisão */}
           {etapaImport === 'revisao' && dadosExtraidos && (
-            <div className="py-2 space-y-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
+            <div className="flex flex-col gap-4 overflow-hidden flex-1 min-h-0">
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 shrink-0">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Dados extraídos com sucesso. Revise e confirme antes de criar.
+                {cargosExtraidos.length} cargo{cargosExtraidos.length !== 1 ? 's' : ''} encontrado{cargosExtraidos.length !== 1 ? 's' : ''}. Selecione um cargo para criar o edital.
               </div>
 
-              <div className="space-y-3">
-                {[
-                  { id: 'nome', label: 'Nome do concurso *' },
-                  { id: 'orgao', label: 'Órgão / Banca' },
-                  { id: 'cargo', label: 'Cargo' },
-                  { id: 'ano', label: 'Ano' },
-                ].map(({ id, label }) => (
-                  <div key={id} className="grid gap-1.5">
-                    <Label>{label}</Label>
-                    <Input
-                      value={dadosExtraidos[id as keyof DadosExtraidos] as string}
-                      onChange={e => setDadosExtraidos(prev => prev ? ({ ...prev, [id]: e.target.value }) : prev)}
-                    />
-                  </div>
-                ))}
-              </div>
-              {dadosExtraidos.cargos.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label>Cargos encontrados no edital</Label>
-                  <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
-                    {dadosExtraidos.cargos.map((cargo, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setDadosExtraidos(prev => prev ? ({ ...prev, cargo }) : prev)}
-                        className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-blue-50 hover:text-blue-700 ${dadosExtraidos.cargo === cargo ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700'}`}
-                      >
-                        {cargo}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-slate-400">Clique em um cargo para usá-lo no campo acima.</p>
+              {/* Metadados */}
+              <div className="grid grid-cols-3 gap-3 shrink-0">
+                <div className="col-span-2 grid gap-1.5">
+                  <Label className="text-xs">Nome do concurso</Label>
+                  <Input
+                    value={dadosExtraidos.nome}
+                    onChange={e => setDadosExtraidos(p => p ? { ...p, nome: e.target.value } : p)}
+                    className="h-8 text-sm"
+                  />
                 </div>
-              )}
-              <DialogFooter>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Ano</Label>
+                  <Input
+                    value={dadosExtraidos.ano}
+                    onChange={e => setDadosExtraidos(p => p ? { ...p, ano: e.target.value } : p)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="col-span-3 grid gap-1.5">
+                  <Label className="text-xs">Órgão / Banca</Label>
+                  <Input
+                    value={dadosExtraidos.orgao}
+                    onChange={e => setDadosExtraidos(p => p ? { ...p, orgao: e.target.value } : p)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Cargos + disciplinas */}
+              <div className="overflow-y-auto flex-1 border rounded-lg divide-y">
+                {cargosExtraidos.map(cargo => {
+                  const selecionado = cargoSelecionado === cargo.nome
+                  const expandido = cargoExpandido === cargo.nome
+                  const incluidas = cargo.disciplinas.filter(d => d.incluir).length
+
+                  return (
+                    <div key={cargo.nome} className={`transition-colors ${selecionado ? 'bg-blue-50' : 'bg-white'}`}>
+                      {/* Cabeçalho do cargo */}
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <input
+                          type="radio"
+                          name="cargo-selecionado"
+                          checked={selecionado}
+                          onChange={() => {
+                            setCargoSelecionado(cargo.nome)
+                            setCargoExpandido(cargo.nome)
+                          }}
+                          className="h-4 w-4 accent-blue-600 shrink-0"
+                        />
+                        <button
+                          type="button"
+                          className="flex-1 flex items-center justify-between text-left"
+                          onClick={() => setCargoExpandido(expandido ? '' : cargo.nome)}
+                        >
+                          <span className={`text-sm font-medium ${selecionado ? 'text-blue-700' : 'text-slate-700'}`}>
+                            {cargo.nome}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-400">
+                              {incluidas}/{cargo.disciplinas.length} disciplina{cargo.disciplinas.length !== 1 ? 's' : ''}
+                            </span>
+                            {expandido
+                              ? <ChevronDown className="h-4 w-4 text-slate-400" />
+                              : <ChevronRight className="h-4 w-4 text-slate-400" />
+                            }
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Disciplinas do cargo */}
+                      {expandido && (
+                        <div className="border-t bg-white">
+                          {cargo.disciplinas.length === 0 ? (
+                            <p className="px-8 py-3 text-xs text-slate-400">Nenhuma disciplina encontrada para este cargo.</p>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2 px-8 py-1.5 border-b bg-slate-50">
+                                <button
+                                  type="button"
+                                  className="text-xs text-blue-600 hover:underline"
+                                  onClick={() => setCargosExtraidos(prev => prev.map(c =>
+                                    c.nome === cargo.nome ? { ...c, disciplinas: c.disciplinas.map(d => ({ ...d, incluir: true })) } : c
+                                  ))}
+                                >
+                                  Marcar todas
+                                </button>
+                                <span className="text-slate-300">|</span>
+                                <button
+                                  type="button"
+                                  className="text-xs text-slate-500 hover:underline"
+                                  onClick={() => setCargosExtraidos(prev => prev.map(c =>
+                                    c.nome === cargo.nome ? { ...c, disciplinas: c.disciplinas.map(d => ({ ...d, incluir: false })) } : c
+                                  ))}
+                                >
+                                  Desmarcar todas
+                                </button>
+                              </div>
+                              {cargo.disciplinas.map((disc, i) => (
+                                <div key={i} className="flex items-center gap-3 px-8 py-1.5 border-b last:border-b-0 hover:bg-slate-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={disc.incluir}
+                                    onChange={e => toggleDisciplina(cargo.nome, i, e.target.checked)}
+                                    className="h-3.5 w-3.5 accent-blue-600 shrink-0"
+                                  />
+                                  <span className={`text-sm ${disc.incluir ? 'text-slate-700' : 'text-slate-400 line-through'}`}>
+                                    {disc.nome}
+                                  </span>
+                                  {disc.conteudo && (
+                                    <span className="ml-auto text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                      com conteúdo
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <DialogFooter className="shrink-0">
                 <Button variant="outline" onClick={() => setEtapaImport('upload')}>Voltar</Button>
                 <Button
-                  variant="outline"
-                  disabled={!dadosExtraidos.cargo.trim()}
-                  onClick={handleExtrairDisciplinas}
-                >
-                  Extrair disciplinas
-                </Button>
-                <Button
-                  disabled={!dadosExtraidos.nome.trim() || salvandoImport}
+                  disabled={!dadosExtraidos.nome.trim() || !cargoSelecionado || salvandoImport}
                   onClick={handleConfirmarImport}
                 >
                   {salvandoImport && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Criar sem disciplinas
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-
-          {etapaImport === 'revisao_disc' && (
-            <div className="py-2 space-y-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                {disciplinasExtraidas.length} disciplina{disciplinasExtraidas.length !== 1 ? 's' : ''} encontrada{disciplinasExtraidas.length !== 1 ? 's' : ''} para "{dadosExtraidos?.cargo}". Selecione as que deseja importar.
-              </div>
-              {erroImport && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{erroImport}</p>
-              )}
-              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                {disciplinasExtraidas.map((disc, i) => (
-                  <div key={i} className="flex items-center gap-3 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={disc.incluir}
-                      onChange={e => setDisciplinasExtraidas(prev => prev.map((d, j) => j === i ? { ...d, incluir: e.target.checked } : d))}
-                      className="h-4 w-4 accent-blue-600 flex-shrink-0"
-                    />
-                    <input
-                      type="text"
-                      value={disc.nome}
-                      onChange={e => setDisciplinasExtraidas(prev => prev.map((d, j) => j === i ? { ...d, nome: e.target.value } : d))}
-                      className="flex-1 text-sm border-none outline-none bg-transparent text-slate-700"
-                    />
-                  </div>
-                ))}
-                {disciplinasExtraidas.length === 0 && (
-                  <p className="px-3 py-4 text-sm text-slate-400 text-center">Nenhuma disciplina encontrada para este cargo.</p>
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setEtapaImport('revisao')}>Voltar</Button>
-                <Button
-                  disabled={!dadosExtraidos?.nome.trim() || salvandoImport}
-                  onClick={handleConfirmarImport}
-                >
-                  {salvandoImport && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Criar edital
+                  Criar edital — {cargoAtivo ? `${cargoAtivo.disciplinas.filter(d => d.incluir).length} disciplinas` : ''}
                 </Button>
               </DialogFooter>
             </div>
@@ -531,12 +590,9 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
               <div className="grid gap-1.5">
                 <Label>Ano</Label>
                 <Input
-                  type="number"
-                  value={form.ano}
+                  type="number" value={form.ano}
                   onChange={e => setForm(p => ({ ...p, ano: e.target.value }))}
-                  placeholder="Ex: 2025"
-                  min={2000}
-                  max={2099}
+                  placeholder="Ex: 2025" min={2000} max={2099}
                 />
               </div>
               <div className="grid gap-1.5">

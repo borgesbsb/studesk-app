@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/interface/actions/admin/auth'
 import { prisma } from '@/lib/prisma'
-import OpenAI from 'openai'
+import { callIA } from '@/lib/ai-client'
 
 function buildPrompt(disciplina: string, conteudo: string): string {
   return `Você é especialista em concursos públicos brasileiros e em editoração de editais verticalizados.
@@ -36,39 +36,6 @@ CONTEÚDO BRUTO DA DISCIPLINA "${disciplina}":
 ${conteudo}`
 }
 
-async function callIA(prompt: string, groqKey?: string, openaiKey?: string): Promise<string> {
-  if (groqKey) {
-    try {
-      const groq = new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' })
-      const res = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-      })
-      const content = res.choices[0]?.message?.content?.trim()
-      if (content) return content
-    } catch (err: any) {
-      console.warn('[verticalizar] Groq falhou:', err?.message)
-    }
-  }
-
-  if (openaiKey) {
-    try {
-      const openai = new OpenAI({ apiKey: openaiKey })
-      const res = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-      })
-      const content = res.choices[0]?.message?.content?.trim()
-      if (content) return content
-    } catch (err: any) {
-      console.warn('[verticalizar] OpenAI falhou:', err?.message)
-    }
-  }
-
-  throw new Error('Nenhum provedor de IA disponível')
-}
 
 export async function POST(
   _req: NextRequest,
@@ -98,19 +65,12 @@ export async function POST(
       return NextResponse.json({ error: 'Nenhuma disciplina possui conteúdo programático' }, { status: 400 })
     }
 
-    const groqKey = process.env.GROQ_API_KEY
-    const openaiKey = process.env.OPENAI_API_KEY
-
-    if (!groqKey && !openaiKey) {
-      return NextResponse.json({ error: 'Nenhuma chave de IA configurada' }, { status: 500 })
-    }
-
     const resultados: { id: string; nome: string; ok: boolean }[] = []
 
     for (const ed of comConteudo) {
       const prompt = buildPrompt(ed.disciplina.nome, ed.conteudoProgramatico!)
       try {
-        const verticalizado = await callIA(prompt, groqKey, openaiKey)
+        const verticalizado = await callIA(prompt, { temperature: 0.1 })
         await prisma.editalDisciplina.update({
           where: { id: ed.id },
           data: { conteudoVerticalizado: verticalizado },

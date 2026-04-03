@@ -81,14 +81,16 @@ model VerificationToken {
 }
 
 model Admin {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("admin") // admin, super_admin
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  email                   String   @unique
+  password                String
+  name                    String
+  role                    String   @default("admin")
+  active                  Boolean  @default(true)
+  googleDriveAccessToken  String?  @db.Text
+  googleDriveRefreshToken String?  @db.Text
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@index([email])
   @@index([active])
@@ -107,6 +109,7 @@ model Edital {
   cargo       String?
   ano         Int?
   link        String?
+  pdfPath     String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -269,15 +272,16 @@ model PdfMobileText {
 }
 
 model PlanoEstudo {
-  id         String         @id @default(cuid())
-  userId     String?        // null para planos criados pelo admin (compartilhados)
-  nome       String
-  descricao  String?
-  dataInicio DateTime
-  dataFim    DateTime
-  ativo      Boolean        @default(true)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  userId         String?        // null para planos criados pelo admin (compartilhados)
+  nome           String
+  descricao      String?
+  dataInicio     DateTime
+  dataFim        DateTime
+  ativo          Boolean        @default(true)
+  driveFolderId  String?        // ID da pasta raiz no Google Drive
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   user       User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   semanas    SemanaEstudo[]
   usuarios   PlanoEstudoUsuario[]

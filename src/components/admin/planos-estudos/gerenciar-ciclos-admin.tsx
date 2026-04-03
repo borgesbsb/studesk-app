@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -18,9 +18,10 @@ import {
 } from '@/components/ui/dialog'
 import {
   Plus, Trash2, Loader2, CalendarDays, FileText, Video, Link2, Check, X, Bold, Italic, ClipboardList, ChevronDown, ChevronUp, BookOpen, ExternalLink, AlertTriangle,
-  Settings2, Zap, Hash, Calendar, ArrowRight, ArrowLeft, Search,
+  Settings2, Zap, Hash, Calendar, ArrowRight, ArrowLeft, Search, HardDrive, RefreshCw, CheckCircle2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { DriveTree } from '@/components/admin/drive/drive-tree'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -37,6 +38,7 @@ import {
   adminAtualizarDiaSimuladoCiclo,
   adminAtualizarCadernoQuestoesCiclo,
   adminGerarCiclosEmLote,
+  adminSalvarDriveFolderPlano,
 } from '@/interface/actions/admin/plano-estudos'
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
@@ -108,6 +110,17 @@ interface GerenciarCiclosAdminProps {
   ciclosIniciais: Ciclo[]
   simuladosDisponiveis: SimuladoRef[]
   editais?: Edital[]
+  driveFolderId?: string | null
+}
+
+interface ProgressoDrive {
+  ativo: boolean
+  mensagem: string
+  materiais: string[]
+  avisos: string[]
+  concluido: boolean
+  criados: number
+  vinculados: number
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -143,7 +156,7 @@ function MaterialIcon({ tipo }: { tipo: string }) {
 
 // ─── Componente ────────────────────────────────────────────────────────────────
 
-export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponiveis, editais = [] }: GerenciarCiclosAdminProps) {
+export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponiveis, editais = [], driveFolderId: driveFolderIdInicial }: GerenciarCiclosAdminProps) {
   const router = useRouter()
   const [ciclos, setCiclos] = useState<Ciclo[]>(ciclosIniciais)
 
@@ -151,6 +164,49 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
   useEffect(() => {
     setCiclos(ciclosIniciais)
   }, [ciclosIniciais])
+
+  // ── Estado: Google Drive ──────────────────────────────────────────────────────
+  const [driveFolderId, setDriveFolderId] = useState(driveFolderIdInicial || '')
+  const [driveFolderNome, setDriveFolderNome] = useState<string | null>(null)
+  const [modalDrive, setModalDrive] = useState(false)
+  const [progressoDrive, setProgressoDrive] = useState<ProgressoDrive | null>(null)
+  const driveEsRef = useRef<EventSource | null>(null)
+
+  const salvarDriveFolder = (id: string, nome: string) => {
+    setDriveFolderId(id)
+    setDriveFolderNome(nome)
+    setModalDrive(false)
+    toast.success(`Pasta "${nome}" selecionada!`)
+  }
+
+  const sincronizarDrive = () => {
+    if (driveEsRef.current) driveEsRef.current.close()
+    setProgressoDrive({ ativo: true, mensagem: 'Iniciando…', materiais: [], avisos: [], concluido: false, criados: 0, vinculados: 0 })
+
+    const es = new EventSource(`/api/admin/plano-estudos/${planoId}/sincronizar-drive?folderId=${encodeURIComponent(driveFolderId)}`)
+    driveEsRef.current = es
+
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data)
+      if (ev.tipo === 'progresso') {
+        setProgressoDrive(p => p ? { ...p, mensagem: ev.mensagem } : p)
+      } else if (ev.tipo === 'material') {
+        setProgressoDrive(p => p ? { ...p, materiais: [...p.materiais, `${ev.disciplina} / Ciclo ${ev.ciclo}: ${ev.nome}`] } : p)
+      } else if (ev.tipo === 'aviso') {
+        setProgressoDrive(p => p ? { ...p, avisos: [...p.avisos, ev.mensagem] } : p)
+      } else if (ev.tipo === 'concluido') {
+        setProgressoDrive(p => p ? { ...p, ativo: false, concluido: true, criados: ev.criados, vinculados: ev.vinculados, mensagem: 'Concluído' } : p)
+        toast.success(`${ev.criados} materiais criados, ${ev.vinculados} vínculos estabelecidos`)
+        router.refresh()
+        es.close()
+      } else if (ev.tipo === 'erro') {
+        toast.error(ev.mensagem)
+        setProgressoDrive(null)
+        es.close()
+      }
+    }
+    es.onerror = () => { toast.error('Conexão interrompida'); setProgressoDrive(null); es.close() }
+  }
 
   // ── Estado: painel do gerador ─────────────────────────────────────────────────
   const [geradorAberto, setGeradorAberto] = useState(false)
@@ -213,6 +269,12 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
       }
       toast.success(`${res.criados} ciclo${res.criados !== 1 ? 's' : ''} gerado${res.criados !== 1 ? 's' : ''} com sucesso!`)
       router.refresh()
+
+      // Aguarda o refresh propagar os ciclos no servidor e então inicia a sincronização
+      if (driveFolderId) {
+        toast.info('Associando materiais do Google Drive aos ciclos…')
+        setTimeout(() => sincronizarDrive(), 1500)
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao gerar ciclos')
     } finally {
@@ -831,7 +893,60 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                 ) : (
                   <div className="flex-1" />
                 )}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Google Drive */}
+                <div className="border-t border-violet-100 pt-4 space-y-2">
+                  <label className="text-xs font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                    <HardDrive className="h-3.5 w-3.5" />
+                    Pasta de materiais no Google Drive <span className="text-slate-400 normal-case font-normal">(opcional)</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {driveFolderId ? (
+                      <div className="flex-1 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 text-sm text-emerald-700">
+                        <HardDrive className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{driveFolderNome || driveFolderId}</span>
+                      </div>
+                    ) : (
+                      <span className="flex-1 text-xs text-slate-400">Nenhuma pasta selecionada — materiais serão associados automaticamente ao gerar</span>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => setModalDrive(true)} className="shrink-0">
+                      {driveFolderId ? 'Alterar' : 'Selecionar pasta'}
+                    </Button>
+                  </div>
+
+                  {/* Progresso da sincronização (aparece após Gerar Ciclos) */}
+                  {progressoDrive && (
+                    <div className="border border-emerald-200 rounded-lg bg-white p-3 space-y-2 text-xs">
+                      <div className="flex items-center gap-2 font-medium text-emerald-700">
+                        {progressoDrive.concluido
+                          ? <CheckCircle2 className="h-3.5 w-3.5" />
+                          : <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        {progressoDrive.concluido
+                          ? `Concluído: ${progressoDrive.criados} materiais criados, ${progressoDrive.vinculados} vínculos`
+                          : progressoDrive.mensagem}
+                      </div>
+                      {progressoDrive.materiais.length > 0 && (
+                        <div className="max-h-28 overflow-y-auto space-y-0.5">
+                          {progressoDrive.materiais.map((m, i) => (
+                            <div key={i} className="text-slate-500 flex items-center gap-1">
+                              <Check className="h-3 w-3 text-emerald-500 shrink-0" /> {m}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {progressoDrive.avisos.length > 0 && (
+                        <div className="space-y-0.5 border-t border-amber-100 pt-2">
+                          {progressoDrive.avisos.map((a, i) => (
+                            <div key={i} className="text-amber-600 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3 shrink-0" /> {a}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 border-t border-violet-100 pt-4">
                   {!dataInicio && (
                     <p className="text-xs text-slate-400">informe a data →</p>
                   )}
@@ -1384,6 +1499,40 @@ export function GerenciarCiclosAdmin({ planoId, ciclosIniciais, simuladosDisponi
                 {addingMatDiscId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Adicionar
               </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal seleção de pasta do Drive */}
+      {modalDrive && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setModalDrive(false)}
+        >
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div
+            style={{ position: 'relative', background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', width: '100%', maxWidth: 520, margin: '0 16px', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <HardDrive style={{ width: 16, height: 16, color: '#10b981' }} />
+                <span style={{ fontWeight: 600, fontSize: 15, color: '#1e293b' }}>Selecionar pasta do Google Drive</span>
+              </div>
+              <button onClick={() => setModalDrive(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, borderRadius: 6, display: 'flex' }}>
+                <X style={{ width: 18, height: 18 }} />
+              </button>
+            </div>
+            <p style={{ padding: '10px 24px 0', fontSize: 12, color: '#64748b' }}>
+              Navegue pelas pastas e clique em <strong>Selecionar</strong> na pasta que contém os materiais organizados por disciplina e ciclo.
+            </p>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 16px' }}>
+              <DriveTree
+                rootFolderId="1lgjdvbwR5bN7kJmLmE6imRXadjecWGTM"
+                onSelectFolder={(folder) => salvarDriveFolder(folder.id, folder.name)}
+              />
             </div>
           </div>
         </div>,

@@ -180,33 +180,12 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
 
       if (cargosRaw.length === 0) throw new Error('Nenhum cargo encontrado no edital.')
 
-      // Passo 2 — para cada cargo, extrai conteúdo usando as páginas mapeadas
-      const resultado: CargoExtraido[] = []
-
-      for (let i = 0; i < cargosRaw.length; i++) {
-        const { nome: cargo, disciplinas: disciplinasMap } = cargosRaw[i]
-        setProgresso({
-          mensagem: 'Extraindo conteúdo programático…',
-          sub: `Cargo ${i + 1} de ${cargosRaw.length}: ${cargo}`,
-        })
-
-        try {
-          const fd2 = new FormData()
-          fd2.append('file', arquivoPdf)
-          fd2.append('cargo', cargo)
-          fd2.append('disciplinas', JSON.stringify(disciplinasMap))
-          const res2 = await fetch('/api/admin/editais/extrair-disciplinas', { method: 'POST', body: fd2 })
-          const json2 = await res2.json()
-
-          const disciplinas: DisciplinaExtraida[] = Array.isArray(json2.data?.disciplinas)
-            ? json2.data.disciplinas.map((d: any) => ({ nome: d.nome, conteudo: d.conteudo || '', incluir: true }))
-            : []
-
-          resultado.push({ nome: cargo, disciplinasMap, disciplinas })
-        } catch {
-          resultado.push({ nome: cargo, disciplinasMap, disciplinas: [] })
-        }
-      }
+      // Monta resultado direto do Pass 1 — disciplinas sem conteúdo por ora
+      const resultado: CargoExtraido[] = cargosRaw.map(({ nome: cargo, disciplinas: disciplinasMap }) => ({
+        nome: cargo,
+        disciplinasMap,
+        disciplinas: disciplinasMap.map(d => ({ nome: d.nome, conteudo: '', incluir: true })),
+      }))
 
       setCargosExtraidos(resultado)
       // Pré-seleciona o primeiro cargo com disciplinas (ou o primeiro)
@@ -243,6 +222,12 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
       if ('error' in res && res.error) { alert(res.error); return }
       if (res.success && res.data) {
         setEditais(prev => [...prev, res.data as Edital])
+
+        // Salva o PDF associado ao edital criado
+        const editalId = (res.data as Edital).id
+        const fdPdf = new FormData()
+        fdPdf.append('file', arquivoPdf)
+        await fetch(`/api/admin/editais/${editalId}/salvar-pdf`, { method: 'POST', body: fdPdf })
       }
       setModalImportar(false)
     } catch (err: any) {

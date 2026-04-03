@@ -61,6 +61,7 @@ export default async function AdminPlanoDetalhe({ params }: Props) {
         ciclosIniciais={plano.semanas as any}
         simuladosDisponiveis={simuladosDisponiveis}
         editais={editais as any}
+        driveFolderId={plano.driveFolderId}
       />
 
     </div>

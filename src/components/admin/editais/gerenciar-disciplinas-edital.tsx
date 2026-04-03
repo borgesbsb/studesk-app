@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, Plus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Save } from 'lucide-react'
+import { BookOpen, Plus, Search, Trash2, Loader2, ChevronDown, ChevronUp, Save, Sparkles } from 'lucide-react'
 import {
   adminAdicionarDisciplina,
   adminRemoverDisciplina,
@@ -31,6 +31,15 @@ interface EditalDisciplina {
 interface GerenciarDisciplinasEditalProps {
   editalId: string
   disciplinasIniciais: EditalDisciplina[]
+  temPdf?: boolean
+}
+
+interface ProgressoExtracao {
+  ativo: boolean
+  atual: number
+  total: number
+  disciplina: string
+  fase: 'extraindo' | 'concluido'
 }
 
 function DisciplinaItem({
@@ -48,6 +57,10 @@ function DisciplinaItem({
   const [conteudo, setConteudo] = useState(ed.conteudoProgramatico || '')
   const [salvando, setSalvando] = useState(false)
   const [sujo, setSujo] = useState(false)
+
+  useEffect(() => {
+    if (!sujo) setConteudo(ed.conteudoProgramatico || '')
+  }, [ed.conteudoProgramatico])
 
   const handleSalvar = async () => {
     setSalvando(true)
@@ -156,6 +169,7 @@ function DisciplinaItem({
 export function GerenciarDisciplinasEdital({
   editalId,
   disciplinasIniciais,
+  temPdf = false,
 }: GerenciarDisciplinasEditalProps) {
   const [disciplinasEdital, setDisciplinasEdital] = useState<EditalDisciplina[]>(disciplinasIniciais)
   const [todasDisciplinas, setTodasDisciplinas] = useState<Disciplina[]>([])
@@ -163,6 +177,8 @@ export function GerenciarDisciplinasEdital({
   const [loadingDisc, setLoadingDisc] = useState(true)
   const [adicionandoId, setAdicionandoId] = useState<string | null>(null)
   const [removendoId, setRemovendoId] = useState<string | null>(null)
+  const [progresso, setProgresso] = useState<ProgressoExtracao | null>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
 
   // Sincroniza estado quando o servidor retorna dados atualizados (após router.refresh())
   useEffect(() => {
@@ -208,6 +224,45 @@ export function GerenciarDisciplinasEdital({
     setRemovendoId(null)
   }
 
+  const iniciarExtracaoConteudo = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
+
+    setProgresso({ ativo: true, atual: 0, total: disciplinasEdital.length, disciplina: '', fase: 'extraindo' })
+
+    const es = new EventSource(`/api/admin/editais/${editalId}/extrair-conteudo`)
+    eventSourceRef.current = es
+
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data)
+
+      if (ev.tipo === 'progresso') {
+        setProgresso(p => p ? { ...p, atual: ev.atual, total: ev.total, disciplina: ev.disciplina } : p)
+      } else if (ev.tipo === 'salvo') {
+        setDisciplinasEdital(prev => prev.map(d =>
+          d.id === ev.disciplinaId ? { ...d, conteudoProgramatico: ev.conteudo } : d
+        ))
+      } else if (ev.tipo === 'concluido') {
+        setProgresso(p => p ? { ...p, fase: 'concluido', ativo: false } : p)
+        toast.success(`Extração concluída: ${ev.salvos} disciplinas atualizadas`)
+        es.close()
+      } else if (ev.tipo === 'erro') {
+        toast.error(ev.mensagem)
+        setProgresso(null)
+        es.close()
+      } else if (ev.tipo === 'erro_disc') {
+        toast.error(`Erro em "${ev.nome}": ${ev.erro}`)
+      }
+    }
+
+    es.onerror = () => {
+      toast.error('Conexão interrompida durante a extração')
+      setProgresso(null)
+      es.close()
+    }
+  }
+
   const idsNoEdital = new Set(disciplinasEdital.map(d => d.disciplinaId))
 
   const disponiveis = todasDisciplinas
@@ -216,12 +271,42 @@ export function GerenciarDisciplinasEdital({
 
   const comConteudo = disciplinasEdital.filter(d => d.conteudoProgramatico).length
 
+  const porcentagem = progresso && progresso.total > 0
+    ? Math.round((progresso.atual / progresso.total) * 100)
+    : 0
+
   return (
+    <div className="space-y-4">
+
+    {/* Barra de progresso da extração */}
+    {progresso && (
+      <div className="border border-blue-200 bg-blue-50 rounded-lg px-4 py-3 space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium text-blue-800">
+            {progresso.fase === 'concluido'
+              ? 'Extração concluída'
+              : progresso.disciplina
+                ? `Extraindo: ${progresso.disciplina}`
+                : 'Iniciando extração…'}
+          </span>
+          <span className="text-blue-600 tabular-nums">
+            {progresso.atual}/{progresso.total}
+          </span>
+        </div>
+        <div className="w-full bg-blue-200 rounded-full h-2">
+          <div
+            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+            style={{ width: `${porcentagem}%` }}
+          />
+        </div>
+      </div>
+    )}
+
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Coluna esquerda: disciplinas já no edital */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2 flex-wrap">
             <BookOpen className="h-4 w-4 text-orange-500" />
             Disciplinas do Edital
             <Badge variant="secondary" className="ml-auto">{disciplinasEdital.length}</Badge>
@@ -229,6 +314,20 @@ export function GerenciarDisciplinasEdital({
               <Badge variant="outline" className="text-green-600 border-green-300 text-xs">
                 {comConteudo} com conteúdo
               </Badge>
+            )}
+            {temPdf && disciplinasEdital.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                onClick={iniciarExtracaoConteudo}
+                disabled={progresso?.ativo}
+              >
+                {progresso?.ativo
+                  ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  : <Sparkles className="h-3 w-3 mr-1" />}
+                Extrair conteúdo com IA
+              </Button>
             )}
           </CardTitle>
         </CardHeader>
@@ -316,6 +415,7 @@ export function GerenciarDisciplinasEdital({
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   )
 }

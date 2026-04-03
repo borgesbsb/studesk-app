@@ -56,6 +56,10 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
   const [verticalizando, setVerticalizando] = useState(false)
   const [limpando, setLimpando] = useState(false)
   const [resultado, setResultado] = useState<{ salvos: number; total: number } | null>(null)
+  const [verticalizandoId, setVerticalizandoId] = useState<string | null>(null)
+  const [conteudosVerticalizados, setConteudosVerticalizados] = useState<Record<string, string>>(() =>
+    Object.fromEntries(edital.disciplinas.filter(d => d.conteudoVerticalizado).map(d => [d.id, d.conteudoVerticalizado!]))
+  )
 
   // Extração de disciplinas via PDF
   const [modalExtrair, setModalExtrair] = useState(false)
@@ -65,6 +69,30 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
   const [disciplinasExtraidas, setDisciplinasExtraidas] = useState<DisciplinaExtraida[]>([])
   const [erroExtract, setErroExtract] = useState<string | null>(null)
   const [salvandoExtract, setSalvandoExtract] = useState(false)
+
+  const handleVerticalizarIndividual = async (ed: EditalDisciplina) => {
+    if (!ed.conteudoProgramatico) {
+      toast.error('Esta disciplina não tem conteúdo programático')
+      return
+    }
+    setVerticalizandoId(ed.id)
+    try {
+      const res = await fetch(`/api/admin/editais/${edital.id}/verticalizar`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editalDisciplinaId: ed.id }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) { toast.error(data.error || 'Erro ao verticalizar'); return }
+      setConteudosVerticalizados(prev => ({ ...prev, [ed.id]: data.verticalizado }))
+      toast.success(`"${ed.disciplina.nome}" verticalizada — ${data.assuntos} assuntos`)
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro de conexão')
+    } finally {
+      setVerticalizandoId(null)
+    }
+  }
 
   const abrirExtrair = () => {
     setArquivoPdf(null)
@@ -241,9 +269,11 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
         {/* Disciplinas */}
         <div className="divide-y divide-slate-100">
           {comConteudo.map((ed, idx) => {
-            const conteudo = ed.conteudoVerticalizado || ed.conteudoProgramatico!
+            const verticalizado = conteudosVerticalizados[ed.id] ?? ed.conteudoVerticalizado
+            const conteudo = verticalizado || ed.conteudoProgramatico!
             const topicos = formatarConteudo(conteudo)
-            const isVerticalizado = !!ed.conteudoVerticalizado
+            const isVerticalizado = !!verticalizado
+            const isProcessando = verticalizandoId === ed.id
             return (
               <div key={ed.id} className="px-8 py-5 print:px-4 print:py-4 print:break-inside-avoid">
                 {/* Nome da disciplina */}
@@ -261,6 +291,17 @@ export function EditalVertical({ edital }: EditalVerticalProps) {
                       IA
                     </Badge>
                   )}
+                  <button
+                    onClick={() => handleVerticalizarIndividual(ed)}
+                    disabled={isProcessando || verticalizando}
+                    className="ml-auto print:hidden flex items-center gap-1 text-xs text-orange-500 hover:text-orange-700 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-orange-50 transition-colors"
+                    title="Verticalizar com IA"
+                  >
+                    {isProcessando
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <Sparkles className="h-3 w-3" />}
+                    {isProcessando ? 'Verticalizando…' : isVerticalizado ? 'Reverter' : 'Verticalizar'}
+                  </button>
                 </div>
 
                 {/* Tópicos */}

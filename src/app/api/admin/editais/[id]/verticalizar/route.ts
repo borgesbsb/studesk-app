@@ -57,11 +57,12 @@ ${conteudo}`
 }
 
 // ---------------------------------------------------------------------------
-// POST — verticaliza todas as disciplinas com conteúdo
+// POST — verticaliza todas as disciplinas com conteúdo (ou uma individual)
+//   Body opcional: { editalDisciplinaId: string } → processa só essa disciplina
 // ---------------------------------------------------------------------------
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -70,6 +71,33 @@ export async function POST(
 
     const { id: editalId } = await params
 
+    // Verifica se é verticalização individual
+    let editalDisciplinaId: string | null = null
+    try {
+      const body = await req.json()
+      editalDisciplinaId = body?.editalDisciplinaId ?? null
+    } catch { /* body vazio = verticalizar todas */ }
+
+    // Busca individual
+    if (editalDisciplinaId) {
+      const ed = await prisma.editalDisciplina.findUnique({
+        where: { id: editalDisciplinaId, editalId },
+        include: { disciplina: true },
+      })
+      if (!ed) return NextResponse.json({ error: 'Disciplina não encontrada' }, { status: 404 })
+      if (!ed.conteudoProgramatico) return NextResponse.json({ error: 'Disciplina sem conteúdo programático' }, { status: 400 })
+
+      const prompt = buildPrompt(ed.disciplina.nome, ed.conteudoProgramatico)
+      const { assuntos } = await callIAStructured<Verticalizado>(
+        prompt, 'salvar_verticalizado', SCHEMA_VERTICALIZADO, { temperature: 0 }
+      )
+      const verticalizado = assuntos.filter(Boolean).join('\n')
+      await prisma.editalDisciplina.update({ where: { id: ed.id }, data: { conteudoVerticalizado: verticalizado } })
+      console.log(`[verticalizar/individual] ${ed.disciplina.nome}: ${assuntos.length} assuntos`)
+      return NextResponse.json({ success: true, verticalizado, assuntos: assuntos.length })
+    }
+
+    // Busca todas
     const edital = await prisma.edital.findUnique({
       where: { id: editalId },
       include: {

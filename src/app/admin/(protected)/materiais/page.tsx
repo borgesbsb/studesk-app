@@ -2,6 +2,7 @@ import { FileText } from 'lucide-react'
 import { adminListarMateriais } from '@/interface/actions/admin/materiais'
 import { adminListarDisciplinas } from '@/interface/actions/admin/disciplinas'
 import { MateriaisAdminTable } from '@/components/admin/materiais/materiais-admin-table'
+import { DrivePanel } from '@/components/admin/drive/drive-panel'
 
 export default async function AdminMateriaisPage() {
   const [matRes, discRes] = await Promise.all([
@@ -25,6 +26,8 @@ export default async function AdminMateriaisPage() {
           </p>
         </div>
       </div>
+
+      <DrivePanel />
 
       <MateriaisAdminTable materiaisIniciais={materiais as any} disciplinasDisponiveis={disciplinas} />
     </div>

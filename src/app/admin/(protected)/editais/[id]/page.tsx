@@ -59,6 +59,7 @@ export default async function AdminEditalDetalhe({ params }: Props) {
         <GerenciarDisciplinasEdital
           editalId={edital.id}
           disciplinasIniciais={edital.disciplinas as any}
+          temPdf={!!edital.pdfPath}
         />
       </div>
     </div>

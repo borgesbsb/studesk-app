@@ -884,3 +884,15 @@ export async function adminGerarCiclosEmLote(data: {
     return { error: error instanceof Error ? error.message : 'Erro ao gerar ciclos' }
   }
 }
+
+export async function adminSalvarDriveFolderPlano(planoId: string, driveFolderId: string | null) {
+  const session = await getAdminSession()
+  if (!session) return { error: 'Não autorizado' }
+  try {
+    await prisma.planoEstudo.update({ where: { id: planoId }, data: { driveFolderId } })
+    revalidatePath(`/admin/plano-estudos/${planoId}`)
+    return { success: true }
+  } catch {
+    return { error: 'Erro ao salvar pasta do Drive' }
+  }
+}

@@ -65,7 +65,7 @@ const navItems: NavItem[] = [
   },
   {
     title: 'Configurações',
-    href: '/admin/settings',
+    href: '/admin/configuracoes',
     icon: Settings
   }
 ]

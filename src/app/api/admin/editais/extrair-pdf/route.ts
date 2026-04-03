@@ -1,69 +1,39 @@
+/**
+ * PASSO 1 — Mapeamento estrutural do edital
+ *
+ * Envia o PDF completo para a API da Anthropic e obtém:
+ * - Metadados do concurso (nome, órgão, ano)
+ * - Todos os cargos
+ * - Para cada cargo: todas as disciplinas com pagina_inicio e pagina_fim
+ *
+ * Esse mapeamento é usado pelo Passo 2 (extrair-disciplinas) para extrair
+ * o conteúdo programático exato de cada disciplina usando apenas suas páginas.
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/interface/actions/admin/auth'
-import { extractPdfText } from '@/lib/pdf-extract-server'
-import { callIAStructured } from '@/lib/ai-client'
+import Anthropic from '@anthropic-ai/sdk'
 
 // ---------------------------------------------------------------------------
-// Schema do tool_use — retorna metadata + cargos com âncoras de seção
+// Tipos
 // ---------------------------------------------------------------------------
 
-interface CargoExtraido {
+interface DisciplinaMap {
   nome: string
-  ancora: string
+  pagina_inicio: number
+  pagina_fim: number
 }
 
-interface MetadataExtraida {
-  nome: string | null
-  orgao: string | null
+interface CargoMap {
+  nome: string
+  disciplinas: DisciplinaMap[]
+}
+
+interface EditalMap {
+  nome: string
+  orgao: string
   ano: number | null
-  cargos: CargoExtraido[]
+  cargos: CargoMap[]
 }
-
-const SCHEMA_METADATA = {
-  properties: {
-    nome: {
-      type: 'string',
-      description: 'Nome completo do concurso/edital',
-    },
-    orgao: {
-      type: 'string',
-      description: 'Nome da banca organizadora (CESPE, FCC, VUNESP, etc.) ou órgão público',
-    },
-    ano: {
-      type: ['integer', 'null'],
-      description: 'Ano do concurso como número inteiro, ou null se não encontrado',
-    },
-    cargos: {
-      type: 'array',
-      description: 'Todos os cargos/funções oferecidos neste concurso',
-      items: {
-        type: 'object',
-        properties: {
-          nome: {
-            type: 'string',
-            description: 'Nome exato do cargo, incluindo área/especialidade quando aplicável',
-          },
-          ancora: {
-            type: 'string',
-            description:
-              'Trecho de 60-150 chars que aparece EXATAMENTE no documento imediatamente antes ou no início da seção de conteúdo programático deste cargo. Use um trecho único e inequívoco (ex: "CARGO: ANALISTA JUDICIÁRIO\\nCONHECIMENTOS ESPECÍFICOS"). Se não houver seção separada por cargo, use o cabeçalho geral de conteúdo programático.',
-          },
-        },
-        required: ['nome', 'ancora'],
-      },
-    },
-  },
-  required: ['nome', 'orgao', 'ano', 'cargos'],
-}
-
-const PROMPT = (texto: string) => `Você é especialista em editais de concursos públicos brasileiros.
-
-Analise o texto do edital abaixo e extraia:
-1. Metadados do concurso (nome, órgão/banca, ano)
-2. TODOS os cargos/funções oferecidos, com a âncora de localização da seção de conteúdo programático de cada um
-
-TEXTO DO EDITAL:
-${texto}`
 
 // ---------------------------------------------------------------------------
 // POST handler
@@ -84,41 +54,93 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Arquivo não é um PDF válido' }, { status: 400 })
     }
 
-    // Extração de texto com awareness de posição
-    console.log('[extrair-pdf] extraindo texto com pdfjs-dist...')
-    const textoCompleto = await extractPdfText(buffer)
-
-    console.log('[extrair-pdf] chars extraídos:', textoCompleto.length)
-
-    if (!textoCompleto || textoCompleto.trim().length < 10) {
-      return NextResponse.json({
-        error: 'Este PDF é baseado em imagem (escaneado) e não possui camada de texto. A extração automática não é possível — por favor, crie o edital manualmente.',
-        imageBased: true,
-      }, { status: 400 })
+    const anthropicKey = process.env.ANTHROPIC_API_KEY
+    if (!anthropicKey) {
+      return NextResponse.json({ error: 'ANTHROPIC_API_KEY não configurada' }, { status: 500 })
     }
 
-    // Envia até 80k chars — cobre ~95% dos editais sem estourar o contexto
-    const textoIA = textoCompleto.slice(0, 80000)
-    console.log('[extrair-pdf] enviando', textoIA.length, 'chars para IA (tool_use)')
+    const client = new Anthropic({ apiKey: anthropicKey })
 
-    const resultado = await callIAStructured<MetadataExtraida>(
-      PROMPT(textoIA),
-      'salvar_metadata_edital',
-      SCHEMA_METADATA,
-      { temperature: 0 }
+    console.log('[extrair-pdf] enviando PDF completo para Anthropic (', (buffer.length / 1024).toFixed(0), 'KB)...')
+
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      tools: [
+        {
+          name: 'mapear_edital',
+          description: 'Mapeia a estrutura do edital com todos os cargos, disciplinas e localização de cada uma no PDF',
+          input_schema: {
+            type: 'object' as const,
+            properties: {
+              nome:  { type: 'string', description: 'Nome completo do concurso/edital' },
+              orgao: { type: 'string', description: 'Nome da banca organizadora ou órgão público realizador' },
+              ano:   { type: ['integer', 'null'] as any, description: 'Ano do concurso como número inteiro' },
+              cargos: {
+                type: 'array',
+                description: 'Todos os cargos oferecidos no concurso',
+                items: {
+                  type: 'object',
+                  properties: {
+                    nome: { type: 'string', description: 'Nome exato do cargo' },
+                    disciplinas: {
+                      type: 'array',
+                      description: 'Todas as disciplinas do conteúdo programático deste cargo',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          nome:          { type: 'string',  description: 'Nome exato da disciplina como aparece no edital' },
+                          pagina_inicio: { type: 'integer', description: 'Número da página onde começa o conteúdo programático desta disciplina' },
+                          pagina_fim:    { type: 'integer', description: 'Número da página onde termina o conteúdo programático desta disciplina' },
+                        },
+                        required: ['nome', 'pagina_inicio', 'pagina_fim'],
+                      },
+                    },
+                  },
+                  required: ['nome', 'disciplinas'],
+                },
+              },
+            },
+            required: ['nome', 'orgao', 'ano', 'cargos'],
+          },
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'mapear_edital' },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: buffer.toString('base64'),
+              },
+            },
+            {
+              type: 'text',
+              text: 'Analise a seção de conteúdo programático deste edital (geralmente em um Anexo). Para cada cargo, liste todas as disciplinas informando em quais páginas do PDF o conteúdo programático de cada disciplina está localizado.',
+            },
+          ],
+        },
+      ],
+    })
+
+    const toolUse = message.content.find(b => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') {
+      return NextResponse.json({ error: 'Anthropic não retornou dados estruturados' }, { status: 500 })
+    }
+
+    const data = toolUse.input as EditalMap
+
+    console.log(
+      '[extrair-pdf] ok — cargos:', data.cargos?.length,
+      '| tokens:', message.usage.input_tokens, '+', message.usage.output_tokens
     )
 
-    console.log('[extrair-pdf] cargos encontrados:', resultado.cargos?.length ?? 0)
+    return NextResponse.json({ success: true, data })
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        nome: resultado.nome ?? null,
-        orgao: resultado.orgao ?? null,
-        ano: resultado.ano ?? null,
-        cargos: Array.isArray(resultado.cargos) ? resultado.cargos : [],
-      },
-    })
   } catch (error: any) {
     console.error('[extrair-pdf] Erro:', error)
     return NextResponse.json(

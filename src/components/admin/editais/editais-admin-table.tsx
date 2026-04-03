@@ -47,6 +47,12 @@ const emptyForm = { nome: '', descricao: '', orgao: '', cargo: '', ano: '', link
 
 type EtapaImport = 'upload' | 'extraindo' | 'revisao'
 
+interface DisciplinaMap {
+  nome: string
+  pagina_inicio: number
+  pagina_fim: number
+}
+
 interface DisciplinaExtraida {
   nome: string
   conteudo: string
@@ -55,8 +61,8 @@ interface DisciplinaExtraida {
 
 interface CargoExtraido {
   nome: string
-  ancora: string   // âncora de localização da seção no PDF (vem do extrair-pdf)
-  disciplinas: DisciplinaExtraida[]
+  disciplinasMap: DisciplinaMap[]      // mapeamento de páginas vindo do Passo 1
+  disciplinas: DisciplinaExtraida[]    // conteúdo extraído no Passo 2
 }
 
 interface DadosExtraidos {
@@ -159,8 +165,8 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
     setEtapaImport('extraindo')
 
     try {
-      // 1. Extrair metadata + lista de cargos
-      setProgresso({ mensagem: 'Lendo o edital e identificando os cargos…' })
+      // Passo 1 — envia PDF completo para o Claude mapear cargos + disciplinas + páginas
+      setProgresso({ mensagem: 'Mapeando estrutura do edital…', sub: 'Identificando cargos e disciplinas' })
       const fd1 = new FormData()
       fd1.append('file', arquivoPdf)
       const res1 = await fetch('/api/admin/editais/extrair-pdf', { method: 'POST', body: fd1 })
@@ -168,22 +174,19 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
       if (!res1.ok || !json1.success) throw new Error(json1.error || 'Erro ao processar PDF')
 
       const d = json1.data
-      // extrair-pdf agora retorna objetos { nome, ancora } para cada cargo
-      const cargosRaw: { nome: string; ancora: string }[] = Array.isArray(d.cargos) && d.cargos.length > 0
-        ? d.cargos
-        : d.cargo ? [{ nome: d.cargo, ancora: '' }] : []
+      const cargosRaw: { nome: string; disciplinas: DisciplinaMap[] }[] = Array.isArray(d.cargos) ? d.cargos : []
 
       setDadosExtraidos({ nome: d.nome || '', orgao: d.orgao || '', ano: d.ano ? String(d.ano) : '' })
 
       if (cargosRaw.length === 0) throw new Error('Nenhum cargo encontrado no edital.')
 
-      // 2. Extrair disciplinas + conteúdo para cada cargo (passa âncora para busca precisa)
+      // Passo 2 — para cada cargo, extrai conteúdo usando as páginas mapeadas
       const resultado: CargoExtraido[] = []
 
       for (let i = 0; i < cargosRaw.length; i++) {
-        const { nome: cargo, ancora } = cargosRaw[i]
+        const { nome: cargo, disciplinas: disciplinasMap } = cargosRaw[i]
         setProgresso({
-          mensagem: `Extraindo disciplinas e conteúdo programático…`,
+          mensagem: 'Extraindo conteúdo programático…',
           sub: `Cargo ${i + 1} de ${cargosRaw.length}: ${cargo}`,
         })
 
@@ -191,17 +194,17 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
           const fd2 = new FormData()
           fd2.append('file', arquivoPdf)
           fd2.append('cargo', cargo)
-          if (ancora) fd2.append('ancora', ancora)
+          fd2.append('disciplinas', JSON.stringify(disciplinasMap))
           const res2 = await fetch('/api/admin/editais/extrair-disciplinas', { method: 'POST', body: fd2 })
           const json2 = await res2.json()
 
           const disciplinas: DisciplinaExtraida[] = Array.isArray(json2.data?.disciplinas)
-            ? json2.data.disciplinas.map((disc: any) => ({ nome: disc.nome, conteudo: disc.conteudo || '', incluir: true }))
+            ? json2.data.disciplinas.map((d: any) => ({ nome: d.nome, conteudo: d.conteudo || '', incluir: true }))
             : []
 
-          resultado.push({ nome: cargo, ancora, disciplinas })
+          resultado.push({ nome: cargo, disciplinasMap, disciplinas })
         } catch {
-          resultado.push({ nome: cargo, ancora, disciplinas: [] })
+          resultado.push({ nome: cargo, disciplinasMap, disciplinas: [] })
         }
       }
 

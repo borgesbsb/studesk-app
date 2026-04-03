@@ -55,6 +55,7 @@ interface DisciplinaExtraida {
 
 interface CargoExtraido {
   nome: string
+  ancora: string   // âncora de localização da seção no PDF (vem do extrair-pdf)
   disciplinas: DisciplinaExtraida[]
 }
 
@@ -167,28 +168,30 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
       if (!res1.ok || !json1.success) throw new Error(json1.error || 'Erro ao processar PDF')
 
       const d = json1.data
-      const cargos: string[] = Array.isArray(d.cargos) && d.cargos.length > 0
+      // extrair-pdf agora retorna objetos { nome, ancora } para cada cargo
+      const cargosRaw: { nome: string; ancora: string }[] = Array.isArray(d.cargos) && d.cargos.length > 0
         ? d.cargos
-        : d.cargo ? [d.cargo] : []
+        : d.cargo ? [{ nome: d.cargo, ancora: '' }] : []
 
       setDadosExtraidos({ nome: d.nome || '', orgao: d.orgao || '', ano: d.ano ? String(d.ano) : '' })
 
-      if (cargos.length === 0) throw new Error('Nenhum cargo encontrado no edital.')
+      if (cargosRaw.length === 0) throw new Error('Nenhum cargo encontrado no edital.')
 
-      // 2. Extrair disciplinas + conteúdo para cada cargo
+      // 2. Extrair disciplinas + conteúdo para cada cargo (passa âncora para busca precisa)
       const resultado: CargoExtraido[] = []
 
-      for (let i = 0; i < cargos.length; i++) {
-        const cargo = cargos[i]
+      for (let i = 0; i < cargosRaw.length; i++) {
+        const { nome: cargo, ancora } = cargosRaw[i]
         setProgresso({
           mensagem: `Extraindo disciplinas e conteúdo programático…`,
-          sub: `Cargo ${i + 1} de ${cargos.length}: ${cargo}`,
+          sub: `Cargo ${i + 1} de ${cargosRaw.length}: ${cargo}`,
         })
 
         try {
           const fd2 = new FormData()
           fd2.append('file', arquivoPdf)
           fd2.append('cargo', cargo)
+          if (ancora) fd2.append('ancora', ancora)
           const res2 = await fetch('/api/admin/editais/extrair-disciplinas', { method: 'POST', body: fd2 })
           const json2 = await res2.json()
 
@@ -196,9 +199,9 @@ export function EditaisAdminTable({ editaisIniciais }: EditaisAdminTableProps) {
             ? json2.data.disciplinas.map((disc: any) => ({ nome: disc.nome, conteudo: disc.conteudo || '', incluir: true }))
             : []
 
-          resultado.push({ nome: cargo, disciplinas })
+          resultado.push({ nome: cargo, ancora, disciplinas })
         } catch {
-          resultado.push({ nome: cargo, disciplinas: [] })
+          resultado.push({ nome: cargo, ancora, disciplinas: [] })
         }
       }
 

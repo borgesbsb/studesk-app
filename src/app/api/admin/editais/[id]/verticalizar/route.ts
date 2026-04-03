@@ -1,41 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/interface/actions/admin/auth'
 import { prisma } from '@/lib/prisma'
-import { callIA } from '@/lib/ai-client'
+import { callIAStructured } from '@/lib/ai-client'
+
+// ---------------------------------------------------------------------------
+// Schema do tool_use — retorna array de strings (um assunto por item)
+// ---------------------------------------------------------------------------
+
+interface Verticalizado {
+  assuntos: string[]
+}
+
+const SCHEMA_VERTICALIZADO = {
+  properties: {
+    assuntos: {
+      type: 'array',
+      description: 'Lista de assuntos do conteúdo programático, um por item, na ordem original do edital',
+      items: {
+        type: 'string',
+        description: 'Um assunto/tópico independente, sem numeração ou marcadores',
+      },
+    },
+  },
+  required: ['assuntos'],
+}
 
 function buildPrompt(disciplina: string, conteudo: string): string {
   return `Você é especialista em concursos públicos brasileiros e em editoração de editais verticalizados.
 
-Sua tarefa é transformar o conteúdo programático bruto da disciplina "${disciplina}" em uma lista verticalizada — cada assunto em uma linha separada, de forma que o candidato consiga ler e marcar cada tópico individualmente durante os estudos.
+Sua tarefa é transformar o conteúdo programático bruto da disciplina "${disciplina}" em uma lista verticalizada — cada assunto em um item separado, de forma que o candidato consiga estudar e marcar cada tópico individualmente.
 
 PRÉ-PROCESSAMENTO (faça antes de verticalizar):
-1. Ignore completamente linhas que sejam cabeçalhos de página: nome de órgão, "EDITAL", "MINISTÉRIO", números de página isolados, rodapés.
-2. Reconecte itens numerados cujo conteúdo foi cortado pela virada de página (ex: "20." em uma linha e o texto na linha seguinte após um cabeçalho).
+1. Ignore linhas que sejam cabeçalhos de página: nome de órgão, "EDITAL", "MINISTÉRIO", números de página isolados, rodapés.
+2. Reconecte itens numerados cujo conteúdo foi cortado pela virada de página.
 3. Corrija palavras hifenizadas por quebra de coluna de PDF (ex: "Admi-nistração" → "Administração").
-4. Una linhas que são continuação de uma frase cortada no meio — o texto deve fluir como um parágrafo contínuo antes de ser verticalizado.
+4. Una linhas que são continuação de uma frase cortada no meio.
 
 COMO IDENTIFICAR UM ASSUNTO (raciocínio semântico, não mecânico):
 - Um assunto é uma unidade de conhecimento que um candidato estudaria de forma independente.
 - Ponto e vírgula (;) geralmente separa assuntos distintos.
-- Vírgula pode separar assuntos distintos OU listar elementos do mesmo assunto — use o contexto para decidir.
-  - "Lucro real, lucro presumido e lucro arbitrado" → 3 assuntos separados (são regimes distintos de tributação).
-  - "conceito, características e abrangência de empregado" → 1 assunto (são aspectos do mesmo tema).
+- Vírgula pode separar assuntos distintos OU listar elementos do mesmo assunto — use o contexto:
+  - "Lucro real, lucro presumido e lucro arbitrado" → 3 assuntos separados (regimes distintos)
+  - "conceito, características e abrangência de empregado" → 1 assunto (aspectos do mesmo tema)
 - Subitens numéricos (1.1, 4.3.2) são assuntos separados quando têm conteúdo próprio.
-- Um item sem separador explícito mas com tema claramente distinto do anterior → nova linha.
+- Um item sem separador explícito mas com tema claramente distinto → novo assunto.
 - Não separe artificialmente: "Balanço patrimonial" é 1 assunto, não quebre em partes.
 
 REGRAS DE SAÍDA:
-1. Um assunto por linha.
-2. Sem numeração, sem marcadores, sem travessão inicial — apenas o texto do assunto.
-3. Sem linhas em branco entre assuntos.
-4. Sem duplicatas.
-5. Mantenha a ordem original do edital.
-6. Retorne SOMENTE os assuntos, um por linha. Nenhum outro texto.
+- Um assunto por item da lista.
+- Sem numeração, sem marcadores, sem travessão — apenas o texto do assunto.
+- Sem duplicatas.
+- Mantenha a ordem original do edital.
 
 CONTEÚDO BRUTO DA DISCIPLINA "${disciplina}":
 ${conteudo}`
 }
 
+// ---------------------------------------------------------------------------
+// POST — verticaliza todas as disciplinas com conteúdo
+// ---------------------------------------------------------------------------
 
 export async function POST(
   _req: NextRequest,
@@ -70,13 +93,22 @@ export async function POST(
     for (const ed of comConteudo) {
       const prompt = buildPrompt(ed.disciplina.nome, ed.conteudoProgramatico!)
       try {
-        const verticalizado = await callIA(prompt, { temperature: 0.1 })
+        const { assuntos } = await callIAStructured<Verticalizado>(
+          prompt,
+          'salvar_verticalizado',
+          SCHEMA_VERTICALIZADO,
+          { temperature: 0 }
+        )
+
+        const verticalizado = assuntos.filter(Boolean).join('\n')
+
         await prisma.editalDisciplina.update({
           where: { id: ed.id },
           data: { conteudoVerticalizado: verticalizado },
         })
+
         resultados.push({ id: ed.id, nome: ed.disciplina.nome, ok: true })
-        console.log(`[verticalizar] ${ed.disciplina.nome}: OK`)
+        console.log(`[verticalizar] ${ed.disciplina.nome}: ${assuntos.length} assuntos`)
       } catch (err: any) {
         console.error(`[verticalizar] ${ed.disciplina.nome}: ERRO`, err?.message)
         resultados.push({ id: ed.id, nome: ed.disciplina.nome, ok: false })
@@ -94,6 +126,10 @@ export async function POST(
     )
   }
 }
+
+// ---------------------------------------------------------------------------
+// DELETE — limpa conteúdo verticalizado
+// ---------------------------------------------------------------------------
 
 export async function DELETE(
   _req: NextRequest,

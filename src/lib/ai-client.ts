@@ -1,6 +1,9 @@
 /**
  * Helper unificado de IA para rotas de editais.
- * Ordem de tentativa: Anthropic (Claude) → Groq → OpenAI
+ *
+ * callIA           — resposta em texto livre (fallback Anthropic → Groq → OpenAI)
+ * callIAStructured — resposta estruturada via Anthropic tool_use (JSON garantido pelo schema)
+ *                    fallback para callIA + JSON.parse se não houver ANTHROPIC_API_KEY
  */
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
@@ -10,15 +13,19 @@ export interface AICallOptions {
   temperature?: number
 }
 
+// ---------------------------------------------------------------------------
+// callIA — texto livre
+// ---------------------------------------------------------------------------
+
 /**
  * Chama a IA com o prompt fornecido.
- * Tenta Anthropic primeiro, depois Groq, depois OpenAI.
+ * Ordem de tentativa: Anthropic Claude → Groq → OpenAI
  */
 export async function callIA(
   prompt: string,
   options: AICallOptions = {}
 ): Promise<string> {
-  const { maxTokens = 4096, temperature = 0 } = options
+  const { maxTokens = 8096, temperature = 0 } = options
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY
   const groqKey = process.env.GROQ_API_KEY
@@ -28,7 +35,7 @@ export async function callIA(
     throw new Error('Nenhuma chave de IA configurada (ANTHROPIC_API_KEY, GROQ_API_KEY ou OPENAI_API_KEY)')
   }
 
-  // 1. Anthropic (Claude Haiku — rápido e eficiente)
+  // 1. Anthropic (Claude Haiku — rápido e janela de 200k tokens)
   if (anthropicKey) {
     try {
       const anthropic = new Anthropic({ apiKey: anthropicKey })
@@ -45,7 +52,7 @@ export async function callIA(
     }
   }
 
-  // 2. Groq (fallback — limita contexto para não ultrapassar TPM)
+  // 2. Groq
   if (groqKey) {
     try {
       const groq = new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' })
@@ -62,7 +69,7 @@ export async function callIA(
     }
   }
 
-  // 3. OpenAI (último fallback)
+  // 3. OpenAI
   if (openaiKey) {
     const openai = new OpenAI({ apiKey: openaiKey })
     const res = await openai.chat.completions.create({
@@ -77,4 +84,72 @@ export async function callIA(
   }
 
   throw new Error('Nenhum provedor de IA disponível')
+}
+
+// ---------------------------------------------------------------------------
+// callIAStructured — JSON garantido via Anthropic tool_use
+// ---------------------------------------------------------------------------
+
+export interface ToolSchema {
+  properties: Record<string, any>
+  required?: string[]
+}
+
+/**
+ * Extração estruturada usando Anthropic tool_use.
+ * O Claude É FORÇADO a retornar JSON válido respeitando o schema fornecido —
+ * elimina falhas de parse e respostas com texto extra.
+ *
+ * Se ANTHROPIC_API_KEY não estiver configurada, cai para callIA + JSON.parse.
+ */
+export async function callIAStructured<T>(
+  prompt: string,
+  toolName: string,
+  schema: ToolSchema,
+  options: AICallOptions = {}
+): Promise<T> {
+  const { temperature = 0 } = options
+  const anthropicKey = process.env.ANTHROPIC_API_KEY
+
+  // Caminho principal: Anthropic tool_use
+  if (anthropicKey) {
+    try {
+      const anthropic = new Anthropic({ apiKey: anthropicKey })
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 8096,
+        temperature,
+        tools: [
+          {
+            name: toolName,
+            description: 'Salva os dados estruturados extraídos do edital',
+            input_schema: {
+              type: 'object',
+              properties: schema.properties,
+              required: schema.required ?? Object.keys(schema.properties),
+            },
+          },
+        ],
+        tool_choice: { type: 'tool', name: toolName },
+        messages: [{ role: 'user', content: prompt }],
+      })
+
+      const toolUse = message.content.find(b => b.type === 'tool_use')
+      if (toolUse?.type === 'tool_use') {
+        return toolUse.input as T
+      }
+    } catch (err: any) {
+      console.warn('[ai-client] tool_use falhou, tentando fallback JSON:', err?.message)
+    }
+  }
+
+  // Fallback: texto livre + parse manual
+  const promptJson = `${prompt}\n\nRetorne APENAS JSON válido, sem markdown, sem texto adicional.`
+  const raw = await callIA(promptJson, options)
+  const limpo = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/m, '')
+    .trim()
+  return JSON.parse(limpo) as T
 }

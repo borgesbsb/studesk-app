@@ -57,3 +57,10 @@ next-env.d.ts
 # uploads e thumbnails (dados do usuário)
 public/uploads/
 public/thumbnails/
+
+# documentação local (specs/DEPLOY.md contém credenciais reais de produção)
+/specs/
+
+# scripts de deploy com credenciais em texto puro (senha do BD, NEXTAUTH_SECRET)
+/prod/deploy-full.sh
+/prod/deploy-mobile.sh

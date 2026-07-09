@@ -20,14 +20,16 @@ Acesse [http://localhost:3000](http://localhost:3000)
 
 ## 📚 Documentação
 
-**Para retomar sessão rapidamente**: Leia [PRD.md](./docs/PRD.md) ⭐
+> `specs/` é local (git-ignorada, veja `.gitignore`) — não existe em outros clones deste repositório.
 
-Documentação completa em [`/docs`](./docs/README.md):
+**Para retomar sessão rapidamente**: Leia [PRD.md](./specs/PRD.md) ⭐
 
-- **[PRD](./docs/PRD.md)** - Contexto rápido (2-3min) ⭐
-- **[Visão Geral](./docs/PROJECT_OVERVIEW.md)** - Funcionalidades e estrutura (5min)
-- **[Arquitetura](./docs/ARCHITECTURE.md)** - Detalhes técnicos completos (15min)
-- **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Problemas comuns e soluções
+Documentação completa em [`/specs`](./specs/README.md):
+
+- **[PRD](./specs/PRD.md)** - Contexto rápido (2-3min) ⭐
+- **[Visão Geral](./specs/PROJECT_OVERVIEW.md)** - Funcionalidades e estrutura (5min)
+- **[Arquitetura](./specs/ARCHITECTURE.md)** - Detalhes técnicos completos (15min)
+- **[Troubleshooting](./specs/TROUBLESHOOTING.md)** - Problemas comuns e soluções
 
 ## 🛠️ Stack Tecnológico
 
@@ -85,12 +87,12 @@ NEXT_PUBLIC_SYNCFUSION_LICENSE_KEY="sua-chave-syncfusion-aqui"
   /components            # Componentes React
 /prisma                  # Schema e migrations
 /public                  # Assets estáticos
-/docs                    # Documentação completa
+/specs                   # Documentação completa (local, git-ignorada)
 ```
 
 ## 📖 Links Úteis
 
-- [Documentação Completa](/docs/README.md)
+- [Documentação Completa](/specs/README.md)
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Prisma Documentation](https://www.prisma.io/docs)
 

@@ -1,149 +1,39 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code in this repo. Fuller detail (full route tree, deploy, feature docs) in `specs/` — local, git-ignored, absent in fresh clones.
 
-## Development Commands
+## Commands
+- `npm run dev` / `build` / `start` / `lint`
+- `npm run migrate-pdf-urls`, `npm run test-delete-material` — see `scripts/` for many more one-off debug/test scripts (check before writing a new throwaway one)
+- `npx prisma generate` / `db push` / `migrate dev` / `studio`
 
-### Setup and Dependencies
-- `npm run dev` - Start development server
-- `npm run build` - Build for production (includes PDF worker setup)
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
+## Stack
+Next.js 15 App Router + React 19 · PostgreSQL/Prisma · Tailwind/Radix · Auth: NextAuth (`[userHash]` multi-user) + separate JWT/bcrypt for admin (`src/lib/admin-auth.ts`) · AI: `@anthropic-ai/sdk` (edital extraction, tool_use), `openai` (GPT-4o-mini text formatting) · PDF: Syncfusion (primary/annotations) + PDFTron (grid) + `@react-pdf-viewer/*` (installed, unconfirmed use) · Mobile: separate RN/Expo app `mobile-react/StudeskMobile/` (APK/IPA, not served here).
 
-### Custom Scripts
-- `npm run migrate-pdf-urls` - Migrate PDF URLs (see scripts/migrate-pdf-urls.js)
-- `npm run test-delete-material` - Test material deletion functionality
+## Layers
+`src/interface/actions/<domain>/` (Server Actions) → `src/application/services/` → `src/domain/entities/` → Prisma. `/api/*` only for pure HTTP needs (OAuth, streaming, scripts).
 
-### Database
-- `npx prisma generate` - Generate Prisma client
-- `npx prisma db push` - Push schema changes to database
-- `npx prisma migrate dev` - Create and apply migrations
-- `npx prisma studio` - Open Prisma Studio for database browsing
+- **Entities**: `Disciplina`, `Edital`, `MaterialEstudo`, `Questao`, `SessaoQuestoes` — no `Concurso`
+- **Services**: `build-plano-ai`, `disciplina`, `material-estudo`, `plano-estudo`, `simulado`, `edital` (Anthropic extraction/verticalization), `header-footer-detector`, `openai-format` (reader formatting), `pdf-background-processor`, `pdf-image-extractor`
+- **Actions**: `admin/`, `agenda/`, `dashboard/`, `disciplina/`, `edital/`, `material-estudo/`, `plano-estudo/`, `simulado/`, `temp/`
 
-## Architecture Overview
+## Features
+- **PDF/reading**: extraction → `openai-format.service.ts` → cached in `PdfMobileText` → rendered by `TextReader.tsx` at `/[userHash]/material/[id]/ler`; annotations via `Anotacao.startOffset/endOffset`; progress in `HistoricoLeitura`
+- **Simulados**: `Simulado`, `SimuladoQuestao`, `SimuladoResultado(Disciplina)`, `ConfigSimulado(Disciplina)` — active system, replaced an old ad-hoc questions feature; extend this, don't recreate a separate one
+- **Editais/Build-Plano**: edital PDF → 2-step Anthropic extraction (`edital.service.ts`) → `Edital`/`EditalDisciplina` → verticalized per subject in `/admin/editais/[id]` → `build-plano-ai.service.ts` distributes subjects into `BuildPlano(Disciplina|Assunto)` → basis for a `PlanoEstudo`
+- **Study plans**: `PlanoEstudo → SemanaEstudo → DisciplinaSemana/Dia`. Shared: `PlanoEstudo.userId=null` = admin plan, `PlanoEstudoUsuario` assigns users, `PlanoEstudoDisciplina` = admin pool, `ProgressoUsuarioDisciplina*` = per-user progress. Units: `horasRealizadas` = HOURS everywhere except `ProgressoUsuarioDisciplinaExtra.horasRealizadas` (MINUTES, deliberate exception); `minutosPlanejados` = MINUTES everywhere
+- **Google Drive — two separate integrations**: end-user video (`User.googleDriveAccessToken/RefreshToken/TokenExpiry`, `/api/google-drive/*`, `/api/video/google-drive-*`) vs admin bulk import (`Admin.googleDriveAccessToken/RefreshToken`, `/api/admin/google-drive/*`, configured at `/admin/configuracoes`)
 
-### Tech Stack
-- **Framework**: Next.js 15.3.2 with App Router
-- **Database**: PostgreSQL with Prisma ORM
-- **UI**: React 19, Tailwind CSS, Radix UI components
-- **PDF Processing**: AI-powered text reader with OpenAI API
-- **Authentication**: NextAuth.js with Prisma adapter
+## Auth
+End users: `src/app/(authenticated)/[userHash]/...`, hash resolved in `src/lib/auth-helpers.ts`/`auth.ts` (NextAuth+Prisma). Admin: `src/app/admin/(protected)/...`, JWT/bcrypt, `Admin` model.
 
-### Core Domain Structure
+## Components
+`src/components/ui/` (Radix), `src/components/[domain]/`, `src/components/layout/`.
 
-The application follows a layered architecture with clear separation:
+## Build config
+ESLint/type-check skipped in build (`ignoreDuringBuilds`, `SKIP_TYPE_CHECK=true`). `OPENAI_API_KEY` + Anthropic key required for AI features.
 
-#### `/src/domain/entities/`
-Domain entities representing core business objects:
-- `Concurso.ts` - Contest/competition data
-- `Disciplina.ts` - Academic subjects
-- `MaterialEstudo.ts` - Study materials
-- `Questao.ts` - Questions/quizzes
-- `SessaoQuestoes.ts` - Question sessions
+## Selected API routes
+`/api/material/[id]/progress`, `/historico-leitura` · `/api/dashboard/{stats,evolucao-ciclo,agenda}` · `/api/pdf/extract-text`, `/api/upload` · `/api/admin/editais/*` (extrair-pdf, extrair-disciplinas, extrair-conteudo) · `/api/admin/google-drive/*` (auth, callback, browse, disconnect) · `/api/admin/plano-estudos/*` (sync-drive, import simulados). Full tree in `specs/ARCHITECTURE.md`.
 
-#### `/src/application/services/`
-Application services for business logic:
-- `concurso.service.ts` - Contest management
-- `disciplina.service.ts` - Subject management
-- `material-estudo.service.ts` - Study material operations
-- `openai.service.ts` - AI question generation
-- `plano-estudo.service.ts` - Study plan management
-
-#### `/src/interface/actions/`
-Server actions organized by domain:
-- `concurso/` - Contest CRUD operations
-- `disciplina/` - Subject CRUD operations
-- `material-estudo/` - Material CRUD operations
-- `plano-estudo/` - Study plan operations
-
-### Key Features
-
-#### PDF Processing System
-- AI-powered text reader with GPT-4o-mini for optimal formatting
-- Text extraction and caching via ChunkCache model
-- Text-based annotation system with startOffset/endOffset positioning
-- Reading progress tracking with HistoricoLeitura
-
-#### AI Question Generation
-- OpenAI integration for generating questions from text
-- Configurable prompts and parameters via OpenAIConfig
-- Adaptive difficulty system with ProgressoAdaptativo
-- Text preprocessing and caching for efficiency
-
-#### Study Management
-- Complex study plans with PlanoEstudo, SemanaEstudo, DisciplinaSemana
-- Progress tracking across materials and sessions
-- Performance analytics with HistoricoPontuacao
-- Adaptive learning paths
-
-### Database Schema Highlights
-
-Key relationships:
-- Concurso ↔ Disciplina (many-to-many via ConcursoDisciplina)
-- MaterialEstudo ↔ Disciplina (many-to-many via DisciplinaMaterial)
-- SessaoQuestoes → Questao (one-to-many)
-- Complex study plan hierarchy: PlanoEstudo → SemanaEstudo → DisciplinaSemana
-
-Important indexes on:
-- Performance tracking fields (pontuacao, percentualAcerto)
-- Time-based queries (createdAt, dataLeitura)
-- Frequently joined foreign keys
-
-### File Upload and Static Assets
-
-#### PDF Storage
-- Upload endpoint: `/api/upload/`
-- Static serving: `/api/static/uploads/[...path]/`
-- AI-formatted text endpoint: `/api/pdf/[id]/mobile-text`
-- PDF reading route: `/material/[id]/ler`
-
-#### PDF Processing Pipeline
-1. Upload via `/api/upload/`
-2. Text extraction via `/api/pdf/extract-text/`
-3. Chunk processing and caching
-4. AI text formatting via OpenAI API
-5. Text rendering with TextReader component at `/material/[id]/ler`
-
-### Authentication Structure
-- Layout: `/src/app/(authenticated)/` - Protected routes
-- Public routes: Login/register forms in main app directory
-- NextAuth configuration with Prisma adapter
-
-### Component Organization
-- `/src/components/ui/` - Reusable UI components (Radix-based)
-- `/src/components/[domain]/` - Domain-specific components
-- `/src/components/layout/` - Layout components (Header, Sidebar, AppLayout)
-
-### Development Notes
-
-#### PDF Integration
-- OpenAI API key required in environment variable `OPENAI_API_KEY`
-- AI text formatting uses GPT-4o-mini model for cost efficiency
-- Text-based annotations use character offsets (startOffset/endOffset)
-
-#### Build Configuration
-- ESLint disabled during builds (`ignoreDuringBuilds: true`)
-- Type checking skipped in build (`SKIP_TYPE_CHECK=true`)
-- Webpack configured for Node.js modules and PDF processing
-
-#### Styling
-- Extensive Tailwind safelist for dynamic classes
-- Custom CSS variables for theming
-- Responsive design patterns throughout
-
-### API Structure
-
-#### Question Generation
-- `/api/questoes/gerar-com-ia/` - Main AI generation endpoint
-- `/api/questoes/gerar-adaptativo/` - Adaptive difficulty generation
-- `/api/questoes/responder/` - Submit answers
-
-#### Study Progress
-- `/api/material/[id]/progress/` - Update reading progress
-- `/api/material/[id]/historico-leitura/` - Reading history
-- `/api/pontuacao/` - Scoring system endpoints
-
-#### File Processing
-- `/api/pdf/extract-text/` - PDF text extraction
-- `/api/upload/` - File upload handling
-- `/api/cache/estatisticas/` - Cache performance stats
+> Stale facts from past versions of this file, now fixed — don't reintroduce: no `Concurso` model, no `/api/questoes|pontuacao|cache/*` routes, no `ChunkCache`/`OpenAIConfig`/`ProgressoAdaptativo`/`HistoricoPontuacao` models.

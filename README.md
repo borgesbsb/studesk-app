@@ -22,12 +22,11 @@ Acesse [http://localhost:3000](http://localhost:3000)
 
 > `specs/` é local (git-ignorada, veja `.gitignore`) — não existe em outros clones deste repositório.
 
-**Para retomar sessão rapidamente**: Leia [PRD.md](./specs/PRD.md) ⭐
+**Para retomar sessão rapidamente**: Leia [PROJECT_OVERVIEW.md](./specs/PROJECT_OVERVIEW.md) ⭐
 
 Documentação completa em [`/specs`](./specs/README.md):
 
-- **[PRD](./specs/PRD.md)** - Contexto rápido (2-3min) ⭐
-- **[Visão Geral](./specs/PROJECT_OVERVIEW.md)** - Funcionalidades e estrutura (5min)
+- **[Visão Geral](./specs/PROJECT_OVERVIEW.md)** - Contexto rápido, stack e estrutura (5min) ⭐
 - **[Arquitetura](./specs/ARCHITECTURE.md)** - Detalhes técnicos completos (15min)
 - **[Troubleshooting](./specs/TROUBLESHOOTING.md)** - Problemas comuns e soluções
 
